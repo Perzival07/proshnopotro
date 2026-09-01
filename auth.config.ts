@@ -3,15 +3,48 @@ import Google from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 import { prisma } from "@/lib/prisma";
 
+/**
+ * The quick-login provider below authenticates on an email address alone and
+ * will mint an ADMIN account for whatever address is posted to it. That is
+ * fine on a laptop and catastrophic on a public URL, so it is only ever
+ * registered outside production. Set ENABLE_DEV_LOGIN=true to opt back in
+ * deliberately (e.g. a private preview deployment) -- never on the live site.
+ */
+const devLoginEnabled =
+  process.env.NODE_ENV !== "production" ||
+  process.env.ENABLE_DEV_LOGIN === "true";
+
+/** Names of auth environment variables that are required but absent. */
+export const missingAuthEnv = [
+  ["AUTH_SECRET", process.env.AUTH_SECRET],
+  ["AUTH_GOOGLE_ID", process.env.AUTH_GOOGLE_ID],
+  ["AUTH_GOOGLE_SECRET", process.env.AUTH_GOOGLE_SECRET],
+]
+  .filter(([, value]) => !value)
+  .map(([name]) => name as string);
+
+if (missingAuthEnv.length > 0) {
+  // Auth.js reports every one of these as a generic "Configuration" error with
+  // no indication of which variable is at fault. Name them in the server log so
+  // the deployment platform's logs actually say what to set.
+  console.error(
+    `[auth] Missing required environment variable(s): ${missingAuthEnv.join(
+      ", "
+    )}. Google sign-in will fail with error=Configuration until these are set ` +
+      `on the deployment (they are read from .env.local locally, which is not deployed).`
+  );
+}
+
 export const authConfig: NextAuthConfig = {
+  trustHost: true,
   providers: [
     Google({
       clientId: process.env.AUTH_GOOGLE_ID || "",
       clientSecret: process.env.AUTH_GOOGLE_SECRET || "",
       allowDangerousEmailAccountLinking: true,
     }),
-    // Development/Test mock provider to test student & admin logins instantly without Google credentials
-    Credentials({
+    // Development-only mock provider. See devLoginEnabled above.
+    ...(devLoginEnabled ? [Credentials({
       id: "credentials",
       name: "Dev Quick Login",
       credentials: {
@@ -50,7 +83,7 @@ export const authConfig: NextAuthConfig = {
           profileComplete: user.profileComplete,
         };
       },
-    }),
+    })] : []),
   ],
   pages: {
     signIn: "/login",

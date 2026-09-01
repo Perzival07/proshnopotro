@@ -17,6 +17,12 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
   CredentialsSignin: "Sign in failed. Check the email and try again.",
 };
 
+// NODE_ENV is inlined into the client bundle at build time, so this collapses
+// to `false` in a production build and the block below is dropped.
+const devLoginEnabled =
+  process.env.NODE_ENV !== "production" ||
+  process.env.NEXT_PUBLIC_ENABLE_DEV_LOGIN === "true";
+
 export function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -110,7 +116,9 @@ export function LoginForm() {
         <span>Continue with Google</span>
       </Button>
 
-      {/* Development Quick-Switch Box */}
+      {/* Development Quick-Switch Box -- never rendered in production, where the
+          credentials provider that backs it is not registered at all. */}
+      {devLoginEnabled && (
       <div className="pt-4 border-t border-brand-border/60">
         <button
           type="button"
@@ -187,6 +195,7 @@ export function LoginForm() {
           </form>
         )}
       </div>
+      )}
     </div>
   );
 }
