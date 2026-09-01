@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { formatDateShort } from "@/lib/utils";
+import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { Calendar, CheckCircle2, Clock, ArrowRight, Lock } from "lucide-react";
 
 export type CardStatus = "AVAILABLE" | "SUBMITTED" | "CLOSED";
@@ -33,7 +34,7 @@ interface StudentTestCardProps {
 export function StudentTestCard({ assignment }: StudentTestCardProps) {
   const { test, result, dueAt } = assignment;
   const isPastDue = new Date() > new Date(dueAt);
-  const isSubmitted = assignment.status === "SUBMITTED" || result != null;
+  const isSubmitted = isAssignmentSubmitted(assignment);
   const isInactive = !test.active;
 
   let cardStatus: CardStatus = "AVAILABLE";

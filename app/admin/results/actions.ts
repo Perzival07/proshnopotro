@@ -3,6 +3,7 @@
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { parseScoreString } from "@/lib/score";
 
 export interface PreviewRow {
   rowIndex: number;
@@ -26,44 +27,6 @@ export interface ImportPreviewResult {
   unmatchedRows: PreviewRow[];
   invalidRows: PreviewRow[];
   totalParsed: number;
-}
-
-function parseScoreString(
-  rawScore: string,
-  defaultMaxScore: number
-): { score: number | null; maxScore: number | null } {
-  if (!rawScore || typeof rawScore !== "string") {
-    return { score: null, maxScore: null };
-  }
-
-  const cleaned = rawScore.trim();
-
-  // A well-formed number: "45" or "45.5" (but not "1.2.3" or ".")
-  const NUMBER = "\\d+(?:\\.\\d+)?";
-
-  // Pattern: "45 / 50" or "45.5/50" or "45 of 50"
-  const ratioMatch = cleaned.match(
-    new RegExp(`^(${NUMBER})\\s*(?:\\/|of)\\s*(${NUMBER})$`, "i")
-  );
-  if (ratioMatch) {
-    const score = parseFloat(ratioMatch[1]);
-    const maxScore = parseFloat(ratioMatch[2]);
-    if (isFinite(score) && isFinite(maxScore) && maxScore > 0) {
-      return { score, maxScore };
-    }
-    return { score: null, maxScore: null };
-  }
-
-  // Simple number: "45"
-  const singleMatch = cleaned.match(new RegExp(`^${NUMBER}$`));
-  if (singleMatch) {
-    const score = parseFloat(singleMatch[0]);
-    if (isFinite(score)) {
-      return { score, maxScore: defaultMaxScore };
-    }
-  }
-
-  return { score: null, maxScore: null };
 }
 
 export async function previewResultsImport(

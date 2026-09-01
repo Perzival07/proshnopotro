@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { StartTestButton } from "./StartTestButton";
 import { formatDate } from "@/lib/utils";
+import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { AlertTriangle, ArrowLeft, Calendar, Shield } from "lucide-react";
 import Link from "next/link";
 
@@ -57,7 +58,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
     redirect("/");
   }
 
-  const isSubmitted = assignment.status === "SUBMITTED" || assignment.result !== null;
+  const isSubmitted = isAssignmentSubmitted(assignment);
   const isPastDue = new Date() > new Date(assignment.dueAt);
   const isInactive = !assignment.test.active;
 

@@ -14,7 +14,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { formatDate } from "@/lib/utils";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { isAssignmentSubmitted } from "@/lib/assignment-status";
+import { toCsv, CSV_BOM } from "@/lib/csv";
 import {
   Download,
   Search,
@@ -25,8 +34,7 @@ import {
   UserX,
   Award,
   PenLine,
-  Check,
-  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 import { EnterMarksModal, StudentGradeTarget } from "@/components/admin/EnterMarksModal";
 import { toggleAssignmentStatus } from "./actions";
@@ -85,6 +93,12 @@ export function RosterClient({
   const [isGradeModalOpen, setIsGradeModalOpen] = useState(false);
   const [selectedGradeTarget, setSelectedGradeTarget] = useState<StudentGradeTarget | null>(null);
   const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [pendingRevert, setPendingRevert] = useState<{
+    assignment: RosterAssignment;
+    score: number;
+    maxScore: number;
+  } | null>(null);
 
   const currentTest = tests.find((t) => t.id === selectedTestId);
 
@@ -102,7 +116,7 @@ export function RosterClient({
       if (statusFilter === "ASSIGNED") {
         matchesStatus = a.status === "ASSIGNED" && a.result === null;
       } else if (statusFilter === "SUBMITTED") {
-        matchesStatus = a.status === "SUBMITTED" || a.result !== null;
+        matchesStatus = isAssignmentSubmitted(a);
       } else if (statusFilter === "NOT_SIGNED_IN") {
         matchesStatus = a.user === null;
       }
@@ -172,19 +186,49 @@ export function RosterClient({
     setIsGradeModalOpen(true);
   };
 
-  // Toggle Status directly
-  const handleToggleStatus = async (assignment: RosterAssignment) => {
-    const nextStatus = assignment.status === "SUBMITTED" ? "ASSIGNED" : "SUBMITTED";
+  // Toggle Status directly. Reverting a graded student deletes their marks, so
+  // that case comes back as needsConfirmation and routes through the dialog.
+  const runToggle = async (
+    assignment: RosterAssignment,
+    clearMarks: boolean
+  ) => {
+    const nextStatus =
+      assignment.status === "SUBMITTED" ? "ASSIGNED" : "SUBMITTED";
+    setStatusError(null);
     setUpdatingStatusId(assignment.id);
     try {
-      await toggleAssignmentStatus(assignment.id, nextStatus);
+      const res = await toggleAssignmentStatus(
+        assignment.id,
+        nextStatus,
+        clearMarks
+      );
+
+      if (res && "needsConfirmation" in res && res.needsConfirmation) {
+        setPendingRevert({
+          assignment,
+          score: res.score,
+          maxScore: res.maxScore,
+        });
+        return;
+      }
+
+      if (res?.error) {
+        setStatusError(res.error);
+        return;
+      }
+
+      setPendingRevert(null);
       router.refresh();
     } catch (err) {
       console.error(err);
+      setStatusError("Could not reach the server to update this status.");
     } finally {
       setUpdatingStatusId(null);
     }
   };
+
+  const handleToggleStatus = (assignment: RosterAssignment) =>
+    runToggle(assignment, false);
 
   // CSV Export
   const handleExportCSV = () => {
@@ -204,11 +248,6 @@ export function RosterClient({
       "Deadline",
     ];
 
-    const escapeCsv = (value: string | number | null | undefined) => {
-      const str = value === null || value === undefined ? "" : String(value);
-      return `"${str.replace(/"/g, '""')}"`;
-    };
-
     const rows = assignments.map((a) => [
       a.studentEmail,
       a.user?.name || "",
@@ -223,12 +262,7 @@ export function RosterClient({
       new Date(a.dueAt).toISOString(),
     ]);
 
-    const csvContent = [
-      headers.map(escapeCsv).join(","),
-      ...rows.map((row) => row.map(escapeCsv).join(",")),
-    ].join("\r\n");
-
-    const blob = new Blob(["\ufeff" + csvContent], {
+    const blob = new Blob([CSV_BOM + toCsv(headers, rows)], {
       type: "text/csv;charset=utf-8;",
     });
     const url = URL.createObjectURL(blob);
@@ -266,6 +300,13 @@ export function RosterClient({
           </Button>
         </div>
       </div>
+
+      {statusError && (
+        <div className="p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-start gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-px" />
+          <span>{statusError}</span>
+        </div>
+      )}
 
       {/* Test Picker & Filters */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4 bg-white rounded-xl border border-brand-border shadow-card">
@@ -418,7 +459,7 @@ export function RosterClient({
               </TableRow>
             ) : (
               paginatedAssignments.map((a) => {
-                const isSubmitted = a.status === "SUBMITTED" || a.result !== null;
+                const isSubmitted = isAssignmentSubmitted(a);
                 const hasSignedIn = a.user !== null;
                 const isToggling = updatingStatusId === a.id;
 
@@ -564,6 +605,62 @@ export function RosterClient({
           )}
         </div>
       </div>
+
+      {/* Confirm destructive revert: reverting to Assigned deletes the marks */}
+      <Dialog
+        open={Boolean(pendingRevert)}
+        onOpenChange={(open) => !open && setPendingRevert(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              <DialogTitle className="text-red-700">
+                Delete recorded marks?
+              </DialogTitle>
+            </div>
+            <DialogDescription>
+              {pendingRevert && (
+                <>
+                  <strong>
+                    {pendingRevert.assignment.user?.name ||
+                      pendingRevert.assignment.studentEmail}
+                  </strong>{" "}
+                  has a recorded score of{" "}
+                  <strong>
+                    {pendingRevert.score} / {pendingRevert.maxScore}
+                  </strong>
+                  . Moving this back to Assigned deletes that score and reopens
+                  the test for them. This cannot be undone.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="pt-2 gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingRevert(null)}
+              disabled={Boolean(updatingStatusId)}
+            >
+              Keep marks
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={Boolean(updatingStatusId)}
+              onClick={() =>
+                pendingRevert && runToggle(pendingRevert.assignment, true)
+              }
+              className="bg-red-600 hover:bg-red-700 text-white font-semibold"
+            >
+              Delete marks & reopen
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Enter Marks Modal */}
       <EnterMarksModal

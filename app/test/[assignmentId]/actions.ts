@@ -2,6 +2,7 @@
 
 import { getVerifiedSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
+import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { revalidatePath } from "next/cache";
 
 export interface FormResolutionResult {
@@ -42,7 +43,7 @@ export async function resolveSecureFormUrl(
   }
 
   // 2. Submission status verification
-  if (assignment.status === "SUBMITTED" || assignment.result !== null) {
+  if (isAssignmentSubmitted(assignment)) {
     return { error: "This assessment has already been submitted." };
   }
 

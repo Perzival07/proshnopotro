@@ -71,7 +71,8 @@ export async function updateStudentScore(
 
 export async function toggleAssignmentStatus(
   assignmentId: string,
-  newStatus: "ASSIGNED" | "SUBMITTED"
+  newStatus: "ASSIGNED" | "SUBMITTED",
+  clearMarks: boolean = false
 ) {
   await requireAdmin();
 
@@ -80,6 +81,50 @@ export async function toggleAssignmentStatus(
   }
 
   try {
+    // The student dashboard, the test page and resolveSecureFormUrl all treat
+    // `result !== null` as submitted. Flipping the status column alone while a
+    // recorded result remains leaves the badge stuck on "Submitted" and keeps
+    // the test locked -- the toggle would silently do nothing. So reverting to
+    // ASSIGNED has to remove the result too; because that destroys a recorded
+    // grade, the caller must confirm it first.
+    if (newStatus === "ASSIGNED") {
+      const existing = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        select: { result: { select: { id: true, score: true, maxScore: true } } },
+      });
+
+      if (!existing) {
+        return { error: "Assignment not found." };
+      }
+
+      if (existing.result && !clearMarks) {
+        return {
+          needsConfirmation: true as const,
+          score: existing.result.score,
+          maxScore: existing.result.maxScore,
+          error:
+            "This student has recorded marks. Reverting to Assigned will delete them.",
+        };
+      }
+
+      if (existing.result) {
+        await prisma.$transaction([
+          prisma.result.delete({ where: { assignmentId } }),
+          prisma.assignment.update({
+            where: { id: assignmentId },
+            data: { status: "ASSIGNED" },
+          }),
+        ]);
+
+        revalidatePath("/admin/roster");
+        revalidatePath("/admin/results");
+        revalidatePath("/admin/tests");
+        revalidatePath("/");
+
+        return { success: true, clearedMarks: true };
+      }
+    }
+
     await prisma.assignment.update({
       where: { id: assignmentId },
       data: { status: newStatus },

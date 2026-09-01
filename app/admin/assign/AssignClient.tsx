@@ -24,6 +24,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { assignTestToStudents, AssignResult } from "./actions";
+import { toDateTimeLocalValue } from "@/lib/utils";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   UserPlus,
@@ -63,18 +64,12 @@ export function AssignClient({ tests, students }: AssignClientProps) {
 
   const [selectedTestId, setSelectedTestId] = useState(initialTestId);
   
-  // Default deadline: 7 days in future at 23:59 local time.
-  // datetime-local expects a LOCAL wall-clock string, so build it from local
-  // parts -- toISOString() would shift it into UTC (e.g. 23:59 IST -> 18:29).
+  // Default deadline: 7 days out at 23:59 local time.
   const defaultDueDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
     d.setHours(23, 59, 0, 0);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return (
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-      `T${pad(d.getHours())}:${pad(d.getMinutes())}`
-    );
+    return toDateTimeLocalValue(d);
   }, []);
 
   const [dueDate, setDueDate] = useState(defaultDueDate);
