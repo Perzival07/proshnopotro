@@ -4,7 +4,6 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
-import { openFormInNewTab } from "@/lib/open-form-tab";
 import { buildWhatsAppLink, answersMessage, TUTOR_WHATSAPP } from "@/lib/whatsapp";
 import {
   enterFullscreen,
@@ -44,7 +43,6 @@ export function StartTestButton({
   const [opened, setOpened] = useState(false);
   // Resolved only after the server has authorised this student, so the link
   // still never appears in the page's initial HTML.
-  const [url, setUrl] = useState<string | null>(null);
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
@@ -96,37 +94,16 @@ export function StartTestButton({
     setLoading(true);
     setError(null);
 
-    // The tab is opened synchronously here in case the resource cannot be
-    // embedded -- see lib/open-form-tab for why that ordering matters.
-    let outcomeUrl: string | null = null;
-    let outcomeEmbed: string | null = null;
-
     const res = await resolveSecureFormUrl(assignmentId);
-    if (res.error || !res.url) {
-      setError(res.error || "Could not resolve the question paper link.");
-      setLoading(false);
-      return;
-    }
-    outcomeUrl = res.url;
-    outcomeEmbed = res.embedUrl ?? null;
-
-    setUrl(outcomeUrl);
-    setEmbedUrl(outcomeEmbed);
-    setOpened(true);
     setLoading(false);
 
-    // Nothing embeddable (a forms.gle shortlink, say) -- fall back to a tab.
-    if (!outcomeEmbed) {
-      const outcome = await openFormInNewTab(
-        () => window.open("about:blank", "_blank"),
-        async () => ({ url: outcomeUrl! })
-      );
-      if (outcome.status === "blocked") {
-        setError(
-          "Your browser blocked the new tab. Use the button below to open the paper."
-        );
-      }
+    if (res.error || !res.embedUrl) {
+      setError(res.error || "Could not load the question paper.");
+      return;
     }
+
+    setEmbedUrl(res.embedUrl);
+    setOpened(true);
   };
 
   const handleConfirmSubmission = async () => {
@@ -171,7 +148,7 @@ export function StartTestButton({
             </div>
           ) : (
             <>
-              <span>Open {paperNoun}</span>
+              <span>View {paperNoun}</span>
               <ExternalLink className="h-4 w-4" />
             </>
           )}
@@ -213,18 +190,6 @@ export function StartTestButton({
                     )}
                   </button>
 
-                  {url && !expanded && (
-                    <a
-                      href={url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-blue hover:underline"
-                    >
-                      <ExternalLink className="h-3 w-3" />
-                      New tab
-                    </a>
-                  )}
-
                   {expanded && (
                     <button
                       type="button"
@@ -247,19 +212,6 @@ export function StartTestButton({
                 sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
               />
             </div>
-          )}
-
-          {/* Always offer the tab, embedded or not */}
-          {url && (
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-navy px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-navy/90"
-            >
-              <ExternalLink className="h-4 w-4" />
-              <span>Open {paperNoun} in a New Tab</span>
-            </a>
           )}
 
           {/* WhatsApp the answers -- the submission route for a written paper */}

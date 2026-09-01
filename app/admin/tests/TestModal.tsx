@@ -265,7 +265,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             />
             <p className="mt-1 text-[11px] text-brand-ink/55">
               {format === "GOOGLE_FORM"
-                ? "Share the form so anyone with the link can respond."
+                ? "Share the form so anyone with the link can respond, and paste the full docs.google.com/forms/\u2026 address \u2014 forms.gle short links cannot be shown inside the portal."
                 : "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error."}
             </p>
           </div>

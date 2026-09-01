@@ -7,10 +7,11 @@ import { revalidatePath } from "next/cache";
 import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 
 export interface FormResolutionResult {
-  /** The tutor's original link, for opening in a new tab. */
-  url?: string;
-  /** The same resource rewritten so it renders inside an iframe, when it can. */
-  embedUrl?: string | null;
+  /**
+   * The resource rewritten so it renders inside an iframe. The paper is only
+   * ever shown within the portal, so the raw link is deliberately not returned.
+   */
+  embedUrl?: string;
   format?: TestFormat;
   error?: string;
 }
@@ -67,11 +68,16 @@ export async function resolveSecureFormUrl(
   }
 
   const format = assignment.test.format as TestFormat;
-  return {
-    url: assignment.test.formUrl,
-    embedUrl: toEmbedUrl(assignment.test.formUrl, format),
-    format,
-  };
+  const embedUrl = toEmbedUrl(assignment.test.formUrl, format);
+
+  if (!embedUrl) {
+    return {
+      error:
+        "This paper's link cannot be displayed in the portal. Please ask your tutor to re-save it.",
+    };
+  }
+
+  return { embedUrl, format };
 }
 
 /**

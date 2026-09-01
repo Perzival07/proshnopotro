@@ -3,7 +3,7 @@
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import { isValidResourceUrl, type TestFormat } from "@/lib/test-resource";
+import { isValidResourceUrl, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 
 export interface TestInput {
   title: string;
@@ -27,6 +27,13 @@ function validateTestInput(data: TestInput): string | null {
     return data.format === "GOOGLE_FORM"
       ? "That does not look like a Google Form link (expected docs.google.com/forms/... or forms.gle/...)."
       : "That does not look like a Google Doc link (expected docs.google.com/document/...).";
+  }
+  // The paper is shown inside the portal and nowhere else, so a link that
+  // cannot be embedded would leave the student with nothing to open.
+  if (!toEmbedUrl(data.formUrl, data.format)) {
+    return data.format === "GOOGLE_FORM"
+      ? "A forms.gle short link cannot be displayed inside the portal. Open the form, choose Send \u2192 link, and paste the full docs.google.com/forms/... address."
+      : "That Google Doc link cannot be displayed inside the portal. Paste the standard docs.google.com/document/... address.";
   }
   return null;
 }
