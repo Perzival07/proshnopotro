@@ -5,61 +5,82 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
 import { openFormInNewTab } from "@/lib/open-form-tab";
+import { buildWhatsAppLink, answersMessage, TUTOR_WHATSAPP } from "@/lib/whatsapp";
+import type { TestFormat } from "@/lib/test-resource";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { ExternalLink, AlertCircle, ShieldAlert, CheckCircle2 } from "lucide-react";
+import {
+  ExternalLink,
+  AlertCircle,
+  ShieldAlert,
+  CheckCircle2,
+  MessageCircle,
+  Maximize2,
+} from "lucide-react";
 
 interface StartTestButtonProps {
   assignmentId: string;
+  testTitle: string;
+  testFormat: TestFormat;
+  studentName?: string | null;
 }
 
-export function StartTestButton({ assignmentId }: StartTestButtonProps) {
+export function StartTestButton({
+  assignmentId,
+  testTitle,
+  testFormat,
+  studentName,
+}: StartTestButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
-  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
+  // Resolved only after the server has authorised this student, so the link
+  // still never appears in the page's initial HTML.
+  const [url, setUrl] = useState<string | null>(null);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
 
-  const handleOpenForm = async () => {
+  const isDoc = testFormat === "GOOGLE_DOC";
+  const paperNoun = isDoc ? "Question Paper" : "Google Form";
+  const whatsappHref = buildWhatsAppLink(
+    TUTOR_WHATSAPP,
+    answersMessage(testTitle, studentName)
+  );
+
+  const handleOpen = async () => {
     setLoading(true);
     setError(null);
-    setBlockedUrl(null);
 
-    try {
-      const outcome = await openFormInNewTab(
-        // Opened synchronously inside the click handler -- see lib/open-form-tab.
-        () => {
-          const tab = window.open("about:blank", "_blank");
-          if (tab) {
-            try {
-              tab.document.write(
-                "<!doctype html><title>Opening your assessment\u2026</title>" +
-                  '<body style="font:15px/1.6 system-ui,sans-serif;color:#1A2230;' +
-                  'display:flex;align-items:center;justify-content:center;height:90vh">' +
-                  "Opening your Google Form\u2026"
-              );
-              tab.document.close();
-            } catch {
-              // The placeholder is cosmetic; never let it break the flow.
-            }
-          }
-          return tab;
-        },
-        () => resolveSecureFormUrl(assignmentId)
-      );
+    // The tab is opened synchronously here in case the resource cannot be
+    // embedded -- see lib/open-form-tab for why that ordering matters.
+    let outcomeUrl: string | null = null;
+    let outcomeEmbed: string | null = null;
 
-      if (outcome.status === "opened") {
-        setOpened(true);
-      } else if (outcome.status === "blocked") {
-        setBlockedUrl(outcome.url);
-        setError(
-          "Your browser blocked the new tab. Use the link below to open your assessment."
-        );
-      } else {
-        setError(outcome.error);
-      }
-    } finally {
+    const res = await resolveSecureFormUrl(assignmentId);
+    if (res.error || !res.url) {
+      setError(res.error || "Could not resolve the question paper link.");
       setLoading(false);
+      return;
+    }
+    outcomeUrl = res.url;
+    outcomeEmbed = res.embedUrl ?? null;
+
+    setUrl(outcomeUrl);
+    setEmbedUrl(outcomeEmbed);
+    setOpened(true);
+    setLoading(false);
+
+    // Nothing embeddable (a forms.gle shortlink, say) -- fall back to a tab.
+    if (!outcomeEmbed) {
+      const outcome = await openFormInNewTab(
+        () => window.open("about:blank", "_blank"),
+        async () => ({ url: outcomeUrl! })
+      );
+      if (outcome.status === "blocked") {
+        setError(
+          "Your browser blocked the new tab. Use the button below to open the paper."
+        );
+      }
     }
   };
 
@@ -73,10 +94,9 @@ export function StartTestButton({ assignmentId }: StartTestButtonProps) {
         setSubmitting(false);
         return;
       }
-      // Redirect to student dashboard
       router.push("/");
       router.refresh();
-    } catch (err) {
+    } catch {
       setError("Failed to confirm submission.");
       setSubmitting(false);
     }
@@ -91,39 +111,10 @@ export function StartTestButton({ assignmentId }: StartTestButtonProps) {
         </div>
       )}
 
-      {blockedUrl && (
-        <a
-          href={blockedUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => {
-            setBlockedUrl(null);
-            setError(null);
-            setOpened(true);
-          }}
-          className="flex items-center justify-center gap-2 w-full rounded-lg bg-brand-navy px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-navy/90"
-        >
-          <ExternalLink className="h-4 w-4" />
-          <span>Open Google Form in a New Tab</span>
-        </a>
-      )}
-
-      {opened && (
-        <div className="p-4 bg-sky-50 text-sky-950 border border-sky-200 rounded-xl flex items-start gap-3 text-left">
-          <ShieldAlert className="h-5 w-5 shrink-0 text-brand-blue mt-0.5" />
-          <div className="space-y-1 text-xs">
-            <p className="font-semibold text-brand-navy">Google Form Opened in a New Tab</p>
-            <p className="text-brand-ink/80">
-              Please complete all questions in the Google Form tab. Once you click <strong>Submit</strong> on Google Forms, click the button below to confirm and return to your dashboard.
-            </p>
-          </div>
-        </div>
-      )}
-
       {!opened ? (
         <Button
           id="start-assessment-btn"
-          onClick={handleOpenForm}
+          onClick={handleOpen}
           disabled={loading}
           size="lg"
           className="w-full bg-brand-navy hover:bg-brand-navy/90 text-white font-medium py-3 px-6 shadow-md transition-all flex items-center justify-center gap-2"
@@ -131,17 +122,85 @@ export function StartTestButton({ assignmentId }: StartTestButtonProps) {
           {loading ? (
             <div className="flex items-center gap-2">
               <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
-              <span>Verifying & Opening Test...</span>
+              <span>Verifying &amp; Opening&hellip;</span>
             </div>
           ) : (
             <>
-              <span>Open Google Form</span>
+              <span>Open {paperNoun}</span>
               <ExternalLink className="h-4 w-4" />
             </>
           )}
         </Button>
       ) : (
-        <div className="space-y-2.5 pt-1">
+        <div className="space-y-4">
+          {/* In-page preview */}
+          {embedUrl && (
+            <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
+              <div className="flex items-center justify-between border-b border-brand-border bg-brand-page px-3 py-2">
+                <span className="text-[11px] font-semibold text-brand-navy">
+                  {isDoc ? "Question paper" : "Assessment form"}
+                </span>
+                {url && (
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-blue hover:underline"
+                  >
+                    <Maximize2 className="h-3 w-3" />
+                    Open in new tab
+                  </a>
+                )}
+              </div>
+              <iframe
+                src={embedUrl}
+                title={isDoc ? "Question paper" : "Assessment form"}
+                className="h-[70vh] w-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer"
+                sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+              />
+            </div>
+          )}
+
+          {/* Always offer the tab, embedded or not */}
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-navy px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-navy/90"
+            >
+              <ExternalLink className="h-4 w-4" />
+              <span>Open {paperNoun} in a New Tab</span>
+            </a>
+          )}
+
+          {/* WhatsApp the answers -- the submission route for a written paper */}
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-600/30 bg-emerald-50 px-6 py-2.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+          >
+            <MessageCircle className="h-4 w-4" />
+            <span>WhatsApp me the test answers</span>
+          </a>
+
+          <div className="p-4 bg-sky-50 text-sky-950 border border-sky-200 rounded-xl flex items-start gap-3 text-left">
+            <ShieldAlert className="h-5 w-5 shrink-0 text-brand-blue mt-0.5" />
+            <div className="space-y-1 text-xs">
+              <p className="font-semibold text-brand-navy">
+                {isDoc ? "Written paper" : "Assessment opened"}
+              </p>
+              <p className="text-brand-ink/80">
+                {isDoc
+                  ? "Write your answers on paper, send them on WhatsApp using the button above, then confirm below."
+                  : "Complete every question and press Submit inside the form, then confirm below."}
+              </p>
+            </div>
+          </div>
+
           <Button
             onClick={handleConfirmSubmission}
             disabled={submitting}
@@ -151,25 +210,16 @@ export function StartTestButton({ assignmentId }: StartTestButtonProps) {
             {submitting ? (
               <div className="flex items-center gap-2">
                 <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#A7F3D0" animate />
-                <span>Confirming Submission...</span>
+                <span>Confirming Submission&hellip;</span>
               </div>
             ) : (
               <>
                 <CheckCircle2 className="h-5 w-5" />
-                <span>I Have Submitted the Form</span>
+                <span>
+                  {isDoc ? "I Have Sent My Answers" : "I Have Submitted the Form"}
+                </span>
               </>
             )}
-          </Button>
-
-          <Button
-            onClick={handleOpenForm}
-            disabled={loading}
-            variant="outline"
-            size="sm"
-            className="w-full border-brand-border text-brand-navy hover:bg-brand-tint text-xs gap-1.5"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            <span>Re-Open Form Tab</span>
           </Button>
         </div>
       )}

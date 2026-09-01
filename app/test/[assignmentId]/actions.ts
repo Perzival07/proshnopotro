@@ -4,9 +4,14 @@ import { getVerifiedSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { revalidatePath } from "next/cache";
+import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 
 export interface FormResolutionResult {
+  /** The tutor's original link, for opening in a new tab. */
   url?: string;
+  /** The same resource rewritten so it renders inside an iframe, when it can. */
+  embedUrl?: string | null;
+  format?: TestFormat;
   error?: string;
 }
 
@@ -58,10 +63,15 @@ export async function resolveSecureFormUrl(
   }
 
   if (!assignment.test.formUrl) {
-    return { error: "Test form URL is not configured. Please contact tutor." };
+    return { error: "The question paper link is not configured. Please contact your tutor." };
   }
 
-  return { url: assignment.test.formUrl };
+  const format = assignment.test.format as TestFormat;
+  return {
+    url: assignment.test.formUrl,
+    embedUrl: toEmbedUrl(assignment.test.formUrl, format),
+    format,
+  };
 }
 
 /**

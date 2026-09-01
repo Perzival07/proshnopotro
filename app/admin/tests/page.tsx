@@ -31,6 +31,7 @@ export default async function AdminTestsPage() {
       subject: t.subject,
       description: t.description,
       iconName: t.iconName,
+      format: t.format,
       formUrl: t.formUrl,
       active: t.active,
       createdAt: t.createdAt,

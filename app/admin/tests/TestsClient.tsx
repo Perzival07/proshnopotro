@@ -16,9 +16,12 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { TestModal } from "./TestModal";
 import { toggleTestActive } from "./actions";
 import { formatDateShort } from "@/lib/utils";
+import type { TestFormat } from "@/lib/test-resource";
 import {
   Plus,
   Search,
+  FileText,
+  ClipboardList,
   Edit2,
   Power,
   Users,
@@ -34,6 +37,7 @@ interface TestItem {
   subject: string;
   description?: string | null;
   iconName: string;
+  format: TestFormat;
   formUrl: string;
   active: boolean;
   createdAt: Date;
@@ -286,9 +290,24 @@ export function TestsClient({ tests }: TestsClientProps) {
                   </TableCell>
 
                   <TableCell>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-brand-tint text-brand-navy">
-                      {test.subject}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-[11px] font-medium bg-brand-tint text-brand-navy">
+                        {test.subject}
+                      </span>
+                      <span className="inline-flex w-fit items-center gap-1 text-[10px] font-medium text-brand-ink/60">
+                        {test.format === "GOOGLE_DOC" ? (
+                          <>
+                            <FileText className="h-3 w-3" />
+                            Written
+                          </>
+                        ) : (
+                          <>
+                            <ClipboardList className="h-3 w-3" />
+                            Form
+                          </>
+                        )}
+                      </span>
+                    </div>
                   </TableCell>
 
                   <TableCell className="text-center">

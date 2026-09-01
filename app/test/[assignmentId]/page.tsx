@@ -36,6 +36,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           description: true,
           iconName: true,
           active: true,
+          format: true,
           // formUrl is explicitly OMITTED to prevent leakage into HTML
         },
       },
@@ -144,7 +145,12 @@ export default async function TestConfirmationPage({ params }: PageProps) {
 
             {/* Form Launch Button */}
             <div className="pt-2">
-              <StartTestButton assignmentId={assignment.id} />
+              <StartTestButton
+                assignmentId={assignment.id}
+                testTitle={assignment.test.title}
+                testFormat={assignment.test.format}
+                studentName={user.name}
+              />
             </div>
           </div>
         </div>

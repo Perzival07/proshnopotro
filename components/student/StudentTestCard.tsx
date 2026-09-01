@@ -22,6 +22,7 @@ interface StudentTestCardProps {
       description?: string | null;
       iconName: string;
       active: boolean;
+      format?: "GOOGLE_FORM" | "GOOGLE_DOC";
     };
     result?: {
       score: number;
@@ -128,7 +129,9 @@ export function StudentTestCard({ assignment }: StudentTestCardProps) {
             </p>
           ) : (
             <p className="text-xs text-brand-ink/50 mt-1.5 italic">
-              Google Form online test
+              {test.format === "GOOGLE_DOC"
+                ? "Written paper \u2014 answers sent on WhatsApp"
+                : "Google Form online test"}
             </p>
           )}
         </div>
@@ -156,7 +159,7 @@ export function StudentTestCard({ assignment }: StudentTestCardProps) {
                 href={`/test/${assignment.id}`}
                 className="flex items-center justify-center gap-2"
               >
-                <span>Take Assessment</span>
+                <span>{test.format === "GOOGLE_DOC" ? "Open Question Paper" : "Take Assessment"}</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </Button>

@@ -17,7 +17,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SubjectIcon, SUBJECT_ICONS } from "@/components/SubjectIcon";
 import { createTest, updateTest } from "./actions";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { AlertCircle, Link as LinkIcon } from "lucide-react";
+import { AlertCircle, Link as LinkIcon, FileText, ClipboardList } from "lucide-react";
+import type { TestFormat } from "@/lib/test-resource";
 
 interface TestModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ interface TestModalProps {
     subject: string;
     description?: string | null;
     iconName: string;
+    format: TestFormat;
     formUrl: string;
     active: boolean;
   } | null;
@@ -39,6 +41,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [subject, setSubject] = useState("Physics");
   const [description, setDescription] = useState("");
   const [iconName, setIconName] = useState("Atom");
+  const [format, setFormat] = useState<TestFormat>("GOOGLE_FORM");
   const [formUrl, setFormUrl] = useState("");
   const [active, setActive] = useState(true);
   const [loading, setLoading] = useState(false);
@@ -50,6 +53,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setSubject(testToEdit.subject);
       setDescription(testToEdit.description || "");
       setIconName(testToEdit.iconName || "BookOpen");
+      setFormat(testToEdit.format || "GOOGLE_FORM");
       setFormUrl(testToEdit.formUrl);
       setActive(testToEdit.active);
     } else {
@@ -57,6 +61,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setSubject("Physics");
       setDescription("");
       setIconName("Atom");
+      setFormat("GOOGLE_FORM");
       setFormUrl("");
       setActive(true);
     }
@@ -73,6 +78,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       subject,
       description,
       iconName,
+      format,
       formUrl,
       active,
     };
@@ -185,10 +191,60 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
           </div>
 
           <div>
+            <Label className="text-xs font-semibold text-brand-navy">
+              Test Type <span className="text-red-500">*</span>
+            </Label>
+            <div className="mt-1.5 grid grid-cols-2 gap-2">
+              {(
+                [
+                  {
+                    value: "GOOGLE_FORM" as const,
+                    icon: ClipboardList,
+                    title: "Google Form",
+                    hint: "Answered online in the form",
+                  },
+                  {
+                    value: "GOOGLE_DOC" as const,
+                    icon: FileText,
+                    title: "Google Doc",
+                    hint: "Written paper, answers sent on WhatsApp",
+                  },
+                ]
+              ).map((opt) => {
+                const Icon = opt.icon;
+                const selected = format === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setFormat(opt.value)}
+                    className={`flex flex-col items-start gap-0.5 rounded-lg border p-3 text-left transition-colors ${
+                      selected
+                        ? "border-brand-blue bg-brand-tint text-brand-navy shadow-xs"
+                        : "border-brand-border bg-white text-brand-ink/70 hover:border-brand-blue/50"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Icon className="h-3.5 w-3.5 text-brand-blue" />
+                      {opt.title}
+                    </span>
+                    <span className="text-[10px] leading-snug text-brand-ink/60">
+                      {opt.hint}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between">
               <Label htmlFor="form-url" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
                 <LinkIcon className="h-3.5 w-3.5 text-brand-blue" />
-                <span>Google Form URL <span className="text-red-500">*</span></span>
+                <span>
+                  {format === "GOOGLE_FORM" ? "Google Form URL" : "Google Doc URL"}{" "}
+                  <span className="text-red-500">*</span>
+                </span>
               </Label>
               <span className="text-[10px] text-brand-ink/50 italic">
                 Never leaked to student HTML
@@ -197,12 +253,21 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             <Input
               id="form-url"
               type="url"
-              placeholder="https://docs.google.com/forms/d/e/.../viewform"
+              placeholder={
+                format === "GOOGLE_FORM"
+                  ? "https://docs.google.com/forms/d/e/.../viewform"
+                  : "https://docs.google.com/document/d/.../edit"
+              }
               value={formUrl}
               onChange={(e) => setFormUrl(e.target.value)}
               required
               className="mt-1 font-mono text-xs"
             />
+            <p className="mt-1 text-[11px] text-brand-ink/55">
+              {format === "GOOGLE_FORM"
+                ? "Share the form so anyone with the link can respond."
+                : "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error."}
+            </p>
           </div>
 
           <div className="flex items-center space-x-2 pt-2">

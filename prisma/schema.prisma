@@ -18,6 +18,15 @@ enum AssignmentStatus {
   SUBMITTED
 }
 
+/// How a test's question paper is delivered.
+/// GOOGLE_FORM: answered online in the form itself.
+/// GOOGLE_DOC:  a written paper the student reads, answers on paper, and
+///              sends back over WhatsApp.
+enum TestFormat {
+  GOOGLE_FORM
+  GOOGLE_DOC
+}
+
 // ─────────────────────────────────────────────────────────────
 // AUTH & USERS (Auth.js v5 compatible)
 // ─────────────────────────────────────────────────────────────
@@ -89,7 +98,8 @@ model Test {
   subject     String
   description String?      @db.Text
   iconName    String       @default("BookOpen")
-  formUrl     String       @db.Text             // Never exposed to client HTML
+  format      TestFormat   @default(GOOGLE_FORM)
+  formUrl     String       @db.Text             // Question paper URL. Never exposed to client HTML.
   active      Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
