@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
+import { openFormInNewTab } from "@/lib/open-form-tab";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { ExternalLink, AlertCircle, ShieldAlert, CheckCircle2 } from "lucide-react";
 
@@ -17,31 +18,46 @@ export function StartTestButton({ assignmentId }: StartTestButtonProps) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [opened, setOpened] = useState(false);
+  const [blockedUrl, setBlockedUrl] = useState<string | null>(null);
 
   const handleOpenForm = async () => {
     setLoading(true);
     setError(null);
+    setBlockedUrl(null);
 
     try {
-      const res = await resolveSecureFormUrl(assignmentId);
+      const outcome = await openFormInNewTab(
+        // Opened synchronously inside the click handler -- see lib/open-form-tab.
+        () => {
+          const tab = window.open("about:blank", "_blank");
+          if (tab) {
+            try {
+              tab.document.write(
+                "<!doctype html><title>Opening your assessment\u2026</title>" +
+                  '<body style="font:15px/1.6 system-ui,sans-serif;color:#1A2230;' +
+                  'display:flex;align-items:center;justify-content:center;height:90vh">' +
+                  "Opening your Google Form\u2026"
+              );
+              tab.document.close();
+            } catch {
+              // The placeholder is cosmetic; never let it break the flow.
+            }
+          }
+          return tab;
+        },
+        () => resolveSecureFormUrl(assignmentId)
+      );
 
-      if (res.error) {
-        setError(res.error);
-        setLoading(false);
-        return;
-      }
-
-      if (res.url) {
+      if (outcome.status === "opened") {
         setOpened(true);
-        // Open Google Form securely in new tab
-        const formWindow = window.open(res.url, "_blank", "noopener,noreferrer");
-        if (!formWindow) {
-          // In case popup was blocked by browser
-          window.location.href = res.url;
-        }
+      } else if (outcome.status === "blocked") {
+        setBlockedUrl(outcome.url);
+        setError(
+          "Your browser blocked the new tab. Use the link below to open your assessment."
+        );
+      } else {
+        setError(outcome.error);
       }
-    } catch (err) {
-      setError("Failed to launch form. Please check your connection.");
     } finally {
       setLoading(false);
     }
@@ -73,6 +89,23 @@ export function StartTestButton({ assignmentId }: StartTestButtonProps) {
           <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
           <span>{error}</span>
         </div>
+      )}
+
+      {blockedUrl && (
+        <a
+          href={blockedUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => {
+            setBlockedUrl(null);
+            setError(null);
+            setOpened(true);
+          }}
+          className="flex items-center justify-center gap-2 w-full rounded-lg bg-brand-navy px-6 py-3 text-sm font-semibold text-white shadow-md transition-colors hover:bg-brand-navy/90"
+        >
+          <ExternalLink className="h-4 w-4" />
+          <span>Open Google Form in a New Tab</span>
+        </a>
       )}
 
       {opened && (
