@@ -1,11 +1,16 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
 import { openFormInNewTab } from "@/lib/open-form-tab";
 import { buildWhatsAppLink, answersMessage, TUTOR_WHATSAPP } from "@/lib/whatsapp";
+import {
+  enterFullscreen,
+  exitFullscreen,
+  isNativeFullscreen,
+} from "@/lib/fullscreen";
 import type { TestFormat } from "@/lib/test-resource";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
@@ -15,6 +20,8 @@ import {
   CheckCircle2,
   MessageCircle,
   Maximize2,
+  Minimize2,
+  X,
 } from "lucide-react";
 
 interface StartTestButtonProps {
@@ -39,6 +46,44 @@ export function StartTestButton({
   // still never appears in the page's initial HTML.
   const [url, setUrl] = useState<string | null>(null);
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  const [expanded, setExpanded] = useState(false);
+  const previewRef = useRef<HTMLDivElement>(null);
+
+  const collapse = useCallback(() => {
+    setExpanded(false);
+    if (typeof document !== "undefined") void exitFullscreen(document);
+  }, []);
+
+  const expand = useCallback(() => {
+    setExpanded(true);
+    // Native fullscreen hides the browser chrome where it is allowed; the CSS
+    // overlay below covers the cases where it is not (notably iOS Safari).
+    void enterFullscreen(previewRef.current);
+  }, []);
+
+  // Escape closes it, and leaving native fullscreen (browser UI, F11) keeps
+  // our overlay in step rather than stranding it.
+  useEffect(() => {
+    if (!expanded) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") collapse();
+    };
+    const onFsChange = () => {
+      if (!isNativeFullscreen(document)) setExpanded(false);
+    };
+    document.addEventListener("keydown", onKey);
+    document.addEventListener("fullscreenchange", onFsChange);
+    document.addEventListener("webkitfullscreenchange", onFsChange);
+    // Stop the page behind the overlay from scrolling.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("fullscreenchange", onFsChange);
+      document.removeEventListener("webkitfullscreenchange", onFsChange);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [expanded, collapse]);
 
   const isDoc = testFormat === "GOOGLE_DOC";
   const paperNoun = isDoc ? "Question Paper" : "Google Form";
@@ -135,27 +180,68 @@ export function StartTestButton({
         <div className="space-y-4">
           {/* In-page preview */}
           {embedUrl && (
-            <div className="overflow-hidden rounded-xl border border-brand-border bg-white shadow-card">
-              <div className="flex items-center justify-between border-b border-brand-border bg-brand-page px-3 py-2">
-                <span className="text-[11px] font-semibold text-brand-navy">
+            <div
+              ref={previewRef}
+              className={
+                expanded
+                  ? "fixed inset-0 z-50 flex flex-col bg-white"
+                  : "overflow-hidden rounded-xl border border-brand-border bg-white shadow-card"
+              }
+            >
+              <div className="flex items-center justify-between gap-2 border-b border-brand-border bg-brand-page px-3 py-2">
+                <span className="truncate text-[11px] font-semibold text-brand-navy">
                   {isDoc ? "Question paper" : "Assessment form"}
+                  {expanded && <span className="ml-2 font-normal text-brand-ink/60">Press Esc to exit</span>}
                 </span>
-                {url && (
-                  <a
-                    href={url}
-                    target="_blank"
-                    rel="noopener noreferrer"
+
+                <div className="flex shrink-0 items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={expanded ? collapse : expand}
                     className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-blue hover:underline"
                   >
-                    <Maximize2 className="h-3 w-3" />
-                    Open in new tab
-                  </a>
-                )}
+                    {expanded ? (
+                      <>
+                        <Minimize2 className="h-3 w-3" />
+                        Exit full screen
+                      </>
+                    ) : (
+                      <>
+                        <Maximize2 className="h-3 w-3" />
+                        Full screen
+                      </>
+                    )}
+                  </button>
+
+                  {url && !expanded && (
+                    <a
+                      href={url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-blue hover:underline"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      New tab
+                    </a>
+                  )}
+
+                  {expanded && (
+                    <button
+                      type="button"
+                      onClick={collapse}
+                      aria-label="Close full screen"
+                      className="rounded p-1 text-brand-ink/70 transition-colors hover:bg-brand-tint hover:text-brand-navy"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  )}
+                </div>
               </div>
+
               <iframe
                 src={embedUrl}
                 title={isDoc ? "Question paper" : "Assessment form"}
-                className="h-[70vh] w-full border-0"
+                className={expanded ? "flex-1 w-full border-0" : "h-[70vh] w-full border-0"}
                 loading="lazy"
                 referrerPolicy="no-referrer"
                 sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
