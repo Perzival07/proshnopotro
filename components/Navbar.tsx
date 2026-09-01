@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, ShieldCheck, User, Phone, BookOpen, Layers } from "lucide-react";
+import { LogOut, ShieldCheck, BookOpen, Layers } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 interface NavbarProps {
@@ -31,12 +31,14 @@ interface NavbarProps {
 export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
   const isAdmin = user?.role === "ADMIN";
-  const initials = (user?.name || user?.email || "U")
-    .split(" ")
-    .map((n) => n[0])
-    .join("")
-    .substring(0, 2)
-    .toUpperCase();
+  const initials =
+    (user?.name || user?.email || "U")
+      .split(" ")
+      .filter(Boolean)
+      .map((n) => n[0])
+      .join("")
+      .substring(0, 2)
+      .toUpperCase() || "U";
 
   return (
     <header className="sticky top-0 z-40 w-full bg-brand-navy shadow-md transition-all">

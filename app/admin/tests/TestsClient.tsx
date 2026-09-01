@@ -12,7 +12,6 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { TestModal } from "./TestModal";
 import { toggleTestActive } from "./actions";
@@ -25,7 +24,6 @@ import {
   Users,
   UserPlus,
   ArrowUpDown,
-  FileSpreadsheet,
   CheckCircle2,
   XCircle,
 } from "lucide-react";
@@ -60,6 +58,10 @@ export function TestsClient({ tests }: TestsClientProps) {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testToEdit, setTestToEdit] = useState<TestItem | null>(null);
+
+  // Status-toggle feedback
+  const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [toggleError, setToggleError] = useState<string | null>(null);
 
   // Filter & Search Logic
   const filteredTests = useMemo(() => {
@@ -103,6 +105,12 @@ export function TestsClient({ tests }: TestsClientProps) {
 
   const totalPages = Math.ceil(sortedTests.length / pageSize) || 1;
 
+  // If the list shrinks (filter, or a refresh after an edit) a stale currentPage
+  // renders an empty table while the pager hides itself -- stranding the user.
+  React.useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const handleSort = (field: typeof sortField) => {
     if (sortField === field) {
       setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -113,7 +121,16 @@ export function TestsClient({ tests }: TestsClientProps) {
   };
 
   const handleToggleActive = async (id: string, currentStatus: boolean) => {
-    await toggleTestActive(id, !currentStatus);
+    setToggleError(null);
+    setTogglingId(id);
+    try {
+      const res = await toggleTestActive(id, !currentStatus);
+      if (res?.error) setToggleError(res.error);
+    } catch {
+      setToggleError("Could not reach the server to update this test.");
+    } finally {
+      setTogglingId(null);
+    }
   };
 
   const openCreateModal = () => {
@@ -147,6 +164,13 @@ export function TestsClient({ tests }: TestsClientProps) {
           <span>New Assessment Test</span>
         </Button>
       </div>
+
+      {toggleError && (
+        <div className="p-3 text-xs bg-red-50 text-red-700 border border-red-200 rounded-lg flex items-center gap-2">
+          <XCircle className="h-4 w-4 shrink-0" />
+          <span>{toggleError}</span>
+        </div>
+      )}
 
       {/* Filter and Search Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 bg-white rounded-xl border border-brand-border shadow-card">
@@ -320,8 +344,9 @@ export function TestsClient({ tests }: TestsClientProps) {
 
                       <button
                         onClick={() => handleToggleActive(test.id, test.active)}
+                        disabled={togglingId === test.id}
                         title={test.active ? "Deactivate Test" : "Activate Test"}
-                        className={`p-1.5 rounded-md transition-colors ${
+                        className={`p-1.5 rounded-md transition-colors disabled:opacity-40 ${
                           test.active
                             ? "hover:bg-red-50 text-red-600"
                             : "hover:bg-green-50 text-green-700"

@@ -24,7 +24,7 @@ export default async function OnboardingPage() {
   return (
     <div className="min-h-screen flex flex-col justify-between bg-brand-page">
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-lg animate-in fade-in zoom-in-95 duration-400">
+        <div className="w-full max-w-lg animate-in fade-in zoom-in-95 duration-500">
           <div className="flex justify-center mb-5">
             <LogoBadge size={140} showPhone={false} />
           </div>

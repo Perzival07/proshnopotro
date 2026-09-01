@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { StartTestButton } from "./StartTestButton";
 import { formatDate } from "@/lib/utils";
-import { AlertTriangle, ArrowLeft, Calendar, Shield, Clock } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Calendar, Shield } from "lucide-react";
 import Link from "next/link";
 
 interface PageProps {

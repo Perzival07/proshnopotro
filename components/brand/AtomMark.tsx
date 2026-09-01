@@ -24,7 +24,7 @@ export function AtomMark({
       viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
-      className={cn(animate && "animate-spin duration-3000", className)}
+      className={cn(animate && "animate-spin", className)}
       {...props}
     >
       {/* Central nucleus */}

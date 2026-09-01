@@ -1,5 +1,5 @@
 import React from "react";
-import { Phone, ShieldAlert, Heart } from "lucide-react";
+import { Phone } from "lucide-react";
 
 export function Footer() {
   return (

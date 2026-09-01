@@ -63,14 +63,15 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ["Inter", ...defaultTheme.fontFamily.sans],
-        heading: ["Poppins", ...defaultTheme.fontFamily.sans],
+        sans: ["var(--font-inter)", ...defaultTheme.fontFamily.sans],
+        heading: ["var(--font-poppins)", ...defaultTheme.fontFamily.sans],
       },
       fontSize: {
         body: ["0.9375rem", { lineHeight: "1.5rem" }], // 15px
         "body-lg": ["1rem", { lineHeight: "1.5rem" }],   // 16px
       },
       boxShadow: {
+        xs: "0 1px 2px 0 rgba(10, 75, 140, 0.05)",
         card: "0 1px 3px 0 rgba(10, 75, 140, 0.04), 0 1px 2px -1px rgba(10, 75, 140, 0.02)",
         "card-hover": "0 4px 12px 0 rgba(10, 75, 140, 0.08)",
       },

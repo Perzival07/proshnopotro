@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { AssignClient } from "./AssignClient";
 
@@ -27,5 +27,9 @@ export default async function AdminAssignPage() {
     orderBy: { name: "asc" },
   });
 
-  return <AssignClient tests={tests} students={students} />;
+  return (
+    <Suspense fallback={null}>
+      <AssignClient tests={tests} students={students} />
+    </Suspense>
+  );
 }

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { LogoBadge } from "@/components/brand/LogoBadge";
@@ -35,7 +35,9 @@ export default async function LoginPage() {
               Sign in with your registered Google account to view and access your assigned assessments.
             </p>
 
-            <LoginForm />
+            <Suspense fallback={<div className="h-24" />}>
+              <LoginForm />
+            </Suspense>
           </div>
         </div>
       </main>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import Papa from "papaparse";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,21 +14,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import {
   previewResultsImport,
   commitResultsImport,
-  PreviewRow,
   ImportPreviewResult,
 } from "./actions";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   UploadCloud,
-  FileSpreadsheet,
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  ShieldCheck,
   Check,
   RefreshCw,
 } from "lucide-react";
@@ -69,12 +65,28 @@ export function ResultsClient({ tests }: ResultsClientProps) {
     setPreviewResult(null);
     setCommitSuccessMessage(null);
     setErrorMessage(null);
+    // Clear the previous file's mapping -- headers may differ entirely.
+    setCsvHeaders([]);
+    setRawCsvData([]);
+    setEmailColumn("");
+    setScoreColumn("");
+
+    // Allow re-selecting the same file later (onChange won't fire otherwise).
+    e.target.value = "";
 
     Papa.parse(selectedFile, {
       header: true,
       skipEmptyLines: true,
       complete: (results) => {
-        const headers = results.meta.fields || [];
+        const headers = (results.meta.fields || []).filter(Boolean);
+
+        if (headers.length === 0) {
+          setErrorMessage(
+            "That CSV has no readable header row. Export the responses sheet again."
+          );
+          return;
+        }
+
         setCsvHeaders(headers);
         setRawCsvData(results.data as Record<string, any>[]);
 
@@ -156,7 +168,12 @@ export function ResultsClient({ tests }: ResultsClientProps) {
         setErrorMessage(res.error);
       } else {
         setCommitSuccessMessage(
-          `Successfully committed ${res.updatedCount} test results! Assignments marked as SUBMITTED.`
+          `Successfully committed ${res.updatedCount} test results! Assignments marked as SUBMITTED.` +
+            (res.duplicateCount
+              ? ` ${res.duplicateCount} duplicate response${
+                  res.duplicateCount === 1 ? "" : "s"
+                } collapsed to the latest score per student.`
+              : "")
         );
         setPreviewResult(null);
         setFile(null);
@@ -167,8 +184,6 @@ export function ResultsClient({ tests }: ResultsClientProps) {
       setErrorMessage("Error occurred during commit.");
     }
   };
-
-  const selectedTest = tests.find((t) => t.id === selectedTestId);
 
   return (
     <div className="space-y-6">

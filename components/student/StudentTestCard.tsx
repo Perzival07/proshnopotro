@@ -4,8 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { formatDate, formatDateShort } from "@/lib/utils";
-import { Calendar, CheckCircle2, Clock, AlertTriangle, ArrowRight, Lock } from "lucide-react";
+import { formatDateShort } from "@/lib/utils";
+import { Calendar, CheckCircle2, Clock, ArrowRight, Lock } from "lucide-react";
 
 export type CardStatus = "AVAILABLE" | "SUBMITTED" | "CLOSED";
 

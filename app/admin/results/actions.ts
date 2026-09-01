@@ -38,21 +38,27 @@ function parseScoreString(
 
   const cleaned = rawScore.trim();
 
+  // A well-formed number: "45" or "45.5" (but not "1.2.3" or ".")
+  const NUMBER = "\\d+(?:\\.\\d+)?";
+
   // Pattern: "45 / 50" or "45.5/50" or "45 of 50"
-  const ratioMatch = cleaned.match(/^([\d.]+)\s*(?:\/|of)\s*([\d.]+)$/i);
+  const ratioMatch = cleaned.match(
+    new RegExp(`^(${NUMBER})\\s*(?:\\/|of)\\s*(${NUMBER})$`, "i")
+  );
   if (ratioMatch) {
     const score = parseFloat(ratioMatch[1]);
     const maxScore = parseFloat(ratioMatch[2]);
-    if (!isNaN(score) && !isNaN(maxScore)) {
+    if (isFinite(score) && isFinite(maxScore) && maxScore > 0) {
       return { score, maxScore };
     }
+    return { score: null, maxScore: null };
   }
 
   // Simple number: "45"
-  const singleMatch = cleaned.match(/^[\d.]+$/);
+  const singleMatch = cleaned.match(new RegExp(`^${NUMBER}$`));
   if (singleMatch) {
     const score = parseFloat(singleMatch[0]);
-    if (!isNaN(score)) {
+    if (isFinite(score)) {
       return { score, maxScore: defaultMaxScore };
     }
   }
@@ -122,19 +128,27 @@ export async function previewResultsImport(
       return;
     }
 
-    const { score, maxScore } = parseScoreString(rawScore, defaultMaxScore);
-    if (score === null || maxScore === null) {
-      invalidRows.push({
-        rowIndex: index + 1,
-        rawEmail,
-        normalizedEmail,
-        rawScore,
-        parsedScore: null,
-        parsedMaxScore: null,
-        isMatched: false,
-        reason: "Could not parse numerical score",
-      });
-      return;
+    // Parse score if present, otherwise treat as non-graded submission
+    let parsedScore: number | null = null;
+    let parsedMaxScore: number | null = null;
+
+    if (rawScore && rawScore.trim() !== "") {
+      const parsed = parseScoreString(rawScore, defaultMaxScore);
+      if (parsed.score === null || parsed.maxScore === null) {
+        invalidRows.push({
+          rowIndex: index + 1,
+          rawEmail,
+          normalizedEmail,
+          rawScore,
+          parsedScore: null,
+          parsedMaxScore: null,
+          isMatched: false,
+          reason: "Could not parse numerical score",
+        });
+        return;
+      }
+      parsedScore = parsed.score;
+      parsedMaxScore = parsed.maxScore;
     }
 
     const assignment = assignmentByEmail.get(normalizedEmail);
@@ -146,8 +160,8 @@ export async function previewResultsImport(
         rawEmail,
         normalizedEmail,
         rawScore,
-        parsedScore: score,
-        parsedMaxScore: maxScore,
+        parsedScore: parsedScore,
+        parsedMaxScore: parsedMaxScore,
         isMatched: true,
         assignmentId: assignment.id,
         studentName: user?.name || null,
@@ -160,8 +174,8 @@ export async function previewResultsImport(
         rawEmail,
         normalizedEmail,
         rawScore,
-        parsedScore: score,
-        parsedMaxScore: maxScore,
+        parsedScore: parsedScore,
+        parsedMaxScore: parsedMaxScore,
         isMatched: false,
         reason: "No assignment exists for this email on this test",
       });
@@ -180,8 +194,8 @@ export async function previewResultsImport(
 export async function commitResultsImport(
   matchedItems: Array<{
     assignmentId: string;
-    score: number;
-    maxScore: number;
+    score?: number | null;
+    maxScore?: number | null;
     responseEmail: string;
   }>
 ) {
@@ -191,29 +205,61 @@ export async function commitResultsImport(
     return { error: "No matched items to import." };
   }
 
+  // Validate server-side: never write client-supplied numbers unchecked.
+  for (const item of matchedItems) {
+    if (!item.assignmentId) {
+      return { error: "An imported row is missing its assignment reference." };
+    }
+    if (typeof item.score === "number" && typeof item.maxScore === "number") {
+      if (!isFinite(item.score) || !isFinite(item.maxScore)) {
+        return { error: `Non-numeric score for ${item.responseEmail}.` };
+      }
+      if (item.score < 0 || item.maxScore <= 0) {
+        return { error: `Score out of range for ${item.responseEmail}.` };
+      }
+      if (item.score > item.maxScore) {
+        return {
+          error: `Score ${item.score} exceeds max ${item.maxScore} for ${item.responseEmail}.`,
+        };
+      }
+    }
+  }
+
+  // A CSV can hold several responses for one email; they all resolve to the
+  // same assignment. Keep the last one so the count reflects rows actually
+  // written rather than rows submitted.
+  const itemsByAssignment = new Map<string, (typeof matchedItems)[number]>();
+  for (const item of matchedItems) {
+    itemsByAssignment.set(item.assignmentId, item);
+  }
+  const deduplicatedItems = Array.from(itemsByAssignment.values());
+  const duplicateCount = matchedItems.length - deduplicatedItems.length;
+
   try {
     let updatedCount = 0;
 
     // Use transaction to ensure data integrity
     await prisma.$transaction(async (tx) => {
-      for (const item of matchedItems) {
-        // Upsert Result
-        await tx.result.upsert({
-          where: { assignmentId: item.assignmentId },
-          update: {
-            score: item.score,
-            maxScore: item.maxScore,
-            responseEmail: item.responseEmail,
-            submittedAt: new Date(),
-          },
-          create: {
-            assignmentId: item.assignmentId,
-            score: item.score,
-            maxScore: item.maxScore,
-            responseEmail: item.responseEmail,
-            submittedAt: new Date(),
-          },
-        });
+      for (const item of deduplicatedItems) {
+        // If numerical scores are present, upsert Result
+        if (typeof item.score === "number" && typeof item.maxScore === "number") {
+          await tx.result.upsert({
+            where: { assignmentId: item.assignmentId },
+            update: {
+              score: item.score,
+              maxScore: item.maxScore,
+              responseEmail: item.responseEmail,
+              submittedAt: new Date(),
+            },
+            create: {
+              assignmentId: item.assignmentId,
+              score: item.score,
+              maxScore: item.maxScore,
+              responseEmail: item.responseEmail,
+              submittedAt: new Date(),
+            },
+          });
+        }
 
         // Update Assignment status to SUBMITTED
         await tx.assignment.update({
@@ -232,7 +278,7 @@ export async function commitResultsImport(
     revalidatePath("/admin/tests");
     revalidatePath("/");
 
-    return { success: true, updatedCount };
+    return { success: true, updatedCount, duplicateCount };
   } catch (error) {
     console.error("Error committing results:", error);
     return { error: "Database error committing test results." };

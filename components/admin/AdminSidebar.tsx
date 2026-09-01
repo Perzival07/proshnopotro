@@ -11,7 +11,6 @@ import {
   Users,
   ExternalLink,
   ChevronRight,
-  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 

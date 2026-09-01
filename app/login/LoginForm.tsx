@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +9,27 @@ import { Label } from "@/components/ui/label";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
 
+const AUTH_ERROR_MESSAGES: Record<string, string> = {
+  OAuthAccountNotLinked:
+    "That email is already registered with a different sign-in method.",
+  AccessDenied: "Access denied. Contact your tutor if this is unexpected.",
+  Configuration: "Sign in is misconfigured. Please contact your tutor.",
+  CredentialsSignin: "Sign in failed. Check the email and try again.",
+};
+
 export function LoginForm() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const urlError = searchParams.get("error");
   const [loading, setLoading] = useState(false);
   const [devEmail, setDevEmail] = useState("student1@example.com");
   const [devRole, setDevRole] = useState<"STUDENT" | "ADMIN">("STUDENT");
   const [showDevAuth, setShowDevAuth] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(
+    urlError
+      ? AUTH_ERROR_MESSAGES[urlError] || "Sign in failed. Please try again."
+      : null
+  );
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
@@ -35,13 +51,15 @@ export function LoginForm() {
         email: devEmail,
         role: devRole,
         name: devRole === "ADMIN" ? "Koustav Tutor (Admin)" : "Rahul Sharma",
-        callbackUrl: devRole === "ADMIN" ? "/admin/tests" : "/",
-        redirect: true,
+        redirect: false,
       });
-      if (res?.error) {
-        setError("Dev sign in failed: " + res.error);
+      if (!res || res.error) {
+        setError("Dev sign in failed: " + (res?.error || "unknown error"));
         setLoading(false);
+        return;
       }
+      router.push(devRole === "ADMIN" ? "/admin/tests" : "/");
+      router.refresh();
     } catch (err) {
       setError("Sign in error occurred.");
       setLoading(false);

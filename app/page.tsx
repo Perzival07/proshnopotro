@@ -5,7 +5,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { StudentTestCard } from "@/components/student/StudentTestCard";
 import { EmptyState } from "@/components/student/EmptyState";
-import { Clock, CheckCircle2, BookOpen, Sparkles } from "lucide-react";
+import { BookOpen } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
