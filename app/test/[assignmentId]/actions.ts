@@ -2,6 +2,7 @@
 
 import { getVerifiedSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 
 export interface FormResolutionResult {
   url?: string;
@@ -60,4 +61,45 @@ export async function resolveSecureFormUrl(
   }
 
   return { url: assignment.test.formUrl };
+}
+
+/**
+ * Allows a student to confirm they completed the form (works for both graded and non-graded forms).
+ */
+export async function markStudentSubmission(assignmentId: string) {
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) {
+    return { error: "Authentication required." };
+  }
+
+  const normalizedEmail = sessionUser.email.trim().toLowerCase();
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+  });
+
+  if (!assignment) {
+    return { error: "Assignment not found." };
+  }
+
+  if (assignment.studentEmail.toLowerCase() !== normalizedEmail) {
+    return { error: "Unauthorized." };
+  }
+
+  try {
+    await prisma.assignment.update({
+      where: { id: assignmentId },
+      data: { status: "SUBMITTED" },
+    });
+
+    revalidatePath(`/test/${assignmentId}`);
+    revalidatePath("/");
+    revalidatePath("/admin/roster");
+    revalidatePath("/admin/results");
+
+    return { success: true };
+  } catch (err) {
+    console.error("Failed to mark student submission:", err);
+    return { error: "Database error marking submission." };
+  }
 }

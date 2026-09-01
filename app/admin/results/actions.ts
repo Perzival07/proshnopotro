@@ -128,27 +128,19 @@ export async function previewResultsImport(
       return;
     }
 
-    // Parse score if present, otherwise treat as non-graded submission
-    let parsedScore: number | null = null;
-    let parsedMaxScore: number | null = null;
-
-    if (rawScore && rawScore.trim() !== "") {
-      const parsed = parseScoreString(rawScore, defaultMaxScore);
-      if (parsed.score === null || parsed.maxScore === null) {
-        invalidRows.push({
-          rowIndex: index + 1,
-          rawEmail,
-          normalizedEmail,
-          rawScore,
-          parsedScore: null,
-          parsedMaxScore: null,
-          isMatched: false,
-          reason: "Could not parse numerical score",
-        });
-        return;
-      }
-      parsedScore = parsed.score;
-      parsedMaxScore = parsed.maxScore;
+    const { score, maxScore } = parseScoreString(rawScore, defaultMaxScore);
+    if (score === null || maxScore === null) {
+      invalidRows.push({
+        rowIndex: index + 1,
+        rawEmail,
+        normalizedEmail,
+        rawScore,
+        parsedScore: null,
+        parsedMaxScore: null,
+        isMatched: false,
+        reason: "Could not parse numerical score",
+      });
+      return;
     }
 
     const assignment = assignmentByEmail.get(normalizedEmail);
@@ -160,8 +152,8 @@ export async function previewResultsImport(
         rawEmail,
         normalizedEmail,
         rawScore,
-        parsedScore: parsedScore,
-        parsedMaxScore: parsedMaxScore,
+        parsedScore: score,
+        parsedMaxScore: maxScore,
         isMatched: true,
         assignmentId: assignment.id,
         studentName: user?.name || null,
@@ -174,8 +166,8 @@ export async function previewResultsImport(
         rawEmail,
         normalizedEmail,
         rawScore,
-        parsedScore: parsedScore,
-        parsedMaxScore: parsedMaxScore,
+        parsedScore: score,
+        parsedMaxScore: maxScore,
         isMatched: false,
         reason: "No assignment exists for this email on this test",
       });
@@ -194,8 +186,8 @@ export async function previewResultsImport(
 export async function commitResultsImport(
   matchedItems: Array<{
     assignmentId: string;
-    score?: number | null;
-    maxScore?: number | null;
+    score: number;
+    maxScore: number;
     responseEmail: string;
   }>
 ) {
@@ -210,18 +202,16 @@ export async function commitResultsImport(
     if (!item.assignmentId) {
       return { error: "An imported row is missing its assignment reference." };
     }
-    if (typeof item.score === "number" && typeof item.maxScore === "number") {
-      if (!isFinite(item.score) || !isFinite(item.maxScore)) {
-        return { error: `Non-numeric score for ${item.responseEmail}.` };
-      }
-      if (item.score < 0 || item.maxScore <= 0) {
-        return { error: `Score out of range for ${item.responseEmail}.` };
-      }
-      if (item.score > item.maxScore) {
-        return {
-          error: `Score ${item.score} exceeds max ${item.maxScore} for ${item.responseEmail}.`,
-        };
-      }
+    if (!isFinite(item.score) || !isFinite(item.maxScore)) {
+      return { error: `Non-numeric score for ${item.responseEmail}.` };
+    }
+    if (item.score < 0 || item.maxScore <= 0) {
+      return { error: `Score out of range for ${item.responseEmail}.` };
+    }
+    if (item.score > item.maxScore) {
+      return {
+        error: `Score ${item.score} exceeds max ${item.maxScore} for ${item.responseEmail}.`,
+      };
     }
   }
 
@@ -241,25 +231,23 @@ export async function commitResultsImport(
     // Use transaction to ensure data integrity
     await prisma.$transaction(async (tx) => {
       for (const item of deduplicatedItems) {
-        // If numerical scores are present, upsert Result
-        if (typeof item.score === "number" && typeof item.maxScore === "number") {
-          await tx.result.upsert({
-            where: { assignmentId: item.assignmentId },
-            update: {
-              score: item.score,
-              maxScore: item.maxScore,
-              responseEmail: item.responseEmail,
-              submittedAt: new Date(),
-            },
-            create: {
-              assignmentId: item.assignmentId,
-              score: item.score,
-              maxScore: item.maxScore,
-              responseEmail: item.responseEmail,
-              submittedAt: new Date(),
-            },
-          });
-        }
+        // Upsert Result
+        await tx.result.upsert({
+          where: { assignmentId: item.assignmentId },
+          update: {
+            score: item.score,
+            maxScore: item.maxScore,
+            responseEmail: item.responseEmail,
+            submittedAt: new Date(),
+          },
+          create: {
+            assignmentId: item.assignmentId,
+            score: item.score,
+            maxScore: item.maxScore,
+            responseEmail: item.responseEmail,
+            submittedAt: new Date(),
+          },
+        });
 
         // Update Assignment status to SUBMITTED
         await tx.assignment.update({
