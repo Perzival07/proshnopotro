@@ -104,7 +104,8 @@ export const authConfig: NextAuthConfig = {
 
       // Auto-assign admin if email matches
       if (shouldBeAdmin) {
-        await prisma.user.upsert({
+        try {
+          await prisma.user.upsert({
           where: { email: normalizedEmail },
           update: { role: "ADMIN", profileComplete: true },
           create: {
@@ -114,7 +115,15 @@ export const authConfig: NextAuthConfig = {
             role: "ADMIN",
             profileComplete: true,
           },
-        });
+          });
+        } catch (err) {
+          console.error(
+            "[auth] Admin upsert failed during signIn -- is DATABASE_URL set " +
+              "and the database reachable from this deployment?",
+            err
+          );
+          throw err;
+        }
       }
 
       return true;
@@ -173,6 +182,32 @@ export const authConfig: NextAuthConfig = {
   },
   session: {
     strategy: "jwt",
+  },
+  // Auth.js wraps anything thrown inside the OAuth callback in a bare
+  // CallbackRouteError and reports it to the browser as a generic
+  // "Configuration" error, which says nothing about what actually failed.
+  // Unwrap and print the underlying cause so the deployment logs name it.
+  logger: {
+    error(error: Error & { cause?: unknown }) {
+      const cause = error.cause as
+        | { err?: Error; provider?: string }
+        | undefined;
+      const underlying = cause?.err ?? cause ?? error;
+      console.error(
+        `[auth][error] ${error.name}: ${error.message}\n` +
+          `  cause: ${
+            underlying instanceof Error
+              ? `${underlying.name}: ${underlying.message}`
+              : JSON.stringify(underlying)
+          }\n` +
+          `  stack: ${
+            underlying instanceof Error ? underlying.stack : error.stack
+          }`
+      );
+    },
+    warn(code: string) {
+      console.warn(`[auth][warn] ${code}`);
+    },
   },
   secret: process.env.AUTH_SECRET,
 };
