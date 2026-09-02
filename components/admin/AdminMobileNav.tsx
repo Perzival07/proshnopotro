@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { NAV_ITEMS } from "./AdminSidebar";
-import { ExternalLink, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -64,7 +64,7 @@ export function AdminMobileNav() {
 
           {/* max-w-[85%] leaves a visible strip of the page behind, so the
               drawer reads as temporary and is easy to dismiss by tapping out. */}
-          <nav className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col justify-between overflow-y-auto bg-brand-navy shadow-2xl animate-in slide-in-from-left duration-200">
+          <nav className="absolute inset-y-0 left-0 flex w-72 max-w-[85%] flex-col overflow-y-auto bg-brand-navy shadow-2xl animate-in slide-in-from-left duration-200">
             <div>
               <div className="flex h-16 items-center justify-between gap-2 border-b border-white/15 bg-black/10 px-4">
                 {/* A compact lockup, not the full LogoLockup: beside the close
@@ -122,16 +122,6 @@ export function AdminMobileNav() {
                   );
                 })}
               </div>
-            </div>
-
-            <div className="border-t border-white/15 bg-black/15 p-4">
-              <Link
-                href="/"
-                className="flex w-full items-center gap-2 rounded-md bg-white/10 px-3 py-2.5 text-xs text-white/90 transition-colors hover:bg-white/15"
-              >
-                <ExternalLink className="h-3.5 w-3.5 shrink-0 text-brand-blue" />
-                <span>Switch to Student View</span>
-              </Link>
             </div>
           </nav>
         </div>

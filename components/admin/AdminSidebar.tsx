@@ -9,7 +9,6 @@ import {
   UserPlus,
   UploadCloud,
   Users,
-  ExternalLink,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -84,18 +83,9 @@ export function AdminSidebar() {
         </div>
       </div>
 
-      {/* Footer / Switch to Student View */}
+      {/* Footer */}
       <div className="p-4 border-t border-white/15 bg-black/15">
-        <Link
-          href="/"
-          className="flex items-center justify-between w-full px-3 py-2 rounded-md bg-white/10 hover:bg-white/15 text-xs text-white/90 transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <ExternalLink className="h-3.5 w-3.5 text-brand-blue" />
-            <span>Switch to Student View</span>
-          </div>
-        </Link>
-        <p className="text-[10px] text-white/40 text-center mt-3">
+        <p className="text-[10px] text-white/40 text-center">
           Classes by Koustav Admin v1.0
         </p>
       </div>
