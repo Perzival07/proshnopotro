@@ -291,7 +291,7 @@ export function StartTestButton({
               ref={previewRef}
               className={
                 expanded
-                  ? "fixed inset-0 z-50 flex flex-col bg-white"
+                  ? "fixed inset-0 z-50 flex h-[100dvh] flex-col bg-white"
                   : "overflow-hidden rounded-xl border border-brand-border bg-white shadow-card"
               }
             >
@@ -342,7 +342,9 @@ export function StartTestButton({
               <iframe
                 src={embedUrl}
                 title={isDoc ? "Question paper" : "Assessment form"}
-                className={expanded ? "flex-1 w-full border-0" : "h-[70vh] w-full border-0"}
+                // dvh, not vh: on mobile Safari `vh` counts the space behind
+                // the URL bar, so a 70vh frame ran off the bottom of the screen.
+                className={expanded ? "flex-1 w-full border-0" : "h-[60dvh] w-full border-0 sm:h-[70vh]"}
                 loading="lazy"
                 referrerPolicy="no-referrer"
                 sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"

@@ -376,7 +376,7 @@ export function ResultsClient({ tests }: ResultsClientProps) {
           </div>
 
           {/* Tab Selector */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() => setActiveTab("MATCHED")}
               className={`flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${
@@ -418,7 +418,45 @@ export function ResultsClient({ tests }: ResultsClientProps) {
 
           {/* Matched Rows Table */}
           {activeTab === "MATCHED" && (
-            <div className="rounded-lg border border-brand-border overflow-hidden">
+            <>
+            {/* Below md the five columns are shown stacked, so nothing has to
+                be scrolled to sideways to be read before committing scores. */}
+            <div className="space-y-2 md:hidden">
+              {previewResult.matchedRows.length === 0 ? (
+                <div className="rounded-lg border border-brand-border bg-white p-4 text-center text-xs text-brand-ink/60">
+                  No matched assignments found. Check if the CSV emails match the assigned emails.
+                </div>
+              ) : (
+                previewResult.matchedRows.map((r) => (
+                  <div
+                    key={r.rowIndex}
+                    className="rounded-lg border border-[#C2EBDB] bg-[#E1F5EE]/30 p-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-all font-mono text-[11px] font-medium text-brand-navy">
+                          {r.normalizedEmail}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-medium text-brand-ink">
+                          {r.studentName || (
+                            <span className="italic text-brand-ink/40">Unregistered yet</span>
+                          )}
+                        </p>
+                      </div>
+                      <span className="shrink-0 font-mono text-xs font-bold text-[#085041]">
+                        {r.parsedScore} / {r.parsedMaxScore}
+                      </span>
+                    </div>
+                    <span className="mt-2 inline-flex items-center gap-1 rounded-full border border-[#C2EBDB] bg-[#E1F5EE] px-2 py-0.5 text-[10px] font-semibold text-[#085041]">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Will mark SUBMITTED
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="hidden md:block rounded-lg border border-brand-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -461,6 +499,7 @@ export function ResultsClient({ tests }: ResultsClientProps) {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
 
           {/* Unmatched Rows Table */}
@@ -473,7 +512,32 @@ export function ResultsClient({ tests }: ResultsClientProps) {
                 </div>
               </div>
 
-              <div className="rounded-lg border border-brand-border overflow-hidden">
+              <div className="space-y-2 md:hidden">
+                {previewResult.unmatchedRows.length === 0 ? (
+                  <div className="rounded-lg border border-brand-border bg-white p-4 text-center text-xs text-brand-ink/60">
+                    All rows in CSV matched valid student assignments!
+                  </div>
+                ) : (
+                  previewResult.unmatchedRows.map((r) => (
+                    <div
+                      key={r.rowIndex}
+                      className="rounded-lg border border-[#F3DCB5] bg-[#FAEEDA]/40 p-3 text-[11px]"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="min-w-0 break-all font-mono font-medium text-[#633806]">
+                          {r.normalizedEmail}
+                        </p>
+                        <span className="shrink-0 font-mono">
+                          {r.parsedScore} / {r.parsedMaxScore}
+                        </span>
+                      </div>
+                      <p className="mt-1 italic text-brand-ink/70">{r.reason}</p>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              <div className="hidden md:block rounded-lg border border-brand-border overflow-hidden">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -514,7 +578,25 @@ export function ResultsClient({ tests }: ResultsClientProps) {
 
           {/* Invalid Rows Table */}
           {activeTab === "INVALID" && (
-            <div className="rounded-lg border border-brand-border overflow-hidden">
+            <>
+            <div className="space-y-2 md:hidden">
+              {previewResult.invalidRows.map((r) => (
+                <div
+                  key={r.rowIndex}
+                  className="rounded-lg border border-red-200 bg-red-50/60 p-3 text-[11px]"
+                >
+                  <p className="break-all font-mono text-red-700">
+                    {r.rawEmail || "(blank)"}
+                  </p>
+                  <p className="mt-0.5 font-mono text-red-700">
+                    Score: {r.rawScore || "(blank)"}
+                  </p>
+                  <p className="mt-1 font-medium text-red-600">{r.reason}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="hidden md:block rounded-lg border border-brand-border overflow-hidden">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -536,6 +618,7 @@ export function ResultsClient({ tests }: ResultsClientProps) {
                 </TableBody>
               </Table>
             </div>
+            </>
           )}
         </div>
       )}

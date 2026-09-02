@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   {
     name: "Manage Tests",
     href: "/admin/tests",
@@ -45,7 +45,7 @@ export function AdminSidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="w-64 bg-brand-navy text-white flex flex-col justify-between shrink-0 h-screen sticky top-0 border-r border-white/10 shadow-lg">
+    <aside className="hidden lg:flex w-64 bg-brand-navy text-white flex-col justify-between shrink-0 h-screen sticky top-0 border-r border-white/10 shadow-lg">
       <div>
         {/* Brand Header */}
         <div className="h-16 px-5 flex items-center border-b border-white/15 bg-black/10">

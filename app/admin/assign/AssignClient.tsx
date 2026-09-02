@@ -289,8 +289,8 @@ export function AssignClient({ tests, students }: AssignClientProps) {
           {/* Option A: Table of Registered Students */}
           {assignMode === "TABLE" && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between gap-4">
-                <div className="relative flex-1 max-w-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="relative w-full sm:max-w-sm">
                   <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-brand-ink/40" />
                   <Input
                     placeholder="Search by student name, email, or class..."
@@ -305,7 +305,66 @@ export function AssignClient({ tests, students }: AssignClientProps) {
                 </span>
               </div>
 
-              <div className="rounded-lg border border-brand-border overflow-hidden max-h-[350px] overflow-y-auto">
+              {/* On a phone the five-column picker cut the email -- the one
+                  field that identifies who is being assigned -- so below md it
+                  becomes a tappable list with the email wrapped in full. */}
+              <div className="max-h-[350px] space-y-2 overflow-y-auto md:hidden">
+                {filteredStudents.length === 0 ? (
+                  <div className="rounded-lg border border-brand-border bg-white p-4 text-center text-xs text-brand-ink/60">
+                    {students.length === 0
+                      ? "No registered students found. You can still use 'Bulk Email Paste' below."
+                      : "No students matching your search query."}
+                  </div>
+                ) : (
+                  filteredStudents.map((student) => {
+                    const isSelected = selectedStudentEmails.includes(
+                      student.email.toLowerCase()
+                    );
+                    return (
+                      // A div, not a button: Radix's Checkbox renders its own
+                      // <button>, and a button inside a button is invalid HTML
+                      // that fails hydration. The checkbox stays the real
+                      // control; the row is just a larger tap target for it.
+                      <div
+                        key={student.id}
+                        role="group"
+                        onClick={() => handleToggleStudent(student.email)}
+                        className={`flex w-full cursor-pointer items-start gap-3 rounded-lg border p-3 text-left transition-colors ${
+                          isSelected
+                            ? "border-brand-blue bg-brand-tint/60"
+                            : "border-brand-border bg-white"
+                        }`}
+                      >
+                        <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => handleToggleStudent(student.email)}
+                            aria-label={`Select ${student.name || student.email}`}
+                          />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-xs font-semibold text-brand-navy">
+                            {student.name || "Student"}
+                          </span>
+                          <span className="mt-0.5 block break-all font-mono text-[11px] text-brand-ink/75">
+                            {student.email}
+                          </span>
+                          <span className="mt-1.5 flex flex-wrap items-center gap-2 text-[10px] text-brand-ink/60">
+                            {student.className && (
+                              <span className="rounded bg-brand-tint px-2 py-0.5 font-medium text-brand-navy">
+                                {student.className}
+                              </span>
+                            )}
+                            {student.phone && <span>{student.phone}</span>}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              <div className="hidden md:block rounded-lg border border-brand-border overflow-hidden max-h-[350px] overflow-y-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -480,7 +539,9 @@ export function AssignClient({ tests, students }: AssignClientProps) {
                     <span>Invalid Email Format:</span>
                     <span>{resultSummary.invalidCount}</span>
                   </div>
-                  <p className="text-[11px] text-red-600 truncate">
+                  {/* break-all rather than truncate: a run of long emails
+                      would otherwise stretch the dialog past the screen. */}
+                  <p className="text-[11px] text-red-600 break-all">
                     {resultSummary.invalidEmails.join(", ")}
                   </p>
                 </div>

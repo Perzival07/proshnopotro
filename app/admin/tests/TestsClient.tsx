@@ -198,7 +198,7 @@ export function TestsClient({ tests }: TestsClientProps) {
         </div>
 
         {/* Status Filter Chips */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-brand-ink/60 mr-1">Status:</span>
           {(["ALL", "ACTIVE", "INACTIVE"] as const).map((filter) => (
             <button
@@ -221,8 +221,135 @@ export function TestsClient({ tests }: TestsClientProps) {
         </div>
       </div>
 
+      {/* Below md the seven-column table cannot fit without cutting columns
+          off, so the same rows are stacked as cards instead. */}
+      <div className="space-y-3 md:hidden">
+        {paginatedTests.length === 0 ? (
+          <div className="rounded-xl border border-brand-border bg-white p-6 text-center text-xs text-brand-ink/60 shadow-card">
+            No assessment tests found matching current criteria.
+          </div>
+        ) : (
+          paginatedTests.map((test) => (
+            <div
+              key={test.id}
+              className="rounded-xl border border-brand-border bg-white p-4 shadow-card"
+            >
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-brand-tint text-brand-navy">
+                  <SubjectIcon name={test.iconName} className="h-4 w-4" />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  {/* min-w-0 + break-words: a long untruncated title is the
+                      classic source of sideways scroll on a phone. */}
+                  <p className="break-words font-heading text-sm font-semibold text-brand-navy">
+                    {test.title}
+                  </p>
+                  {test.description && (
+                    <p className="mt-0.5 line-clamp-2 text-[11px] text-brand-ink/60">
+                      {test.description}
+                    </p>
+                  )}
+                </div>
+
+                {test.active ? (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#C2EBDB] bg-[#E1F5EE] px-2 py-0.5 text-[10px] font-semibold text-[#085041]">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Active
+                  </span>
+                ) : (
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#E2DFD6] bg-[#F1EFE8] px-2 py-0.5 text-[10px] font-medium text-[#444441]">
+                    <XCircle className="h-3 w-3" />
+                    Off
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-brand-ink/70">
+                <span className="rounded bg-brand-tint px-2 py-0.5 font-medium text-brand-navy">
+                  {test.subject}
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  {test.format === "GOOGLE_DOC" ? (
+                    <>
+                      <FileText className="h-3 w-3" />
+                      Written
+                    </>
+                  ) : (
+                    <>
+                      <ClipboardList className="h-3 w-3" />
+                      Form
+                    </>
+                  )}
+                </span>
+                {test.durationMinutes ? (
+                  <span className="inline-flex items-center gap-1 text-brand-blue">
+                    <Timer className="h-3 w-3" />
+                    {formatDurationLabel(test.durationMinutes)}
+                  </span>
+                ) : null}
+                {test.proctored && (
+                  <span className="inline-flex items-center gap-1 text-brand-navy">
+                    <Eye className="h-3 w-3" />
+                    Watched
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-3 flex items-center justify-between border-t border-brand-border/60 pt-3">
+                <span className="font-mono text-[11px] text-brand-ink/60">
+                  <span className="font-semibold text-brand-navy">{test.submittedCount}</span>
+                  {" / "}
+                  {test._count.assignments} done
+                  <span className="ml-2">{formatDateShort(test.createdAt)}</span>
+                </span>
+
+                {/* h-9 w-9 targets: comfortably tappable, unlike the 14px
+                    desktop icon buttons. */}
+                <div className="flex items-center gap-1">
+                  <Link
+                    href={`/admin/roster?testId=${test.id}`}
+                    aria-label="View roster"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-brand-navy transition-colors hover:bg-brand-tint"
+                  >
+                    <Users className="h-4 w-4" />
+                  </Link>
+                  <Link
+                    href={`/admin/assign?testId=${test.id}`}
+                    aria-label="Assign students"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-brand-blue transition-colors hover:bg-brand-tint"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                  </Link>
+                  <button
+                    onClick={() => openEditModal(test)}
+                    aria-label="Edit test"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-brand-ink/80 transition-colors hover:bg-brand-tint hover:text-brand-navy"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                  <button
+                    onClick={() => handleToggleActive(test.id, test.active)}
+                    disabled={togglingId === test.id}
+                    aria-label={test.active ? "Deactivate test" : "Activate test"}
+                    className={`inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors disabled:opacity-40 ${
+                      test.active
+                        ? "text-red-600 hover:bg-red-50"
+                        : "text-green-700 hover:bg-green-50"
+                    }`}
+                  >
+                    <Power className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
       {/* Dense Table */}
       <div className="rounded-xl border border-brand-border bg-white shadow-card overflow-hidden">
+        <div className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -400,9 +527,10 @@ export function TestsClient({ tests }: TestsClientProps) {
             )}
           </TableBody>
         </Table>
+        </div>
 
         {/* Pagination Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-brand-border bg-brand-page/50 text-xs text-brand-ink/70">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-brand-border bg-brand-page/50 text-xs text-brand-ink/70">
           <div>
             Showing <strong>{Math.min(sortedTests.length, (currentPage - 1) * pageSize + 1)}</strong> to{" "}
             <strong>{Math.min(sortedTests.length, currentPage * pageSize)}</strong> of{" "}

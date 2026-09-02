@@ -292,12 +292,12 @@ export function RosterClient({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex w-full sm:w-auto items-center gap-3">
           <Button
             onClick={handleExportCSV}
             disabled={assignments.length === 0}
             variant="outline"
-            className="border-brand-navy/30 text-brand-navy hover:bg-brand-tint flex items-center gap-2"
+            className="w-full sm:w-auto border-brand-navy/30 text-brand-navy hover:bg-brand-tint flex items-center justify-center gap-2"
           >
             <Download className="h-4 w-4" />
             <span>Export CSV</span>
@@ -393,7 +393,119 @@ export function RosterClient({
       </div>
 
       {/* Roster Table */}
+      {/* The roster's seven columns cannot fit a phone, so below md each
+          student becomes a card carrying the same facts and actions. */}
+      <div className="space-y-3 md:hidden">
+        {paginatedAssignments.length === 0 ? (
+          <div className="rounded-xl border border-brand-border bg-white p-6 text-center text-xs text-brand-ink/60 shadow-card">
+            {assignments.length === 0
+              ? "No students have been assigned to this test yet."
+              : "No students match the current filters."}
+          </div>
+        ) : (
+          paginatedAssignments.map((a) => {
+            const isSubmitted = isAssignmentSubmitted(a);
+            const hasSignedIn = a.user !== null;
+            const isToggling = updatingStatusId === a.id;
+
+            return (
+              <div
+                key={a.id}
+                className="rounded-xl border border-brand-border bg-white p-4 shadow-card"
+              >
+                <div className="min-w-0">
+                  <p className="font-heading text-sm font-semibold text-brand-navy">
+                    {a.user?.name || (
+                      <span className="italic text-brand-ink/40">Name not set</span>
+                    )}
+                  </p>
+                  {/* break-all, not truncate: an email is the row's identity,
+                      so it wraps rather than being cut or scrolling sideways. */}
+                  <p className="mt-0.5 break-all font-mono text-[11px] text-brand-ink/70">
+                    {a.studentEmail}
+                  </p>
+                </div>
+
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  {a.user?.className && (
+                    <span className="rounded bg-brand-tint px-2 py-0.5 text-[10px] font-medium text-brand-navy">
+                      {a.user.className}
+                    </span>
+                  )}
+                  {hasSignedIn ? (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-brand-blue/30 bg-brand-tint px-2 py-0.5 text-[10px] font-medium text-brand-navy">
+                      <UserCheck className="h-3 w-3 text-brand-blue" />
+                      Signed In
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#E2DFD6] bg-[#F1EFE8] px-2 py-0.5 text-[10px] font-medium text-[#444441]">
+                      <UserX className="h-3 w-3 opacity-60" />
+                      Not registered
+                    </span>
+                  )}
+                  {a.tabSwitches > 0 && (
+                    <span className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700">
+                      <EyeOff className="h-3 w-3" />
+                      Left tab {a.tabSwitches}&times;
+                    </span>
+                  )}
+                </div>
+
+                <div className="mt-3 flex items-center justify-between gap-3 border-t border-brand-border/60 pt-3">
+                  <button
+                    onClick={() => handleToggleStatus(a)}
+                    disabled={isToggling}
+                    className="shrink-0 disabled:opacity-50"
+                  >
+                    {isSubmitted ? (
+                      <Badge variant="submitted" className="gap-1 shadow-xs">
+                        <CheckCircle2 className="h-3 w-3" />
+                        {a.autoSubmitted ? "Auto" : "Submitted"}
+                      </Badge>
+                    ) : (
+                      <Badge variant="available" className="gap-1 shadow-xs">
+                        <Clock className="h-3 w-3" />
+                        Assigned
+                      </Badge>
+                    )}
+                  </button>
+
+                  <div className="flex items-center gap-3">
+                    <span className="font-mono text-xs font-bold text-[#085041]">
+                      {a.result ? `${a.result.score} / ${a.result.maxScore}` : ""}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant={a.result ? "outline" : "default"}
+                      onClick={() => handleOpenGradeModal(a)}
+                      className={`h-9 gap-1.5 px-3 text-[11px] font-medium ${
+                        a.result
+                          ? "border-brand-border text-brand-navy hover:bg-brand-tint"
+                          : "bg-brand-navy text-white shadow-xs hover:bg-brand-navy/90"
+                      }`}
+                    >
+                      {a.result ? (
+                        <>
+                          <PenLine className="h-3 w-3 text-brand-blue" />
+                          <span>Edit</span>
+                        </>
+                      ) : (
+                        <>
+                          <Award className="h-3 w-3 text-amber-300" />
+                          <span>Marks</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+
       <div className="rounded-xl border border-brand-border bg-white shadow-card overflow-hidden">
+        <div className="hidden md:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -586,9 +698,10 @@ export function RosterClient({
             )}
           </TableBody>
         </Table>
+        </div>
 
         {/* Pagination Bar */}
-        <div className="flex items-center justify-between px-4 py-3 border-t border-brand-border bg-brand-page/50 text-xs text-brand-ink/70">
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 border-t border-brand-border bg-brand-page/50 text-xs text-brand-ink/70">
           <div>
             Showing <strong>{Math.min(sortedAssignments.length, (currentPage - 1) * pageSize + 1)}</strong> to{" "}
             <strong>{Math.min(sortedAssignments.length, currentPage * pageSize)}</strong> of{" "}
