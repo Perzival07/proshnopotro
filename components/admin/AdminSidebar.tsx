@@ -9,6 +9,7 @@ import {
   UserPlus,
   UploadCloud,
   Users,
+  GraduationCap,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,12 @@ export const NAV_ITEMS = [
     href: "/admin/assign",
     icon: UserPlus,
     description: "Assign to students or bulk emails",
+  },
+  {
+    name: "Students",
+    href: "/admin/students",
+    icon: GraduationCap,
+    description: "Add, edit or remove students",
   },
   {
     name: "Test Rosters",

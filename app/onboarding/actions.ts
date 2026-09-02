@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { isValidClass } from "@/lib/students";
 
 export async function completeProfile(formData: {
   name: string;
@@ -21,6 +22,12 @@ export async function completeProfile(formData: {
 
   if (!name || !phone || !className) {
     return { error: "Please fill in all profile fields." };
+  }
+
+  // The form only offers listed classes, but the action is a public endpoint
+  // and a stray value here would split the roster into look-alike groups.
+  if (!isValidClass(className)) {
+    return { error: "Choose a class from the list." };
   }
 
   try {

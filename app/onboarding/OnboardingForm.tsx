@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AtomMark } from "@/components/brand/AtomMark";
+import { CLASS_OPTIONS } from "@/lib/students";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
 
 interface OnboardingFormProps {
@@ -105,13 +106,11 @@ export function OnboardingForm({ defaultName, email }: OnboardingFormProps) {
             <SelectValue placeholder="Select class" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="Class 8">Class 8</SelectItem>
-            <SelectItem value="Class 9">Class 9</SelectItem>
-            <SelectItem value="Class 10">Class 10</SelectItem>
-            <SelectItem value="Class 11 - Science">Class 11 - Science</SelectItem>
-            <SelectItem value="Class 12 - Science">Class 12 - Science</SelectItem>
-            <SelectItem value="NEET / JEE Repeater">NEET / JEE Repeater</SelectItem>
-            <SelectItem value="Foundation Batch">Foundation Batch</SelectItem>
+            {CLASS_OPTIONS.map((option) => (
+              <SelectItem key={option} value={option}>
+                {option}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
