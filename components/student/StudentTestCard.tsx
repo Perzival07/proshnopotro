@@ -5,15 +5,17 @@ import { Button } from "@/components/ui/button";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { formatDateShort } from "@/lib/utils";
-import { isAssignmentSubmitted } from "@/lib/assignment-status";
-import { Calendar, CheckCircle2, Clock, ArrowRight, Lock } from "lucide-react";
+import { deriveCardStatus, type CardStatus } from "@/lib/assignment-status";
+import { formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
+import { Calendar, CheckCircle2, Clock, ArrowRight, Lock, Timer } from "lucide-react";
 
-export type CardStatus = "AVAILABLE" | "SUBMITTED" | "CLOSED";
+export type { CardStatus };
 
 interface StudentTestCardProps {
   assignment: {
     id: string;
     dueAt: Date;
+    startedAt?: Date | null;
     status: "ASSIGNED" | "SUBMITTED";
     test: {
       id: string;
@@ -23,6 +25,7 @@ interface StudentTestCardProps {
       iconName: string;
       active: boolean;
       format?: "GOOGLE_FORM" | "GOOGLE_DOC";
+      durationMinutes?: number | null;
     };
     result?: {
       score: number;
@@ -34,22 +37,22 @@ interface StudentTestCardProps {
 
 export function StudentTestCard({ assignment }: StudentTestCardProps) {
   const { test, result, dueAt } = assignment;
-  const isPastDue = new Date() > new Date(dueAt);
-  const isSubmitted = isAssignmentSubmitted(assignment);
-  const isInactive = !test.active;
+  const cardStatus: CardStatus = deriveCardStatus(assignment);
+  const timed = isTimed(assignment);
 
-  let cardStatus: CardStatus = "AVAILABLE";
   let reasonText = "";
-
-  if (isSubmitted) {
-    cardStatus = "SUBMITTED";
+  if (cardStatus === "SUBMITTED") {
     reasonText = "Already submitted";
-  } else if (isInactive) {
-    cardStatus = "CLOSED";
+  } else if (!test.active) {
     reasonText = "Test deactivated by tutor";
-  } else if (isPastDue) {
-    cardStatus = "CLOSED";
-    reasonText = `Deadline passed ${formatDateShort(dueAt)}`;
+  } else if (cardStatus === "CLOSED") {
+    // Both endings close the card, and a student whose own window ran out
+    // needs to be told that rather than being pointed at a deadline that has
+    // not arrived yet.
+    reasonText =
+      timed && assignment.startedAt && isTimeUp(assignment)
+        ? "Time limit reached"
+        : `Deadline passed ${formatDateShort(dueAt)}`;
   }
 
   const isInteractive = cardStatus === "AVAILABLE";
@@ -77,9 +80,17 @@ export function StudentTestCard({ assignment }: StudentTestCardProps) {
             <span className="text-xs font-semibold uppercase tracking-wider text-brand-blue block">
               {test.subject}
             </span>
-            <span className="text-[11px] text-brand-ink/60 flex items-center gap-1 mt-0.5">
-              <Calendar className="h-3 w-3" />
-              Due {formatDateShort(dueAt)}
+            <span className="text-[11px] text-brand-ink/60 flex items-center gap-2 mt-0.5">
+              <span className="flex items-center gap-1">
+                <Calendar className="h-3 w-3" />
+                Due {formatDateShort(dueAt)}
+              </span>
+              {timed && (
+                <span className="flex items-center gap-1 text-brand-blue font-medium">
+                  <Timer className="h-3 w-3" />
+                  {formatDurationLabel(test.durationMinutes)}
+                </span>
+              )}
             </span>
           </div>
         </div>

@@ -16,6 +16,7 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { TestModal } from "./TestModal";
 import { toggleTestActive } from "./actions";
 import { formatDateShort } from "@/lib/utils";
+import { formatDurationLabel } from "@/lib/exam-timer";
 import type { TestFormat } from "@/lib/test-resource";
 import {
   Plus,
@@ -29,6 +30,7 @@ import {
   ArrowUpDown,
   CheckCircle2,
   XCircle,
+  Timer,
 } from "lucide-react";
 
 interface TestItem {
@@ -39,6 +41,7 @@ interface TestItem {
   iconName: string;
   format: TestFormat;
   formUrl: string;
+  durationMinutes: number | null;
   active: boolean;
   createdAt: Date;
   _count: {
@@ -306,6 +309,12 @@ export function TestsClient({ tests }: TestsClientProps) {
                             Form
                           </>
                         )}
+                        {test.durationMinutes ? (
+                          <span className="inline-flex items-center gap-1 text-brand-blue">
+                            <Timer className="h-3 w-3" />
+                            {formatDurationLabel(test.durationMinutes)}
+                          </span>
+                        ) : null}
                       </span>
                     </div>
                   </TableCell>

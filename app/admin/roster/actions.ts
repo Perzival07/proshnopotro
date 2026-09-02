@@ -69,6 +69,18 @@ export async function updateStudentScore(
   }
 }
 
+/**
+ * Putting a student back on ASSIGNED clears the timer as well as the status.
+ * On a timed test a leftover `startedAt` is an expired window, so the attempt
+ * would be auto-submitted again the moment they opened it and the tutor's
+ * revert would appear to do nothing.
+ */
+const REOPEN_DATA = {
+  status: "ASSIGNED",
+  startedAt: null,
+  autoSubmitted: false,
+} as const;
+
 export async function toggleAssignmentStatus(
   assignmentId: string,
   newStatus: "ASSIGNED" | "SUBMITTED",
@@ -112,7 +124,7 @@ export async function toggleAssignmentStatus(
           prisma.result.delete({ where: { assignmentId } }),
           prisma.assignment.update({
             where: { id: assignmentId },
-            data: { status: "ASSIGNED" },
+            data: REOPEN_DATA,
           }),
         ]);
 
@@ -127,7 +139,7 @@ export async function toggleAssignmentStatus(
 
     await prisma.assignment.update({
       where: { id: assignmentId },
-      data: { status: newStatus },
+      data: newStatus === "ASSIGNED" ? REOPEN_DATA : { status: "SUBMITTED" },
     });
 
     revalidatePath("/admin/roster");

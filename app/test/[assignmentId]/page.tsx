@@ -8,7 +8,9 @@ import { SubjectIcon } from "@/components/SubjectIcon";
 import { StartTestButton } from "./StartTestButton";
 import { formatDate } from "@/lib/utils";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
-import { AlertTriangle, ArrowLeft, Calendar, Shield } from "lucide-react";
+import { attemptDeadline, formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
+import { closeExpiredAttempts } from "@/lib/close-expired";
+import { AlertTriangle, ArrowLeft, Calendar, Shield, Timer } from "lucide-react";
 import Link from "next/link";
 
 interface PageProps {
@@ -27,6 +29,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
       id: true,
       studentEmail: true,
       dueAt: true,
+      startedAt: true,
       status: true,
       test: {
         select: {
@@ -37,6 +40,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           iconName: true,
           active: true,
           format: true,
+          durationMinutes: true,
           // formUrl is explicitly OMITTED to prevent leakage into HTML
         },
       },
@@ -59,14 +63,26 @@ export default async function TestConfirmationPage({ params }: PageProps) {
     redirect("/");
   }
 
+  // A window that ran out while the student was away is closed here, so the
+  // record catches up before the page decides what to show them.
+  await closeExpiredAttempts([assignment]);
+
   const isSubmitted = isAssignmentSubmitted(assignment);
-  const isPastDue = new Date() > new Date(assignment.dueAt);
   const isInactive = !assignment.test.active;
 
+  // Covers both the tutor's deadline and, once started, this student's own
+  // window -- either one ending puts the paper out of reach.
+  const outOfTime = isTimeUp(assignment);
+
   // If closed or already submitted, redirect to dashboard
-  if (isSubmitted || isPastDue || isInactive) {
+  if (isSubmitted || outOfTime || isInactive) {
     redirect("/");
   }
+
+  const timed = isTimed(assignment);
+  // Only a started attempt has a live clock; before that the countdown has
+  // nothing to count and the student still sees the limit stated below.
+  const endsAt = timed && assignment.startedAt ? attemptDeadline(assignment) : null;
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-brand-page">
@@ -125,6 +141,15 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                   <strong>Candidate Email:</strong> {user.email}
                 </span>
               </div>
+              {timed && (
+                <div className="flex items-center gap-2 text-brand-ink/75">
+                  <Timer className="h-4 w-4 text-brand-blue shrink-0" />
+                  <span>
+                    <strong>Time Limit:</strong>{" "}
+                    {formatDurationLabel(assignment.test.durationMinutes)}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* Mandatory Instruction Warning Alert */}
@@ -137,6 +162,15 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 <p className="text-xs leading-relaxed font-medium">
                   You get one attempt. Do not close the form until you submit.
                 </p>
+                {timed && (
+                  <p className="text-xs leading-relaxed font-medium">
+                    {assignment.startedAt
+                      ? "Your timer is already running \u2014 it started when you first opened this paper and does not reset."
+                      : `This is a timed assessment. Your ${formatDurationLabel(
+                          assignment.test.durationMinutes
+                        )} starts the moment you open the paper and keeps running if you close this page. When it reaches zero the assessment is submitted automatically.`}
+                  </p>
+                )}
                 <p className="text-[11px] opacity-80 leading-normal">
                   Make sure your internet connection is stable before opening the test.
                 </p>
@@ -150,6 +184,8 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 testTitle={assignment.test.title}
                 testFormat={assignment.test.format}
                 studentName={user.name}
+                initialEndsAt={endsAt?.toISOString() ?? null}
+                initialServerNow={endsAt ? new Date().toISOString() : null}
               />
             </div>
           </div>

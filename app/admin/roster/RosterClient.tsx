@@ -50,7 +50,9 @@ export interface RosterAssignment {
   studentEmail: string;
   assignedAt: Date;
   dueAt: Date;
+  startedAt: Date | null;
   status: "ASSIGNED" | "SUBMITTED";
+  autoSubmitted: boolean;
   user: {
     id: string;
     name: string | null;
@@ -516,7 +518,11 @@ export function RosterClient({
                         {isSubmitted ? (
                           <Badge variant="submitted" className="gap-1 shadow-xs cursor-pointer hover:bg-emerald-100">
                             <CheckCircle2 className="h-3 w-3" />
-                            <span>Submitted</span>
+                            <span>
+                              {/* Worth distinguishing: the timer ended this
+                                  attempt, the student did not hand it in. */}
+                              {a.autoSubmitted ? "Auto-submitted" : "Submitted"}
+                            </span>
                           </Badge>
                         ) : (
                           <Badge variant="available" className="gap-1 shadow-xs cursor-pointer hover:bg-sky-100">

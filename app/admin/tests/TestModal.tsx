@@ -17,8 +17,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { SubjectIcon, SUBJECT_ICONS } from "@/components/SubjectIcon";
 import { createTest, updateTest } from "./actions";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { AlertCircle, Link as LinkIcon, FileText, ClipboardList } from "lucide-react";
+import { AlertCircle, Link as LinkIcon, FileText, ClipboardList, Timer } from "lucide-react";
 import type { TestFormat } from "@/lib/test-resource";
+import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
 
 interface TestModalProps {
   isOpen: boolean;
@@ -31,6 +32,7 @@ interface TestModalProps {
     iconName: string;
     format: TestFormat;
     formUrl: string;
+    durationMinutes: number | null;
     active: boolean;
   } | null;
 }
@@ -43,6 +45,9 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [iconName, setIconName] = useState("Atom");
   const [format, setFormat] = useState<TestFormat>("GOOGLE_FORM");
   const [formUrl, setFormUrl] = useState("");
+  // Held as a string so the field can be genuinely empty, which is what
+  // "no time limit" means -- a number state would coerce that to 0.
+  const [durationMinutes, setDurationMinutes] = useState("");
   const [active, setActive] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +60,9 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setIconName(testToEdit.iconName || "BookOpen");
       setFormat(testToEdit.format || "GOOGLE_FORM");
       setFormUrl(testToEdit.formUrl);
+      setDurationMinutes(
+        testToEdit.durationMinutes ? String(testToEdit.durationMinutes) : ""
+      );
       setActive(testToEdit.active);
     } else {
       setTitle("");
@@ -63,6 +71,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setIconName("Atom");
       setFormat("GOOGLE_FORM");
       setFormUrl("");
+      setDurationMinutes("");
       setActive(true);
     }
     setError(null);
@@ -80,6 +89,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       iconName,
       format,
       formUrl,
+      durationMinutes,
       active,
     };
 
@@ -267,6 +277,33 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               {format === "GOOGLE_FORM"
                 ? "Share the form so anyone with the link can respond, and paste the full docs.google.com/forms/\u2026 address \u2014 forms.gle short links cannot be shown inside the portal."
                 : "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error."}
+            </p>
+          </div>
+
+          <div>
+            <Label
+              htmlFor="test-duration"
+              className="text-xs font-semibold text-brand-navy flex items-center gap-1.5"
+            >
+              <Timer className="h-3.5 w-3.5 text-brand-blue" />
+              <span>Time Limit (minutes)</span>
+            </Label>
+            <Input
+              id="test-duration"
+              type="number"
+              inputMode="numeric"
+              min={MIN_DURATION_MINUTES}
+              max={MAX_DURATION_MINUTES}
+              step={1}
+              placeholder="Leave blank for no time limit"
+              value={durationMinutes}
+              onChange={(e) => setDurationMinutes(e.target.value)}
+              className="mt-1"
+            />
+            <p className="mt-1 text-[11px] text-brand-ink/55">
+              The countdown starts when the student first opens the paper, not when
+              you assign it, and the test submits itself automatically when it
+              reaches zero. It never runs past the submission deadline.
             </p>
           </div>
 

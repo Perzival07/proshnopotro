@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { isValidResourceUrl, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
+import { parseDurationMinutes } from "@/lib/exam-timer";
 
 export interface TestInput {
   title: string;
@@ -12,6 +13,8 @@ export interface TestInput {
   iconName: string;
   format: TestFormat;
   formUrl: string;
+  /** Minutes the student gets once they open the paper. Blank/null = untimed. */
+  durationMinutes?: number | string | null;
   active?: boolean;
 }
 
@@ -35,6 +38,8 @@ function validateTestInput(data: TestInput): string | null {
       ? "A forms.gle short link cannot be displayed inside the portal. Open the form, choose Send \u2192 link, and paste the full docs.google.com/forms/... address."
       : "That Google Doc link cannot be displayed inside the portal. Paste the standard docs.google.com/document/... address.";
   }
+  const duration = parseDurationMinutes(data.durationMinutes);
+  if (duration.error) return duration.error;
   return null;
 }
 
@@ -53,6 +58,7 @@ export async function createTest(data: TestInput) {
         iconName: data.iconName || "BookOpen",
         format: data.format,
         formUrl: data.formUrl.trim(),
+        durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         active: data.active ?? true,
       },
     });
@@ -83,6 +89,7 @@ export async function updateTest(id: string, data: TestInput) {
         iconName: data.iconName || "BookOpen",
         format: data.format,
         formUrl: data.formUrl.trim(),
+        durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         active: data.active ?? true,
       },
     });

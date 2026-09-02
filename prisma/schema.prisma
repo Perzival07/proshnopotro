@@ -100,6 +100,8 @@ model Test {
   iconName    String       @default("BookOpen")
   format      TestFormat   @default(GOOGLE_FORM)
   formUrl     String       @db.Text             // Question paper URL. Never exposed to client HTML.
+  /// Minutes a student gets once they open the paper. null = untimed.
+  durationMinutes Int?
   active      Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -115,7 +117,12 @@ model Assignment {
   studentEmail String           // Lowercase normalized email (allows pre-assignment before user signs in)
   assignedAt   DateTime         @default(now())
   dueAt        DateTime
+  /// Stamped the first time the student opens the paper. The countdown for a
+  /// timed test runs from here, so a reload or a second device cannot restart it.
+  startedAt    DateTime?
   status       AssignmentStatus @default(ASSIGNED)
+  /// True when the timer ran out rather than the student confirming.
+  autoSubmitted Boolean         @default(false)
 
   test         Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
   result       Result?

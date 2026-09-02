@@ -5,6 +5,8 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { StudentTestCard } from "@/components/student/StudentTestCard";
 import { EmptyState } from "@/components/student/EmptyState";
+import { deriveCardStatus } from "@/lib/assignment-status";
+import { closeExpiredAttempts } from "@/lib/close-expired";
 import { BookOpen } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -27,15 +29,19 @@ export default async function StudentDashboardPage() {
     ],
   });
 
-  const availableCount = assignments.filter(
-    (a) =>
-      a.status === "ASSIGNED" &&
-      a.test.active &&
-      new Date() <= new Date(a.dueAt)
+  // Any timed attempt whose window ran out while the student was away is
+  // closed here, so the dashboard they land on is already truthful.
+  const autoClosed = await closeExpiredAttempts(assignments);
+  const cards = assignments.map((a) =>
+    autoClosed.has(a.id) ? { ...a, status: "SUBMITTED" as const } : a
+  );
+
+  const availableCount = cards.filter(
+    (a) => deriveCardStatus(a) === "AVAILABLE"
   ).length;
 
-  const submittedCount = assignments.filter(
-    (a) => a.status === "SUBMITTED" || a.result !== null
+  const submittedCount = cards.filter(
+    (a) => deriveCardStatus(a) === "SUBMITTED"
   ).length;
 
   return (
@@ -78,19 +84,19 @@ export default async function StudentDashboardPage() {
         </div>
 
         {/* Tests Grid */}
-        {assignments.length === 0 ? (
+        {cards.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="font-heading text-lg font-semibold text-brand-navy flex items-center gap-2">
                 <BookOpen className="h-5 w-5 text-brand-blue" />
-                <span>Assigned Tests ({assignments.length})</span>
+                <span>Assigned Tests ({cards.length})</span>
               </h2>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {assignments.map((assignment) => (
+              {cards.map((assignment) => (
                 <StudentTestCard
                   key={assignment.id}
                   assignment={assignment}

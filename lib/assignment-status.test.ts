@@ -78,4 +78,51 @@ describe("deriveCardStatus", () => {
       deriveCardStatus({ status: "ASSIGNED", dueAt: past, result: null, test: active }, now)
     ).toBe("CLOSED");
   });
+
+  it("is CLOSED when a timed attempt's own window has run out", () => {
+    // The tutor's deadline is still a week off, but this student's 30 minutes
+    // ended an hour ago -- the card must not offer them the paper again.
+    expect(
+      deriveCardStatus(
+        {
+          status: "ASSIGNED",
+          dueAt: future,
+          startedAt: new Date("2026-08-31T23:00:00.000Z"),
+          result: null,
+          test: { active: true, durationMinutes: 30 },
+        },
+        now
+      )
+    ).toBe("CLOSED");
+  });
+
+  it("is AVAILABLE while a timed attempt still has minutes left", () => {
+    expect(
+      deriveCardStatus(
+        {
+          status: "ASSIGNED",
+          dueAt: future,
+          startedAt: new Date("2026-08-31T23:50:00.000Z"),
+          result: null,
+          test: { active: true, durationMinutes: 30 },
+        },
+        now
+      )
+    ).toBe("AVAILABLE");
+  });
+
+  it("is AVAILABLE for a timed test the student has not opened yet", () => {
+    expect(
+      deriveCardStatus(
+        {
+          status: "ASSIGNED",
+          dueAt: future,
+          startedAt: null,
+          result: null,
+          test: { active: true, durationMinutes: 30 },
+        },
+        now
+      )
+    ).toBe("AVAILABLE");
+  });
 });

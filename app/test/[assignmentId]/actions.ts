@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { revalidatePath } from "next/cache";
 import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
+import { attemptDeadline, isTimed, isTimeUp, remainingMs } from "@/lib/exam-timer";
 
 export interface FormResolutionResult {
   /**
@@ -13,6 +14,14 @@ export interface FormResolutionResult {
    */
   embedUrl?: string;
   format?: TestFormat;
+  /** Present only for a timed test: when this student's attempt ends. */
+  endsAt?: string;
+  /**
+   * The server's clock at the moment of the reply. The countdown corrects for
+   * the offset against this, so a browser clock that is minutes out does not
+   * hand the student extra time or cut them short.
+   */
+  serverNow?: string;
   error?: string;
 }
 
@@ -58,9 +67,17 @@ export async function resolveSecureFormUrl(
     return { error: "This test has been deactivated by the tutor." };
   }
 
-  // 4. Due date verification
-  if (new Date() > new Date(assignment.dueAt)) {
-    return { error: "The deadline for this assessment has passed." };
+  // 4. Deadline verification -- the tutor's date and, on a timed test, the
+  //    student's own window, whichever ends first. Re-opening the paper after
+  //    the window closed must not hand the paper back, so this is checked
+  //    against the stored `startedAt` rather than anything the client sent.
+  if (isTimeUp(assignment)) {
+    await closeOutAssignment(assignment.id, isTimed(assignment));
+    return {
+      error: isTimed(assignment)
+        ? "Your time for this assessment is up. It has been submitted automatically."
+        : "The deadline for this assessment has passed.",
+    };
   }
 
   if (!assignment.test.formUrl) {
@@ -77,13 +94,83 @@ export async function resolveSecureFormUrl(
     };
   }
 
-  return { embedUrl, format };
+  // Start the clock on first sight of the paper, and only then -- a student
+  // who never opened it should not lose the window to a stale timestamp.
+  const startedAt = await ensureStarted(assignment);
+
+  if (!isTimed(assignment)) {
+    return { embedUrl, format };
+  }
+
+  const deadline = attemptDeadline({ ...assignment, startedAt });
+  return {
+    embedUrl,
+    format,
+    endsAt: deadline.toISOString(),
+    serverNow: new Date().toISOString(),
+  };
 }
 
 /**
- * Allows a student to confirm they completed the form (works for both graded and non-graded forms).
+ * Stamps `startedAt` the first time a timed paper is opened and returns the
+ * value now in force.
+ *
+ * The write is conditional on the column still being null so that two tabs
+ * opening at once cannot restart the clock -- whoever loses the race reads the
+ * winner's timestamp back rather than overwriting it.
  */
-export async function markStudentSubmission(assignmentId: string) {
+async function ensureStarted(assignment: {
+  id: string;
+  startedAt: Date | null;
+  test: { durationMinutes: number | null };
+}): Promise<Date | null> {
+  if (!isTimed(assignment) || assignment.startedAt) return assignment.startedAt;
+
+  const now = new Date();
+  const claimed = await prisma.assignment.updateMany({
+    where: { id: assignment.id, startedAt: null },
+    data: { startedAt: now },
+  });
+
+  if (claimed.count > 0) {
+    revalidatePath("/");
+    return now;
+  }
+
+  const fresh = await prisma.assignment.findUnique({
+    where: { id: assignment.id },
+    select: { startedAt: true },
+  });
+  return fresh?.startedAt ?? now;
+}
+
+/** Marks an assignment submitted, recording whether the timer did it. */
+async function closeOutAssignment(assignmentId: string, auto: boolean) {
+  await prisma.assignment.update({
+    where: { id: assignmentId },
+    data: { status: "SUBMITTED", autoSubmitted: auto },
+  });
+
+  revalidatePath(`/test/${assignmentId}`);
+  revalidatePath("/");
+  revalidatePath("/admin/roster");
+  revalidatePath("/admin/results");
+}
+
+export type SubmissionTrigger = "STUDENT" | "TIMER";
+
+/**
+ * Records a submission, either because the student confirmed it or because
+ * their timer ran out (works for both graded and non-graded forms).
+ *
+ * A TIMER submission is re-checked against the server's own clock before it is
+ * accepted: the browser is the one that notices zero, but it is not the one
+ * that gets to decide the attempt is over.
+ */
+export async function markStudentSubmission(
+  assignmentId: string,
+  trigger: SubmissionTrigger = "STUDENT"
+) {
   const sessionUser = await getVerifiedSession();
   if (!sessionUser?.email) {
     return { error: "Authentication required." };
@@ -93,6 +180,7 @@ export async function markStudentSubmission(assignmentId: string) {
 
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
+    include: { test: { select: { durationMinutes: true } }, result: true },
   });
 
   if (!assignment) {
@@ -103,17 +191,18 @@ export async function markStudentSubmission(assignmentId: string) {
     return { error: "Unauthorized." };
   }
 
+  // Already done (including by an earlier auto-submit) -- treat as success so a
+  // countdown that fires twice does not surface a spurious error.
+  if (isAssignmentSubmitted(assignment)) {
+    return { success: true, alreadySubmitted: true };
+  }
+
+  if (trigger === "TIMER" && remainingMs(assignment) > 0) {
+    return { error: "There is still time left on this assessment." };
+  }
+
   try {
-    await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: { status: "SUBMITTED" },
-    });
-
-    revalidatePath(`/test/${assignmentId}`);
-    revalidatePath("/");
-    revalidatePath("/admin/roster");
-    revalidatePath("/admin/results");
-
+    await closeOutAssignment(assignmentId, trigger === "TIMER");
     return { success: true };
   } catch (err) {
     console.error("Failed to mark student submission:", err);

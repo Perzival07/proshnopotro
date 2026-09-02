@@ -60,7 +60,9 @@ export default async function AdminRosterPage({ searchParams }: RosterPageProps)
       studentEmail: a.studentEmail,
       assignedAt: a.assignedAt,
       dueAt: a.dueAt,
+      startedAt: a.startedAt,
       status: a.status,
+      autoSubmitted: a.autoSubmitted,
       user: userMap.get(a.studentEmail.toLowerCase()) || null,
       result: a.result,
     }));

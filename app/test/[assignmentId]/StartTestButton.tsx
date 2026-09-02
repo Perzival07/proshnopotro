@@ -11,10 +11,12 @@ import {
   isNativeFullscreen,
 } from "@/lib/fullscreen";
 import type { TestFormat } from "@/lib/test-resource";
+import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   ExternalLink,
   AlertCircle,
+  TimerOff,
   ShieldAlert,
   CheckCircle2,
   MessageCircle,
@@ -28,6 +30,12 @@ interface StartTestButtonProps {
   testTitle: string;
   testFormat: TestFormat;
   studentName?: string | null;
+  /**
+   * Set only when this student already started a timed attempt, so a reload
+   * shows the clock still running rather than a fresh, untouched page.
+   */
+  initialEndsAt?: string | null;
+  initialServerNow?: string | null;
 }
 
 export function StartTestButton({
@@ -35,6 +43,8 @@ export function StartTestButton({
   testTitle,
   testFormat,
   studentName,
+  initialEndsAt,
+  initialServerNow,
 }: StartTestButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -46,6 +56,15 @@ export function StartTestButton({
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [expanded, setExpanded] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
+
+  // Timing comes from the server -- both on load (a resumed attempt) and from
+  // the resolve call that starts the clock.
+  const [timing, setTiming] = useState<{ endsAt: string; serverNow: string } | null>(
+    initialEndsAt && initialServerNow
+      ? { endsAt: initialEndsAt, serverNow: initialServerNow }
+      : null
+  );
+  const [timeUp, setTimeUp] = useState(false);
 
   const collapse = useCallback(() => {
     setExpanded(false);
@@ -104,13 +123,57 @@ export function StartTestButton({
 
     setEmbedUrl(res.embedUrl);
     setOpened(true);
+    if (res.endsAt && res.serverNow) {
+      setTiming({ endsAt: res.endsAt, serverNow: res.serverNow });
+    }
   };
+
+  /**
+   * The countdown hit zero. The submission still has to clear the server's own
+   * clock check, so this is a request to close the attempt, not a decision.
+   * The ref guards against the countdown remounting (it moves in the tree when
+   * the preview opens) and firing a second time.
+   */
+  const expiringRef = useRef(false);
+  const handleExpire = useCallback(async () => {
+    if (expiringRef.current) return;
+    expiringRef.current = true;
+
+    setTimeUp(true);
+    collapse();
+    setSubmitting(true);
+    try {
+      const res = await markStudentSubmission(assignmentId, "TIMER");
+      if (res.error) {
+        // Leave the manual confirm button in reach rather than trapping the
+        // student behind a failed auto-submit.
+        setError(res.error);
+        setTimeUp(false);
+        expiringRef.current = false;
+      }
+    } catch {
+      setError("Your time is up, but the submission could not be saved. Please press the confirm button.");
+      setTimeUp(false);
+      expiringRef.current = false;
+    } finally {
+      setSubmitting(false);
+    }
+  }, [assignmentId, collapse]);
+
+  const countdown = timing ? (
+    <ExamCountdown
+      endsAt={timing.endsAt}
+      serverNow={timing.serverNow}
+      onExpire={handleExpire}
+      expired={timeUp}
+    />
+  ) : null;
 
   const handleConfirmSubmission = async () => {
     setSubmitting(true);
     setError(null);
     try {
-      const res = await markStudentSubmission(assignmentId);
+      const res = await markStudentSubmission(assignmentId, "STUDENT");
       if (res.error) {
         setError(res.error);
         setSubmitting(false);
@@ -133,28 +196,68 @@ export function StartTestButton({
         </div>
       )}
 
-      {!opened ? (
-        <Button
-          id="start-assessment-btn"
-          onClick={handleOpen}
-          disabled={loading}
-          size="lg"
-          className="w-full bg-brand-navy hover:bg-brand-navy/90 text-white font-medium py-3 px-6 shadow-md transition-all flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <div className="flex items-center gap-2">
-              <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
-              <span>Verifying &amp; Opening&hellip;</span>
+      {timeUp ? (
+        <div className="space-y-4">
+          {countdown}
+          <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-left text-red-900">
+            <TimerOff className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
+            <div className="space-y-1 text-xs">
+              <p className="font-heading text-sm font-semibold">Time is up</p>
+              <p className="leading-relaxed">
+                {submitting
+                  ? "Submitting your assessment\u2026"
+                  : isDoc
+                  ? "This assessment has been submitted automatically. Anything you already sent on WhatsApp still counts."
+                  : "This assessment has been submitted automatically. Only the answers you saved inside the form before the timer ended were recorded."}
+              </p>
             </div>
-          ) : (
-            <>
-              <span>View {paperNoun}</span>
-              <ExternalLink className="h-4 w-4" />
-            </>
-          )}
-        </Button>
+          </div>
+          <Button
+            onClick={() => {
+              router.push("/");
+              router.refresh();
+            }}
+            size="lg"
+            variant="outline"
+            className="w-full"
+          >
+            Back to All Assessments
+          </Button>
+        </div>
+      ) : !opened ? (
+        <div className="space-y-4">
+          {/* A reload lands here with the attempt already running. The clock is
+              shown before they re-open the paper, not after, so the time they
+              have left is never hidden behind a button press. */}
+          {countdown}
+
+          <Button
+            id="start-assessment-btn"
+            onClick={handleOpen}
+            disabled={loading}
+            size="lg"
+            className="w-full bg-brand-navy hover:bg-brand-navy/90 text-white font-medium py-3 px-6 shadow-md transition-all flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                <span>Verifying &amp; Opening&hellip;</span>
+              </div>
+            ) : (
+              <>
+                <span>{timing ? `Return to ${paperNoun}` : `View ${paperNoun}`}</span>
+                <ExternalLink className="h-4 w-4" />
+              </>
+            )}
+          </Button>
+        </div>
       ) : (
         <div className="space-y-4">
+          {/* The clock lives above the paper, and travels inside the overlay
+              when the paper goes full screen so it never leaves the student's
+              sight. */}
+          {!expanded && countdown}
+
           {/* In-page preview */}
           {embedUrl && (
             <div
@@ -202,6 +305,12 @@ export function StartTestButton({
                   )}
                 </div>
               </div>
+
+              {expanded && countdown && (
+                <div className="border-b border-brand-border bg-brand-page px-3 py-2">
+                  {countdown}
+                </div>
+              )}
 
               <iframe
                 src={embedUrl}
