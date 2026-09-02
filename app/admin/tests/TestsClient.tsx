@@ -31,6 +31,7 @@ import {
   CheckCircle2,
   XCircle,
   Timer,
+  Eye,
 } from "lucide-react";
 
 interface TestItem {
@@ -42,6 +43,7 @@ interface TestItem {
   format: TestFormat;
   formUrl: string;
   durationMinutes: number | null;
+  proctored: boolean;
   active: boolean;
   createdAt: Date;
   _count: {
@@ -315,6 +317,15 @@ export function TestsClient({ tests }: TestsClientProps) {
                             {formatDurationLabel(test.durationMinutes)}
                           </span>
                         ) : null}
+                        {test.proctored && (
+                          <span
+                            title="Students are warned when they leave the tab, and submitted on the third time"
+                            className="inline-flex items-center gap-1 text-brand-navy"
+                          >
+                            <Eye className="h-3 w-3" />
+                            Watched
+                          </span>
+                        )}
                       </span>
                     </div>
                   </TableCell>

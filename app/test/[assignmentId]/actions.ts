@@ -6,6 +6,7 @@ import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { revalidatePath } from "next/cache";
 import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { attemptDeadline, isTimed, isTimeUp, remainingMs } from "@/lib/exam-timer";
+import { isProctored, registerSwitch, warningMessage } from "@/lib/proctoring";
 
 export interface FormResolutionResult {
   /**
@@ -157,7 +158,7 @@ async function closeOutAssignment(assignmentId: string, auto: boolean) {
   revalidatePath("/admin/results");
 }
 
-export type SubmissionTrigger = "STUDENT" | "TIMER";
+export type SubmissionTrigger = "STUDENT" | "TIMER" | "TAB_SWITCH";
 
 /**
  * Records a submission, either because the student confirmed it or because
@@ -208,4 +209,82 @@ export async function markStudentSubmission(
     console.error("Failed to mark student submission:", err);
     return { error: "Database error marking submission." };
   }
+}
+
+
+/** Sentinel for "not being watched", so the client stops counting. */
+const MAX_UNWATCHED = Number.MAX_SAFE_INTEGER;
+
+export interface TabSwitchResult {
+  count?: number;
+  remaining?: number;
+  submitted?: boolean;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Records that the student left the exam tab, and ends the attempt once they
+ * have done it too often.
+ *
+ * The increment is a single atomic statement rather than a read-then-write:
+ * leaving and returning quickly can fire two of these at once, and a
+ * read-modify-write would let one overwrite the other, quietly handing the
+ * student a free departure.
+ */
+export async function recordTabSwitch(
+  assignmentId: string
+): Promise<TabSwitchResult> {
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) {
+    return { error: "Authentication required." };
+  }
+
+  const normalizedEmail = sessionUser.email.trim().toLowerCase();
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      test: { select: { proctored: true, durationMinutes: true } },
+      result: true,
+    },
+  });
+
+  if (!assignment) return { error: "Assignment not found." };
+  if (assignment.studentEmail.toLowerCase() !== normalizedEmail) {
+    return { error: "Unauthorized." };
+  }
+
+  // Nothing to police on an unproctored test or a finished attempt.
+  if (!isProctored(assignment)) return { count: 0, remaining: MAX_UNWATCHED };
+  if (isAssignmentSubmitted(assignment)) {
+    return { submitted: true, count: assignment.tabSwitches };
+  }
+
+  const updated = await prisma.assignment.update({
+    where: { id: assignmentId },
+    data: { tabSwitches: { increment: 1 } },
+    select: { tabSwitches: true },
+  });
+
+  const outcome = registerSwitch(updated.tabSwitches - 1);
+
+  if (outcome.shouldSubmit) {
+    await closeOutAssignment(assignmentId, true);
+    return {
+      count: outcome.count,
+      remaining: 0,
+      submitted: true,
+      message: warningMessage(outcome),
+    };
+  }
+
+  revalidatePath("/admin/roster");
+
+  return {
+    count: outcome.count,
+    remaining: outcome.remaining,
+    submitted: false,
+    message: warningMessage(outcome),
+  };
 }

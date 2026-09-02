@@ -33,6 +33,7 @@ interface TestModalProps {
     format: TestFormat;
     formUrl: string;
     durationMinutes: number | null;
+    proctored: boolean;
     active: boolean;
   } | null;
 }
@@ -48,6 +49,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   // Held as a string so the field can be genuinely empty, which is what
   // "no time limit" means -- a number state would coerce that to 0.
   const [durationMinutes, setDurationMinutes] = useState("");
+  const [proctored, setProctored] = useState(true);
   const [active, setActive] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,6 +65,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setDurationMinutes(
         testToEdit.durationMinutes ? String(testToEdit.durationMinutes) : ""
       );
+      setProctored(testToEdit.proctored);
       setActive(testToEdit.active);
     } else {
       setTitle("");
@@ -72,6 +75,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setFormat("GOOGLE_FORM");
       setFormUrl("");
       setDurationMinutes("");
+      setProctored(true);
       setActive(true);
     }
     setError(null);
@@ -90,6 +94,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       format,
       formUrl,
       durationMinutes,
+      proctored,
       active,
     };
 
@@ -305,6 +310,24 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               you assign it, and the test submits itself automatically when it
               reaches zero. It never runs past the submission deadline.
             </p>
+          </div>
+
+          <div className="flex items-start space-x-2 pt-2">
+            <Checkbox
+              id="proctored"
+              checked={proctored}
+              onCheckedChange={(checked) => setProctored(Boolean(checked))}
+              className="mt-0.5"
+            />
+            <label htmlFor="proctored" className="cursor-pointer leading-tight">
+              <span className="text-xs font-medium text-brand-ink">
+                Lock students to the exam tab
+              </span>
+              <span className="block text-[11px] text-brand-ink/55">
+                Warn them when they switch to another tab, window or app, and submit
+                the assessment automatically on the third time.
+              </span>
+            </label>
           </div>
 
           <div className="flex items-center space-x-2 pt-2">

@@ -12,6 +12,7 @@ import {
 } from "@/lib/fullscreen";
 import type { TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
+import { TabGuard } from "@/components/student/TabGuard";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   ExternalLink,
@@ -36,6 +37,8 @@ interface StartTestButtonProps {
    */
   initialEndsAt?: string | null;
   initialServerNow?: string | null;
+  /** Whether leaving the tab is warned about and, on the third time, ends it. */
+  proctored?: boolean;
 }
 
 export function StartTestButton({
@@ -45,6 +48,7 @@ export function StartTestButton({
   studentName,
   initialEndsAt,
   initialServerNow,
+  proctored = false,
 }: StartTestButtonProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -65,6 +69,15 @@ export function StartTestButton({
       : null
   );
   const [timeUp, setTimeUp] = useState(false);
+  // Set when the tab guard, rather than the clock, ended the attempt -- the
+  // closing panel has to say which, since the student can tell the difference.
+  const [guardMessage, setGuardMessage] = useState<string | null>(null);
+
+  const handleGuardSubmitted = useCallback((message: string) => {
+    setGuardMessage(message);
+    setTimeUp(true);
+    if (typeof document !== "undefined") void exitFullscreen(document);
+  }, []);
 
   const collapse = useCallback(() => {
     setExpanded(false);
@@ -189,6 +202,16 @@ export function StartTestButton({
 
   return (
     <div className="space-y-4">
+      {/* Watching starts only once the paper is actually in front of them, and
+          stops the moment the attempt is over. */}
+      {proctored && (
+        <TabGuard
+          assignmentId={assignmentId}
+          active={opened && !timeUp && !submitting}
+          onSubmitted={handleGuardSubmitted}
+        />
+      )}
+
       {error && (
         <div className="p-3.5 text-xs bg-red-50 text-red-800 border border-red-200 rounded-lg flex items-center gap-2.5 text-left">
           <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
@@ -202,9 +225,13 @@ export function StartTestButton({
           <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-left text-red-900">
             <TimerOff className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
             <div className="space-y-1 text-xs">
-              <p className="font-heading text-sm font-semibold">Time is up</p>
+              <p className="font-heading text-sm font-semibold">
+                {guardMessage ? "Assessment closed" : "Time is up"}
+              </p>
               <p className="leading-relaxed">
-                {submitting
+                {guardMessage
+                  ? guardMessage
+                  : submitting
                   ? "Submitting your assessment\u2026"
                   : isDoc
                   ? "This assessment has been submitted automatically. Anything you already sent on WhatsApp still counts."

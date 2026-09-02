@@ -15,6 +15,7 @@ export interface TestInput {
   formUrl: string;
   /** Minutes the student gets once they open the paper. Blank/null = untimed. */
   durationMinutes?: number | string | null;
+  proctored?: boolean;
   active?: boolean;
 }
 
@@ -59,6 +60,7 @@ export async function createTest(data: TestInput) {
         format: data.format,
         formUrl: data.formUrl.trim(),
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
+        proctored: data.proctored ?? true,
         active: data.active ?? true,
       },
     });
@@ -90,6 +92,7 @@ export async function updateTest(id: string, data: TestInput) {
         format: data.format,
         formUrl: data.formUrl.trim(),
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
+        proctored: data.proctored ?? true,
         active: data.active ?? true,
       },
     });

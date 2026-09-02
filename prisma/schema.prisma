@@ -102,6 +102,8 @@ model Test {
   formUrl     String       @db.Text             // Question paper URL. Never exposed to client HTML.
   /// Minutes a student gets once they open the paper. null = untimed.
   durationMinutes Int?
+  /// Warn the student when they leave the exam tab, and submit on the third.
+  proctored   Boolean      @default(true)
   active      Boolean      @default(true)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
@@ -121,8 +123,11 @@ model Assignment {
   /// timed test runs from here, so a reload or a second device cannot restart it.
   startedAt    DateTime?
   status       AssignmentStatus @default(ASSIGNED)
-  /// True when the timer ran out rather than the student confirming.
+  /// True when the timer or the tab guard ended it, not the student.
   autoSubmitted Boolean         @default(false)
+  /// How many times this student left the exam tab. Counted on the server so
+  /// a reload cannot wipe the tally.
+  tabSwitches  Int              @default(0)
 
   test         Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
   result       Result?

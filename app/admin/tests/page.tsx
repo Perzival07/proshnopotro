@@ -34,6 +34,7 @@ export default async function AdminTestsPage() {
       format: t.format,
       formUrl: t.formUrl,
       durationMinutes: t.durationMinutes,
+      proctored: t.proctored,
       active: t.active,
       createdAt: t.createdAt,
       _count: t._count,

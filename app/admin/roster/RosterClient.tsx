@@ -35,6 +35,7 @@ import {
   Award,
   PenLine,
   AlertTriangle,
+  EyeOff,
 } from "lucide-react";
 import { EnterMarksModal, StudentGradeTarget } from "@/components/admin/EnterMarksModal";
 import { toggleAssignmentStatus } from "./actions";
@@ -53,6 +54,7 @@ export interface RosterAssignment {
   startedAt: Date | null;
   status: "ASSIGNED" | "SUBMITTED";
   autoSubmitted: boolean;
+  tabSwitches: number;
   user: {
     id: string;
     name: string | null;
@@ -519,7 +521,7 @@ export function RosterClient({
                           <Badge variant="submitted" className="gap-1 shadow-xs cursor-pointer hover:bg-emerald-100">
                             <CheckCircle2 className="h-3 w-3" />
                             <span>
-                              {/* Worth distinguishing: the timer ended this
+                              {/* Worth distinguishing: something ended this
                                   attempt, the student did not hand it in. */}
                               {a.autoSubmitted ? "Auto-submitted" : "Submitted"}
                             </span>
@@ -531,6 +533,15 @@ export function RosterClient({
                           </Badge>
                         )}
                       </button>
+                      {a.tabSwitches > 0 && (
+                        <span
+                          title={`Left the exam tab ${a.tabSwitches} time(s)`}
+                          className="mt-1 flex items-center justify-center gap-1 text-[10px] font-medium text-red-700"
+                        >
+                          <EyeOff className="h-3 w-3" />
+                          Left tab {a.tabSwitches}×
+                        </span>
+                      )}
                     </TableCell>
 
                     {/* Score */}

@@ -70,15 +70,17 @@ export async function updateStudentScore(
 }
 
 /**
- * Putting a student back on ASSIGNED clears the timer as well as the status.
- * On a timed test a leftover `startedAt` is an expired window, so the attempt
- * would be auto-submitted again the moment they opened it and the tutor's
- * revert would appear to do nothing.
+ * Putting a student back on ASSIGNED clears the timer and the tab-switch tally
+ * as well as the status. On a timed test a leftover `startedAt` is an expired
+ * window, so the attempt would be auto-submitted again the moment they opened
+ * it and the tutor's revert would appear to do nothing; a leftover tally would
+ * likewise start the retake already on its final warning.
  */
 const REOPEN_DATA = {
   status: "ASSIGNED",
   startedAt: null,
   autoSubmitted: false,
+  tabSwitches: 0,
 } as const;
 
 export async function toggleAssignmentStatus(

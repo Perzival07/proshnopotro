@@ -41,6 +41,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           active: true,
           format: true,
           durationMinutes: true,
+          proctored: true,
           // formUrl is explicitly OMITTED to prevent leakage into HTML
         },
       },
@@ -171,6 +172,13 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                         )} starts the moment you open the paper and keeps running if you close this page. When it reaches zero the assessment is submitted automatically.`}
                   </p>
                 )}
+                {assignment.test.proctored && (
+                  <p className="text-xs leading-relaxed font-medium">
+                    Stay on this tab once the paper opens. Switching to another tab,
+                    another window or another app is recorded; the third time your
+                    assessment is submitted automatically.
+                  </p>
+                )}
                 <p className="text-[11px] opacity-80 leading-normal">
                   Make sure your internet connection is stable before opening the test.
                 </p>
@@ -186,6 +194,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 studentName={user.name}
                 initialEndsAt={endsAt?.toISOString() ?? null}
                 initialServerNow={endsAt ? new Date().toISOString() : null}
+                proctored={assignment.test.proctored}
               />
             </div>
           </div>
