@@ -37,8 +37,21 @@ interface StartTestButtonProps {
    */
   initialEndsAt?: string | null;
   initialServerNow?: string | null;
-  /** Whether leaving the tab is warned about and, on the third time, ends it. */
+  /** Whether leaving the tab is warned about and, on the second time, ends it. */
   proctored?: boolean;
+}
+
+/**
+ * Turns the server's deadline into an instant on this browser's clock.
+ *
+ * `serverNow` is the server's own time at the moment it issued `endsAt`, so
+ * the difference against `Date.now()` right now is the browser's skew -- a
+ * machine whose clock is minutes out cannot hand itself extra time or lose
+ * any. This must be measured while `serverNow` is fresh, which is why the
+ * result is computed once here and then held, never recomputed further down.
+ */
+function toClientDeadline(endsAt: string, serverNow: string): number {
+  return Date.parse(endsAt) + (Date.now() - Date.parse(serverNow));
 }
 
 export function StartTestButton({
@@ -62,10 +75,13 @@ export function StartTestButton({
   const previewRef = useRef<HTMLDivElement>(null);
 
   // Timing comes from the server -- both on load (a resumed attempt) and from
-  // the resolve call that starts the clock.
-  const [timing, setTiming] = useState<{ endsAt: string; serverNow: string } | null>(
+  // the resolve call that starts the clock. It is stored as a single instant
+  // on this browser's clock, fixed when it arrives: the countdown below is
+  // remounted as the paper moves in and out of full screen, and a value it had
+  // to re-derive on every mount would drift back to the full duration.
+  const [deadlineMs, setDeadlineMs] = useState<number | null>(() =>
     initialEndsAt && initialServerNow
-      ? { endsAt: initialEndsAt, serverNow: initialServerNow }
+      ? toClientDeadline(initialEndsAt, initialServerNow)
       : null
   );
   const [timeUp, setTimeUp] = useState(false);
@@ -137,7 +153,10 @@ export function StartTestButton({
     setEmbedUrl(res.embedUrl);
     setOpened(true);
     if (res.endsAt && res.serverNow) {
-      setTiming({ endsAt: res.endsAt, serverNow: res.serverNow });
+      const fresh = toClientDeadline(res.endsAt, res.serverNow);
+      // Re-opening the paper resolves the same attempt again, so never let a
+      // second answer push the deadline out; the earliest one stands.
+      setDeadlineMs((current) => (current === null ? fresh : Math.min(current, fresh)));
     }
   };
 
@@ -173,14 +192,10 @@ export function StartTestButton({
     }
   }, [assignmentId, collapse]);
 
-  const countdown = timing ? (
-    <ExamCountdown
-      endsAt={timing.endsAt}
-      serverNow={timing.serverNow}
-      onExpire={handleExpire}
-      expired={timeUp}
-    />
-  ) : null;
+  const countdown =
+    deadlineMs !== null ? (
+      <ExamCountdown deadlineMs={deadlineMs} onExpire={handleExpire} expired={timeUp} />
+    ) : null;
 
   const handleConfirmSubmission = async () => {
     setSubmitting(true);
@@ -272,7 +287,9 @@ export function StartTestButton({
               </div>
             ) : (
               <>
-                <span>{timing ? `Return to ${paperNoun}` : `View ${paperNoun}`}</span>
+                <span>
+                  {deadlineMs !== null ? `Return to ${paperNoun}` : `View ${paperNoun}`}
+                </span>
                 <ExternalLink className="h-4 w-4" />
               </>
             )}

@@ -11,8 +11,11 @@
  * meant to catch.
  */
 
-/** Departures allowed before the attempt is submitted. The third ends it. */
-export const MAX_TAB_SWITCHES = 3;
+/**
+ * Departures allowed before the attempt is submitted. The first one buys a
+ * single warning; the second ends the attempt.
+ */
+export const MAX_TAB_SWITCHES = 2;
 
 export interface SwitchOutcome {
   /** The tally after this departure. */
@@ -39,9 +42,11 @@ export function warningMessage(outcome: SwitchOutcome): string {
     return "You left the assessment once too often. Your test has been submitted automatically.";
   }
   const left = outcome.remaining;
-  return `You left the assessment tab. This is warning ${outcome.count} of ${MAX_TAB_SWITCHES}. Leaving ${
-    left === 1 ? "once more" : `${left} more times`
-  } will submit your test automatically.`;
+  return `You left the assessment tab. This is your ${
+    left === 1 ? "only warning" : `warning ${outcome.count} of ${MAX_TAB_SWITCHES}`
+  } -- leaving ${
+    left === 1 ? "again" : `${left} more times`
+  } will submit your test automatically. Your timer has kept running.`;
 }
 
 /** Whether an attempt should be watched at all. */

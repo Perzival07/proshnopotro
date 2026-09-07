@@ -5,10 +5,18 @@ import { formatRemaining } from "@/lib/exam-timer";
 import { Timer, AlertTriangle } from "lucide-react";
 
 interface ExamCountdownProps {
-  /** ISO instant the attempt ends, decided by the server. */
-  endsAt: string;
-  /** The server's clock when it issued `endsAt`, used to cancel browser skew. */
-  serverNow: string;
+  /**
+   * The server's deadline already translated into this browser's clock, so
+   * this component only ever subtracts it from `Date.now()`.
+   *
+   * The translation deliberately belongs to the parent: it can only be done
+   * correctly at the instant the server's timestamp arrives, and this widget
+   * is remounted whenever the paper goes in or out of full screen. Doing it
+   * here meant every remount re-measured the offset against a `serverNow`
+   * that was by then minutes old, and the whole elapsed time was absorbed
+   * into the offset -- restarting the countdown from the top.
+   */
+  deadlineMs: number;
   /** Fired once, when the countdown reaches zero. */
   onExpire: () => void;
   /** Suppresses the callback once the attempt is already closed. */
@@ -28,19 +36,13 @@ const CRITICAL_MS = 60_000;
  * student who is still on the page gets submitted the moment it runs out.
  */
 export function ExamCountdown({
-  endsAt,
-  serverNow,
+  deadlineMs,
   onExpire,
   expired = false,
 }: ExamCountdownProps) {
-  const endsAtMs = Date.parse(endsAt);
-  // A browser clock minutes out of true would otherwise show -- and act on --
-  // the wrong remaining time, so everything is measured against the server's.
-  const skewMs = useRef(Date.now() - Date.parse(serverNow));
-
   const readRemaining = useCallback(
-    () => Math.max(0, endsAtMs - (Date.now() - skewMs.current)),
-    [endsAtMs]
+    () => Math.max(0, deadlineMs - Date.now()),
+    [deadlineMs]
   );
 
   // Rendered as null on the server and on the first client paint: the value is
@@ -48,10 +50,6 @@ export function ExamCountdown({
   // mismatch a second later.
   const [remaining, setRemaining] = useState<number | null>(null);
   const firedRef = useRef(false);
-
-  useEffect(() => {
-    skewMs.current = Date.now() - Date.parse(serverNow);
-  }, [serverNow]);
 
   useEffect(() => {
     const tick = () => {

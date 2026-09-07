@@ -175,8 +175,9 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 {assignment.test.proctored && (
                   <p className="text-xs leading-relaxed font-medium">
                     Stay on this tab once the paper opens. Switching to another tab,
-                    another window or another app is recorded; the third time your
-                    assessment is submitted automatically.
+                    another window or another app is recorded. You get one warning;
+                    the second time, your assessment is submitted automatically. Your
+                    timer keeps running throughout.
                   </p>
                 )}
                 <p className="text-[11px] opacity-80 leading-normal">

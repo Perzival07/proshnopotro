@@ -325,7 +325,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               </span>
               <span className="block text-[11px] text-brand-ink/55">
                 Warn them when they switch to another tab, window or app, and submit
-                the assessment automatically on the third time.
+                the assessment automatically on the second time.
               </span>
             </label>
           </div>

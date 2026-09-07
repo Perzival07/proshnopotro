@@ -446,7 +446,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                         ) : null}
                         {test.proctored && (
                           <span
-                            title="Students are warned when they leave the tab, and submitted on the third time"
+                            title="Students get one warning when they leave the tab, and are submitted on the second time"
                             className="inline-flex items-center gap-1 text-brand-navy"
                           >
                             <Eye className="h-3 w-3" />

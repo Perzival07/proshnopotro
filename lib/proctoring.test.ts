@@ -1,22 +1,13 @@
 import { describe, it, expect } from "vitest";
-import {
-  MAX_TAB_SWITCHES,
-  isProctored,
-  registerSwitch,
-  warningMessage,
-} from "./proctoring";
+import { isProctored, registerSwitch, warningMessage } from "./proctoring";
 
 describe("registerSwitch", () => {
-  it("counts the first departure without ending the attempt", () => {
-    expect(registerSwitch(0)).toEqual({ count: 1, remaining: 2, shouldSubmit: false });
+  it("counts the first departure as a warning without ending the attempt", () => {
+    expect(registerSwitch(0)).toEqual({ count: 1, remaining: 1, shouldSubmit: false });
   });
 
-  it("still forgives the second", () => {
-    expect(registerSwitch(1)).toEqual({ count: 2, remaining: 1, shouldSubmit: false });
-  });
-
-  it("ends the attempt on the third", () => {
-    expect(registerSwitch(2)).toEqual({ count: 3, remaining: 0, shouldSubmit: true });
+  it("ends the attempt on the second", () => {
+    expect(registerSwitch(1)).toEqual({ count: 2, remaining: 0, shouldSubmit: true });
   });
 
   it("keeps ending it past the limit, never going negative on remaining", () => {
@@ -30,18 +21,19 @@ describe("registerSwitch", () => {
 });
 
 describe("warningMessage", () => {
-  it("counts the warning out of the limit", () => {
+  it("tells the student the single warning is all they get", () => {
     const msg = warningMessage(registerSwitch(0));
-    expect(msg).toContain(`warning 1 of ${MAX_TAB_SWITCHES}`);
+    expect(msg).toContain("only warning");
+    expect(msg).toContain("leaving again will submit your test automatically");
   });
 
-  it("says 'once more' rather than '1 more times' on the last chance", () => {
-    expect(warningMessage(registerSwitch(1))).toContain("once more");
+  it("says the clock kept running, since the warning interrupts a live paper", () => {
+    expect(warningMessage(registerSwitch(0))).toContain("timer has kept running");
   });
 
   it("switches to the submitted wording once the limit is hit", () => {
-    expect(warningMessage(registerSwitch(2))).toContain("submitted automatically");
-    expect(warningMessage(registerSwitch(2))).not.toContain("warning");
+    expect(warningMessage(registerSwitch(1))).toContain("submitted automatically");
+    expect(warningMessage(registerSwitch(1))).not.toContain("warning");
   });
 });
 
