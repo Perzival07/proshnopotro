@@ -3,6 +3,20 @@
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
+import { canReassign, parseNewDeadline, REOPEN_DATA } from "@/lib/reassign";
+
+/**
+ * Every write here changes the same four surfaces: the roster it was made
+ * from, the results table, the per-test counts and the student's own
+ * dashboard. Naming the set once keeps a new action from quietly refreshing
+ * three of them.
+ */
+function revalidateAdminSurfaces() {
+  revalidatePath("/admin/roster");
+  revalidatePath("/admin/results");
+  revalidatePath("/admin/tests");
+  revalidatePath("/");
+}
 
 export async function updateStudentScore(
   assignmentId: string,
@@ -57,10 +71,7 @@ export async function updateStudentScore(
       });
     });
 
-    revalidatePath("/admin/roster");
-    revalidatePath("/admin/results");
-    revalidatePath("/admin/tests");
-    revalidatePath("/");
+    revalidateAdminSurfaces();
 
     return { success: true };
   } catch (error) {
@@ -68,20 +79,6 @@ export async function updateStudentScore(
     return { error: "Database error updating student score." };
   }
 }
-
-/**
- * Putting a student back on ASSIGNED clears the timer and the tab-switch tally
- * as well as the status. On a timed test a leftover `startedAt` is an expired
- * window, so the attempt would be auto-submitted again the moment they opened
- * it and the tutor's revert would appear to do nothing; a leftover tally would
- * likewise start the retake already on its final warning.
- */
-const REOPEN_DATA = {
-  status: "ASSIGNED",
-  startedAt: null,
-  autoSubmitted: false,
-  tabSwitches: 0,
-} as const;
 
 export async function toggleAssignmentStatus(
   assignmentId: string,
@@ -130,10 +127,7 @@ export async function toggleAssignmentStatus(
           }),
         ]);
 
-        revalidatePath("/admin/roster");
-        revalidatePath("/admin/results");
-        revalidatePath("/admin/tests");
-        revalidatePath("/");
+        revalidateAdminSurfaces();
 
         return { success: true, clearedMarks: true };
       }
@@ -144,14 +138,113 @@ export async function toggleAssignmentStatus(
       data: newStatus === "ASSIGNED" ? REOPEN_DATA : { status: "SUBMITTED" },
     });
 
-    revalidatePath("/admin/roster");
-    revalidatePath("/admin/results");
-    revalidatePath("/admin/tests");
-    revalidatePath("/");
+    revalidateAdminSurfaces();
 
     return { success: true };
   } catch (error) {
     console.error("Failed to toggle status:", error);
     return { error: "Database error updating assignment status." };
+  }
+}
+
+export interface ReassignResult {
+  success?: true;
+  /** True when a recorded score was deleted to make room for the new attempt. */
+  clearedMarks?: boolean;
+  /** Set when marks would be lost and the tutor has not agreed to that yet. */
+  needsConfirmation?: true;
+  score?: number;
+  maxScore?: number;
+  error?: string;
+}
+
+/**
+ * Hands a finished test back to one student for another attempt.
+ *
+ * This is not the status toggle under a friendlier name. The toggle reopens an
+ * attempt on its original deadline, which for the case a tutor actually cares
+ * about -- a paper the timer or the tab guard closed hours ago -- reopens it
+ * onto a deadline that has already passed, so the student still sees "Closed".
+ * A reassignment therefore takes a fresh deadline, and is only offered on an
+ * attempt that is genuinely finished.
+ *
+ * The previous marks cannot be kept: every consumer reads `result != null` as
+ * submitted, so a surviving Result would leave the test locked. Because that
+ * makes the reassignment destructive, a graded student comes back as
+ * needsConfirmation the first time and is only reopened once the tutor agrees.
+ */
+export async function reassignAssignment(
+  assignmentId: string,
+  dueAtIsoString: string,
+  clearMarks: boolean = false
+): Promise<ReassignResult> {
+  await requireAdmin();
+
+  if (!assignmentId) {
+    return { error: "Missing assignment ID." };
+  }
+
+  const parsedDeadline = parseNewDeadline(dueAtIsoString);
+  if (!parsedDeadline.dueAt) {
+    return { error: parsedDeadline.error };
+  }
+
+  try {
+    const existing = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: {
+        status: true,
+        result: { select: { id: true, score: true, maxScore: true } },
+      },
+    });
+
+    if (!existing) {
+      return { error: "Assignment not found." };
+    }
+
+    if (!canReassign(existing)) {
+      return {
+        error:
+          "This student has not submitted yet, so there is nothing to reassign. Change their deadline instead.",
+      };
+    }
+
+    if (existing.result && !clearMarks) {
+      return {
+        needsConfirmation: true,
+        score: existing.result.score,
+        maxScore: existing.result.maxScore,
+        error:
+          "This student has recorded marks. Reassigning the test will delete them.",
+      };
+    }
+
+    // assignedAt moves too: this is a fresh handout, and the roster's default
+    // sort is on that column, so the student just given another go sits at the
+    // top of the list where the tutor is already looking.
+    const reopen = {
+      ...REOPEN_DATA,
+      dueAt: parsedDeadline.dueAt,
+      assignedAt: new Date(),
+    };
+
+    if (existing.result) {
+      await prisma.$transaction([
+        prisma.result.delete({ where: { assignmentId } }),
+        prisma.assignment.update({ where: { id: assignmentId }, data: reopen }),
+      ]);
+    } else {
+      await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: reopen,
+      });
+    }
+
+    revalidateAdminSurfaces();
+
+    return { success: true, clearedMarks: Boolean(existing.result) };
+  } catch (error) {
+    console.error("Failed to reassign test:", error);
+    return { error: "Database error reassigning this test." };
   }
 }

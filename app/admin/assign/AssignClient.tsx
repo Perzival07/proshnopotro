@@ -35,6 +35,8 @@ import {
   AlertCircle,
   Search,
   Info,
+  RotateCcw,
+  AlertTriangle,
 } from "lucide-react";
 
 interface TestOption {
@@ -82,11 +84,22 @@ export function AssignClient({ tests, students }: AssignClientProps) {
   // Mode B: Bulk Paste
   const [bulkEmailText, setBulkEmailText] = useState("");
 
+  /**
+   * Whether students who have already finished this test should get it back.
+   * Off by default: the common case is handing a test to a new group, and a
+   * reassignment resets an attempt and deletes its marks.
+   */
+  const [reassignSubmitted, setReassignSubmitted] = useState(false);
+
   // Submission & Summary States
   const [loading, setLoading] = useState(false);
   const [resultSummary, setResultSummary] = useState<AssignResult | null>(null);
   const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  /** Emails whose recorded marks a confirmed reassignment would delete. */
+  const [pendingGradedEmails, setPendingGradedEmails] = useState<string[] | null>(
+    null
+  );
 
   // Filter students in table
   const filteredStudents = useMemo(() => {
@@ -128,8 +141,9 @@ export function AssignClient({ tests, students }: AssignClientProps) {
       .filter(Boolean);
   }, [bulkEmailText]);
 
-  const handleSubmitAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Reassigning graded students deletes their marks, so that batch comes back
+  // as needsConfirmation with nothing written and routes through the dialog.
+  const runAssign = async (clearMarks: boolean) => {
     setErrorMessage(null);
     setLoading(true);
 
@@ -153,13 +167,22 @@ export function AssignClient({ tests, students }: AssignClientProps) {
       const res = await assignTestToStudents(
         selectedTestId,
         emailsToProcess,
-        parsedDueDate.toISOString()
+        parsedDueDate.toISOString(),
+        reassignSubmitted,
+        clearMarks
       );
 
       setLoading(false);
+
+      if (res.needsConfirmation) {
+        setPendingGradedEmails(res.gradedEmails ?? []);
+        return;
+      }
+
       if (!res.success) {
         setErrorMessage(res.error || "Failed to assign test.");
       } else {
+        setPendingGradedEmails(null);
         setResultSummary(res);
         setIsSummaryModalOpen(true);
         // Clear selections
@@ -170,6 +193,11 @@ export function AssignClient({ tests, students }: AssignClientProps) {
       setErrorMessage("An unexpected error occurred while assigning tests.");
       setLoading(false);
     }
+  };
+
+  const handleSubmitAssignment = (e: React.FormEvent) => {
+    e.preventDefault();
+    runAssign(false);
   };
 
   const selectedTest = tests.find((t) => t.id === selectedTestId);
@@ -459,11 +487,47 @@ export function AssignClient({ tests, students }: AssignClientProps) {
                   Detected Emails: <strong>{parsedBulkEmails.length}</strong>
                 </span>
                 <span className="text-brand-ink/50 text-[11px]">
-                  Duplicate emails and already assigned students will be skipped automatically.
+                  Duplicates are skipped, as are students who already hold this
+                  test unless you reassign them below.
                 </span>
               </div>
             </div>
           )}
+
+          {/* Reassignment toggle: the one control that can overwrite an
+              existing attempt, so it sits with the button that acts on it
+              rather than up with the deadline. */}
+          <div className="rounded-lg border border-brand-border bg-brand-page p-3">
+            <div
+              role="group"
+              onClick={() => setReassignSubmitted(!reassignSubmitted)}
+              className="flex cursor-pointer items-start gap-3"
+            >
+              <span className="pt-0.5" onClick={(e) => e.stopPropagation()}>
+                <Checkbox
+                  id="reassign-submitted"
+                  checked={reassignSubmitted}
+                  onCheckedChange={(checked) =>
+                    setReassignSubmitted(checked === true)
+                  }
+                  aria-label="Reassign students who have already submitted"
+                />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5 text-xs font-semibold text-brand-navy">
+                  <RotateCcw className="h-3.5 w-3.5 text-brand-blue" />
+                  <span>Reassign students who have already submitted</span>
+                </span>
+                <span className="mt-1 block text-[11px] leading-relaxed text-brand-ink/65">
+                  Gives a fresh attempt at the deadline above to anyone on this
+                  list who already handed the test in or was auto-submitted by
+                  the timer or the tab guard. Their countdown and tab-switch
+                  tally restart, and any marks recorded for the old attempt are
+                  deleted. Students still working on the test are never touched.
+                </span>
+              </span>
+            </div>
+          </div>
 
           {/* Action Button */}
           <div className="pt-3 flex justify-end">
@@ -493,6 +557,65 @@ export function AssignClient({ tests, students }: AssignClientProps) {
           </div>
         </div>
       </form>
+
+      {/* Confirm destructive reassignment: reopening deletes recorded marks */}
+      <Dialog
+        open={Boolean(pendingGradedEmails)}
+        onOpenChange={(open) => !open && setPendingGradedEmails(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              <DialogTitle className="text-red-700">
+                Delete recorded marks?
+              </DialogTitle>
+            </div>
+            <DialogDescription>
+              {pendingGradedEmails && (
+                <>
+                  <strong>{pendingGradedEmails.length}</strong> of these
+                  students have marks recorded for{" "}
+                  <strong>{selectedTest?.title}</strong>. Reassigning the test
+                  deletes those scores, because a saved result keeps the test
+                  locked for them. This cannot be undone.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          {pendingGradedEmails && pendingGradedEmails.length > 0 && (
+            <div className="max-h-32 overflow-y-auto rounded-lg border border-red-200 bg-red-50 p-3">
+              {/* break-all rather than truncate: a run of long emails would
+                  otherwise stretch the dialog past the screen. */}
+              <p className="break-all font-mono text-[11px] text-red-700">
+                {pendingGradedEmails.join(", ")}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPendingGradedEmails(null)}
+              disabled={loading}
+            >
+              Keep marks
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={loading}
+              onClick={() => runAssign(true)}
+              className="bg-red-600 font-semibold text-white hover:bg-red-700"
+            >
+              {loading ? "Reassigning..." : "Delete marks & reassign"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Summary Dialog */}
       <Dialog
@@ -526,10 +649,45 @@ export function AssignClient({ tests, students }: AssignClientProps) {
                 </span>
               </div>
 
+              {resultSummary.reassignedCount > 0 && (
+                <div className="p-3 bg-brand-tint border border-brand-blue/30 rounded-lg text-brand-navy space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold">Reassigned a fresh attempt:</span>
+                    <span className="font-heading font-bold text-sm">
+                      {resultSummary.reassignedCount} students
+                    </span>
+                  </div>
+                  {resultSummary.clearedMarksCount > 0 && (
+                    <p className="text-[11px] text-brand-ink/70">
+                      {resultSummary.clearedMarksCount} recorded{" "}
+                      {resultSummary.clearedMarksCount === 1 ? "score was" : "scores were"}{" "}
+                      deleted along with the old attempt.
+                    </p>
+                  )}
+                </div>
+              )}
+
               {resultSummary.skippedCount > 0 && (
                 <div className="p-3 bg-[#F1EFE8] border border-[#E2DFD6] rounded-lg text-[#444441] flex items-center justify-between">
-                  <span>Skipped (Already Assigned):</span>
+                  <span>Skipped (test still open for them):</span>
                   <span className="font-semibold">{resultSummary.skippedCount}</span>
+                </div>
+              )}
+
+              {/* The one skip a tutor may not have meant, so it says what to
+                  do about it rather than only reporting the number. */}
+              {resultSummary.alreadySubmittedCount > 0 && (
+                <div className="p-3 bg-[#F1EFE8] border border-[#E2DFD6] rounded-lg text-[#444441] space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span>Skipped (already submitted):</span>
+                    <span className="font-semibold">
+                      {resultSummary.alreadySubmittedCount}
+                    </span>
+                  </div>
+                  <p className="text-[11px]">
+                    To give them another go, tick &ldquo;Reassign students who
+                    have already submitted&rdquo; and assign again.
+                  </p>
                 </div>
               )}
 

@@ -36,8 +36,10 @@ import {
   PenLine,
   AlertTriangle,
   EyeOff,
+  RotateCcw,
 } from "lucide-react";
 import { EnterMarksModal, StudentGradeTarget } from "@/components/admin/EnterMarksModal";
+import { ReassignModal, ReassignTarget } from "@/components/admin/ReassignModal";
 import { toggleAssignmentStatus } from "./actions";
 
 interface TestOption {
@@ -103,6 +105,9 @@ export function RosterClient({
     score: number;
     maxScore: number;
   } | null>(null);
+
+  // Reassign Modal State
+  const [reassignTarget, setReassignTarget] = useState<ReassignTarget | null>(null);
 
   const currentTest = tests.find((t) => t.id === selectedTestId);
 
@@ -188,6 +193,20 @@ export function RosterClient({
       currentMaxScore: assignment.result?.maxScore ?? 50,
     });
     setIsGradeModalOpen(true);
+  };
+
+  // Offer a fresh attempt on a finished test. Only reachable on a submitted
+  // row: an attempt still open needs its deadline changed, not a reset.
+  const handleOpenReassign = (assignment: RosterAssignment) => {
+    setReassignTarget({
+      assignmentId: assignment.id,
+      studentEmail: assignment.studentEmail,
+      studentName: assignment.user?.name || null,
+      testTitle: currentTest?.title || "Assessment",
+      autoSubmitted: assignment.autoSubmitted,
+      currentScore: assignment.result?.score ?? null,
+      currentMaxScore: assignment.result?.maxScore ?? null,
+    });
   };
 
   // Toggle Status directly. Reverting a graded student deletes their marks, so
@@ -451,7 +470,7 @@ export function RosterClient({
                   )}
                 </div>
 
-                <div className="mt-3 flex items-center justify-between gap-3 border-t border-brand-border/60 pt-3">
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-brand-border/60 pt-3">
                   <button
                     onClick={() => handleToggleStatus(a)}
                     disabled={isToggling}
@@ -470,10 +489,22 @@ export function RosterClient({
                     )}
                   </button>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center justify-end gap-2">
                     <span className="font-mono text-xs font-bold text-[#085041]">
                       {a.result ? `${a.result.score} / ${a.result.maxScore}` : ""}
                     </span>
+                    {isSubmitted && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenReassign(a)}
+                        aria-label="Reassign this test"
+                        className="h-9 gap-1.5 border-brand-border px-3 text-[11px] font-medium text-brand-navy hover:bg-brand-tint"
+                      >
+                        <RotateCcw className="h-3 w-3 text-brand-blue" />
+                        <span>Reassign</span>
+                      </Button>
+                    )}
                     <Button
                       size="sm"
                       variant={a.result ? "outline" : "default"}
@@ -667,30 +698,46 @@ export function RosterClient({
                       )}
                     </TableCell>
 
-                    {/* Manual Grade Action */}
+                    {/* Manual Grade & Reassign Actions */}
                     <TableCell className="text-right">
-                      <Button
-                        size="sm"
-                        variant={a.result ? "outline" : "default"}
-                        onClick={() => handleOpenGradeModal(a)}
-                        className={`h-7 px-2.5 text-[11px] font-medium gap-1.5 ${
-                          a.result
-                            ? "border-brand-border text-brand-navy hover:bg-brand-tint"
-                            : "bg-brand-navy hover:bg-brand-navy/90 text-white shadow-xs"
-                        }`}
-                      >
-                        {a.result ? (
-                          <>
-                            <PenLine className="h-3 w-3 text-brand-blue" />
-                            <span>Edit Marks</span>
-                          </>
-                        ) : (
-                          <>
-                            <Award className="h-3 w-3 text-amber-300" />
-                            <span>Enter Marks</span>
-                          </>
+                      <div className="flex items-center justify-end gap-1.5">
+                        {/* Only a finished attempt can be handed back; an open
+                            one is changed by moving its deadline. */}
+                        {isSubmitted && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenReassign(a)}
+                            title="Give this student another attempt at the test"
+                            className="h-7 gap-1.5 border-brand-border px-2.5 text-[11px] font-medium text-brand-navy hover:bg-brand-tint"
+                          >
+                            <RotateCcw className="h-3 w-3 text-brand-blue" />
+                            <span>Reassign</span>
+                          </Button>
                         )}
-                      </Button>
+                        <Button
+                          size="sm"
+                          variant={a.result ? "outline" : "default"}
+                          onClick={() => handleOpenGradeModal(a)}
+                          className={`h-7 px-2.5 text-[11px] font-medium gap-1.5 ${
+                            a.result
+                              ? "border-brand-border text-brand-navy hover:bg-brand-tint"
+                              : "bg-brand-navy hover:bg-brand-navy/90 text-white shadow-xs"
+                          }`}
+                        >
+                          {a.result ? (
+                            <>
+                              <PenLine className="h-3 w-3 text-brand-blue" />
+                              <span>Edit Marks</span>
+                            </>
+                          ) : (
+                            <>
+                              <Award className="h-3 w-3 text-amber-300" />
+                              <span>Enter Marks</span>
+                            </>
+                          )}
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );
@@ -791,6 +838,16 @@ export function RosterClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Reassign Modal */}
+      <ReassignModal
+        isOpen={Boolean(reassignTarget)}
+        onClose={() => setReassignTarget(null)}
+        target={reassignTarget}
+        onSuccess={() => {
+          router.refresh();
+        }}
+      />
 
       {/* Enter Marks Modal */}
       <EnterMarksModal
