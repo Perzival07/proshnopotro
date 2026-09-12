@@ -7,6 +7,7 @@ import { AtomMark } from "@/components/brand/AtomMark";
 import { NAV_ITEMS } from "./AdminSidebar";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { InstallAppNavButton } from "@/components/pwa/InstallApp";
 
 /**
  * The admin navigation on phones and tablets.
@@ -122,6 +123,10 @@ export function AdminMobileNav() {
                   );
                 })}
               </div>
+            </div>
+
+            <div className="mt-auto border-t border-white/15 p-3">
+              <InstallAppNavButton />
             </div>
           </nav>
         </div>

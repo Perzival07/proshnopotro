@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { LogoBadge } from "@/components/brand/LogoBadge";
 import { LoginForm } from "./LoginForm";
 import { Footer } from "@/components/Footer";
+import { InstallAppCard } from "@/components/pwa/InstallApp";
 
 export default async function LoginPage() {
   const session = await auth();
@@ -39,6 +40,8 @@ export default async function LoginPage() {
               <LoginForm />
             </Suspense>
           </div>
+
+          <InstallAppCard className="mt-4 w-full" />
         </div>
       </main>
 

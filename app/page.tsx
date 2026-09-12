@@ -10,6 +10,7 @@ import { closeExpiredAttempts } from "@/lib/close-expired";
 import { attemptDeadline } from "@/lib/exam-timer";
 import { uploadState } from "@/lib/answer-upload";
 import { BookOpen } from "lucide-react";
+import { InstallAppCard } from "@/components/pwa/InstallApp";
 
 export const dynamic = "force-dynamic";
 
@@ -86,6 +87,8 @@ export default async function StudentDashboardPage() {
             </div>
           </div>
         </div>
+
+        <InstallAppCard className="mb-6 max-w-xl" />
 
         {/* Tests Grid */}
         {cards.length === 0 ? (

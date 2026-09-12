@@ -13,6 +13,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { InstallAppNavButton } from "@/components/pwa/InstallApp";
 
 export const NAV_ITEMS = [
   {
@@ -91,7 +92,8 @@ export function AdminSidebar() {
       </div>
 
       {/* Footer */}
-      <div className="p-4 border-t border-white/15 bg-black/15">
+      <div className="p-3 border-t border-white/15 bg-black/15 space-y-2">
+        <InstallAppNavButton />
         <p className="text-[10px] text-white/40 text-center">
           Classes by Koustav Admin v1.0
         </p>
