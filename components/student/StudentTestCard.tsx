@@ -7,7 +7,7 @@ import { AtomMark } from "@/components/brand/AtomMark";
 import { formatDateShort } from "@/lib/utils";
 import { deriveCardStatus, type CardStatus } from "@/lib/assignment-status";
 import { formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
-import { Calendar, CheckCircle2, Clock, ArrowRight, Lock, Timer } from "lucide-react";
+import { Calendar, CheckCircle2, Clock, ArrowRight, Lock, Timer, UploadCloud } from "lucide-react";
 
 export type { CardStatus };
 
@@ -33,9 +33,14 @@ interface StudentTestCardProps {
       submittedAt: Date;
     } | null;
   };
+  /**
+   * The attempt is over but the answer photos are not uploaded yet, and the
+   * upload window is still open. Worked out on the server, where the clock is.
+   */
+  awaitingUpload?: boolean;
 }
 
-export function StudentTestCard({ assignment }: StudentTestCardProps) {
+export function StudentTestCard({ assignment, awaitingUpload = false }: StudentTestCardProps) {
   const { test, result, dueAt } = assignment;
   const cardStatus: CardStatus = deriveCardStatus(assignment);
   const timed = isTimed(assignment);
@@ -141,7 +146,7 @@ export function StudentTestCard({ assignment }: StudentTestCardProps) {
           ) : (
             <p className="text-xs text-brand-ink/50 mt-1.5 italic">
               {test.format === "GOOGLE_DOC"
-                ? "Written paper \u2014 answers sent on WhatsApp"
+                ? "Written paper \u2014 answers uploaded as photos"
                 : "Google Form online test"}
             </p>
           )}
@@ -161,7 +166,20 @@ export function StudentTestCard({ assignment }: StudentTestCardProps) {
 
         {/* Card Footer / Action */}
         <div className="pt-2 border-t border-brand-border/40">
-          {isInteractive ? (
+          {awaitingUpload ? (
+            <Button
+              asChild
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-sm transition-all"
+            >
+              <Link
+                href={`/test/${assignment.id}`}
+                className="flex items-center justify-center gap-2"
+              >
+                <UploadCloud className="h-4 w-4" />
+                <span>Upload Your Answers</span>
+              </Link>
+            </Button>
+          ) : isInteractive ? (
             <Button
               asChild
               className="w-full bg-brand-navy hover:bg-brand-navy/90 text-white font-medium shadow-sm transition-all"

@@ -222,7 +222,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                     value: "GOOGLE_DOC" as const,
                     icon: FileText,
                     title: "Google Doc",
-                    hint: "Written paper, answers sent on WhatsApp",
+                    hint: "Written paper, answers uploaded as photos",
                   },
                 ]
               ).map((opt) => {

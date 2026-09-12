@@ -1,10 +1,8 @@
 "use client";
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
-import { buildWhatsAppLink, answersMessage, TUTOR_WHATSAPP } from "@/lib/whatsapp";
 import {
   enterFullscreen,
   exitFullscreen,
@@ -13,6 +11,7 @@ import {
 import type { TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { TabGuard } from "@/components/student/TabGuard";
+import { AnswerUploadPanel } from "@/components/student/AnswerUploadPanel";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   ExternalLink,
@@ -20,7 +19,6 @@ import {
   TimerOff,
   ShieldAlert,
   CheckCircle2,
-  MessageCircle,
   Maximize2,
   Minimize2,
   X,
@@ -39,6 +37,12 @@ interface StartTestButtonProps {
   initialServerNow?: string | null;
   /** Whether leaving the tab is warned about and, on the second time, ends it. */
   proctored?: boolean;
+  /**
+   * "upload" when the attempt already ended but the answers are not uploaded
+   * yet -- a reload, or a student coming back -- so the page opens straight
+   * onto the upload pop-up instead of the paper.
+   */
+  initialPhase?: "exam" | "upload";
 }
 
 /**
@@ -62,8 +66,8 @@ export function StartTestButton({
   initialEndsAt,
   initialServerNow,
   proctored = false,
+  initialPhase = "exam",
 }: StartTestButtonProps) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,7 +88,17 @@ export function StartTestButton({
       ? toClientDeadline(initialEndsAt, initialServerNow)
       : null
   );
-  const [timeUp, setTimeUp] = useState(false);
+  // True once the attempt is over, however it ended. The paper is taken away
+  // and the answer upload takes its place.
+  const [timeUp, setTimeUp] = useState(initialPhase === "upload");
+  // Read once. Closing the attempt revalidates this page, which re-renders it
+  // with initialPhase="upload" while this component keeps its state -- so the
+  // live prop cannot tell a page that opened on the upload from one that just
+  // got there.
+  const [openedOnUpload] = useState(initialPhase === "upload");
+  // The student pressed Finish, as opposed to the clock or the guard ending it.
+  const [finishedEarly, setFinishedEarly] = useState(false);
+  const [confirmingFinish, setConfirmingFinish] = useState(false);
   // Set when the tab guard, rather than the clock, ended the attempt -- the
   // closing panel has to say which, since the student can tell the difference.
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
@@ -133,10 +147,6 @@ export function StartTestButton({
 
   const isDoc = testFormat === "GOOGLE_DOC";
   const paperNoun = isDoc ? "Question Paper" : "Google Form";
-  const whatsappHref = buildWhatsAppLink(
-    TUTOR_WHATSAPP,
-    answersMessage(testTitle, studentName)
-  );
 
   const handleOpen = async () => {
     setLoading(true);
@@ -145,6 +155,11 @@ export function StartTestButton({
     const res = await resolveSecureFormUrl(assignmentId);
     setLoading(false);
 
+    if (res.ended) {
+      // The attempt closed while they were away; go straight to the upload.
+      setTimeUp(true);
+      return;
+    }
     if (res.error || !res.embedUrl) {
       setError(res.error || "Could not load the question paper.");
       return;
@@ -197,20 +212,22 @@ export function StartTestButton({
       <ExamCountdown deadlineMs={deadlineMs} onExpire={handleExpire} expired={timeUp} />
     ) : null;
 
-  const handleConfirmSubmission = async () => {
+  const handleFinish = async () => {
+    setConfirmingFinish(false);
     setSubmitting(true);
     setError(null);
     try {
       const res = await markStudentSubmission(assignmentId, "STUDENT");
       if (res.error) {
         setError(res.error);
-        setSubmitting(false);
         return;
       }
-      router.push("/");
-      router.refresh();
+      collapse();
+      setFinishedEarly(true);
+      setTimeUp(true);
     } catch {
-      setError("Failed to confirm submission.");
+      setError("Could not finish the assessment. Check your internet and try again.");
+    } finally {
       setSubmitting(false);
     }
   };
@@ -236,35 +253,36 @@ export function StartTestButton({
 
       {timeUp ? (
         <div className="space-y-4">
-          {countdown}
           <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-left text-red-900">
             <TimerOff className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
             <div className="space-y-1 text-xs">
               <p className="font-heading text-sm font-semibold">
-                {guardMessage ? "Assessment closed" : "Time is up"}
+                {guardMessage ? "Assessment closed" : finishedEarly ? "Assessment finished" : "Time is up"}
               </p>
               <p className="leading-relaxed">
-                {guardMessage
-                  ? guardMessage
-                  : submitting
+                {submitting
                   ? "Submitting your assessment\u2026"
-                  : isDoc
-                  ? "This assessment has been submitted automatically. Anything you already sent on WhatsApp still counts."
-                  : "This assessment has been submitted automatically. Only the answers you saved inside the form before the timer ended were recorded."}
+                  : "The question paper is closed. Upload photos of your answers to finish."}
               </p>
             </div>
           </div>
-          <Button
-            onClick={() => {
-              router.push("/");
-              router.refresh();
-            }}
-            size="lg"
-            variant="outline"
-            className="w-full"
-          >
-            Back to All Assessments
-          </Button>
+
+          {/* The paper is gone; the upload pop-up is the only way forward.
+              Held back until the close-out has landed, so the server is
+              already treating the attempt as ended when it is asked. */}
+          {!submitting && (
+            <AnswerUploadPanel
+              assignmentId={assignmentId}
+              testTitle={testTitle}
+              studentName={studentName}
+              endedMessage={
+                guardMessage ||
+                (finishedEarly || openedOnUpload
+                  ? null
+                  : "Time is up. The question paper has been closed.")
+              }
+            />
+          )}
         </div>
       ) : !opened ? (
         <div className="space-y-4">
@@ -369,17 +387,6 @@ export function StartTestButton({
             </div>
           )}
 
-          {/* WhatsApp the answers -- the submission route for a written paper */}
-          <a
-            href={whatsappHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-600/30 bg-emerald-50 px-6 py-2.5 text-sm font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
-          >
-            <MessageCircle className="h-4 w-4" />
-            <span>WhatsApp me the test answers</span>
-          </a>
-
           <div className="p-4 bg-sky-50 text-sky-950 border border-sky-200 rounded-xl flex items-start gap-3 text-left">
             <ShieldAlert className="h-5 w-5 shrink-0 text-brand-blue mt-0.5" />
             <div className="space-y-1 text-xs">
@@ -388,32 +395,52 @@ export function StartTestButton({
               </p>
               <p className="text-brand-ink/80">
                 {isDoc
-                  ? "Write your answers on paper, send them on WhatsApp using the button above, then confirm below."
-                  : "Complete every question and press Submit inside the form, then confirm below."}
+                  ? "Write your answers on paper. When you finish, or when the time runs out, the paper closes and you upload photos of your answer sheets."
+                  : "Answer every question and press Submit inside the form. When you finish, or when the time runs out, the paper closes and you upload photos of your answer sheets."}
               </p>
             </div>
           </div>
 
-          <Button
-            onClick={handleConfirmSubmission}
-            disabled={submitting}
-            size="lg"
-            className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 shadow-md transition-all flex items-center justify-center gap-2"
-          >
-            {submitting ? (
-              <div className="flex items-center gap-2">
-                <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#A7F3D0" animate />
-                <span>Confirming Submission&hellip;</span>
+          {confirmingFinish ? (
+            <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left">
+              <p className="text-xs font-medium text-emerald-950">
+                {isDoc
+                  ? "Finish now? The question paper will close and you cannot open it again."
+                  : "Have you pressed Submit inside the form? Finishing closes the paper and you cannot open it again."}
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => setConfirmingFinish(false)}>
+                  Keep working
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleFinish}
+                  className="bg-emerald-600 font-semibold text-white hover:bg-emerald-700"
+                >
+                  Yes, finish
+                </Button>
               </div>
-            ) : (
-              <>
-                <CheckCircle2 className="h-5 w-5" />
-                <span>
-                  {isDoc ? "I Have Sent My Answers" : "I Have Submitted the Form"}
-                </span>
-              </>
-            )}
-          </Button>
+            </div>
+          ) : (
+            <Button
+              onClick={() => setConfirmingFinish(true)}
+              disabled={submitting}
+              size="lg"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 px-6 shadow-md transition-all flex items-center justify-center gap-2"
+            >
+              {submitting ? (
+                <div className="flex items-center gap-2">
+                  <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#A7F3D0" animate />
+                  <span>Finishing&hellip;</span>
+                </div>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span>I&apos;ve Finished &mdash; Upload My Answers</span>
+                </>
+              )}
+            </Button>
+          )}
         </div>
       )}
     </div>

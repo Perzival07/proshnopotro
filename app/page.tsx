@@ -7,6 +7,8 @@ import { StudentTestCard } from "@/components/student/StudentTestCard";
 import { EmptyState } from "@/components/student/EmptyState";
 import { deriveCardStatus } from "@/lib/assignment-status";
 import { closeExpiredAttempts } from "@/lib/close-expired";
+import { attemptDeadline } from "@/lib/exam-timer";
+import { uploadState } from "@/lib/answer-upload";
 import { BookOpen } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -33,7 +35,9 @@ export default async function StudentDashboardPage() {
   // closed here, so the dashboard they land on is already truthful.
   const autoClosed = await closeExpiredAttempts(assignments);
   const cards = assignments.map((a) =>
-    autoClosed.has(a.id) ? { ...a, status: "SUBMITTED" as const } : a
+    autoClosed.has(a.id)
+      ? { ...a, status: "SUBMITTED" as const, endedAt: attemptDeadline(a) }
+      : a
   );
 
   const availableCount = cards.filter(
@@ -100,6 +104,7 @@ export default async function StudentDashboardPage() {
                 <StudentTestCard
                   key={assignment.id}
                   assignment={assignment}
+                  awaitingUpload={uploadState(assignment) === "OPEN"}
                 />
               ))}
             </div>

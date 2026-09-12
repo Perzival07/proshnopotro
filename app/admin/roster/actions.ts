@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { canReassign, parseNewDeadline, REOPEN_DATA } from "@/lib/reassign";
+import { signedAnswerUrl } from "@/lib/cloudinary";
 
 /**
  * Every write here changes the same four surfaces: the roster it was made
@@ -121,6 +122,7 @@ export async function toggleAssignmentStatus(
       if (existing.result) {
         await prisma.$transaction([
           prisma.result.delete({ where: { assignmentId } }),
+          prisma.answerImage.deleteMany({ where: { assignmentId } }),
           prisma.assignment.update({
             where: { id: assignmentId },
             data: REOPEN_DATA,
@@ -133,10 +135,18 @@ export async function toggleAssignmentStatus(
       }
     }
 
-    await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: newStatus === "ASSIGNED" ? REOPEN_DATA : { status: "SUBMITTED" },
-    });
+    if (newStatus === "ASSIGNED") {
+      // Reopening clears the upload stamp, so the old photos go with it.
+      await prisma.$transaction([
+        prisma.answerImage.deleteMany({ where: { assignmentId } }),
+        prisma.assignment.update({ where: { id: assignmentId }, data: REOPEN_DATA }),
+      ]);
+    } else {
+      await prisma.assignment.update({
+        where: { id: assignmentId },
+        data: { status: "SUBMITTED" },
+      });
+    }
 
     revalidateAdminSurfaces();
 
@@ -228,17 +238,13 @@ export async function reassignAssignment(
       assignedAt: new Date(),
     };
 
-    if (existing.result) {
-      await prisma.$transaction([
-        prisma.result.delete({ where: { assignmentId } }),
-        prisma.assignment.update({ where: { id: assignmentId }, data: reopen }),
-      ]);
-    } else {
-      await prisma.assignment.update({
-        where: { id: assignmentId },
-        data: reopen,
-      });
-    }
+    await prisma.$transaction([
+      ...(existing.result
+        ? [prisma.result.delete({ where: { assignmentId } })]
+        : []),
+      prisma.answerImage.deleteMany({ where: { assignmentId } }),
+      prisma.assignment.update({ where: { id: assignmentId }, data: reopen }),
+    ]);
 
     revalidateAdminSurfaces();
 
@@ -247,4 +253,56 @@ export async function reassignAssignment(
     console.error("Failed to reassign test:", error);
     return { error: "Database error reassigning this test." };
   }
+}
+
+export interface AnswerSheetPage {
+  id: string;
+  position: number;
+  /** Signed links; the photos are private and open only through these. */
+  thumbUrl: string;
+  fullUrl: string;
+  width: number | null;
+  height: number | null;
+}
+
+export interface AnswerSheetsResult {
+  pages?: AnswerSheetPage[];
+  uploadedAt?: string | null;
+  error?: string;
+}
+
+/** The student's uploaded answer pages, in the order they arranged them. */
+export async function getAnswerSheets(assignmentId: string): Promise<AnswerSheetsResult> {
+  await requireAdmin();
+
+  if (!assignmentId) return { error: "Missing assignment ID." };
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    select: {
+      answersUploadedAt: true,
+      answerImages: { orderBy: { position: "asc" } },
+    },
+  });
+
+  if (!assignment) return { error: "Assignment not found." };
+
+  const pages: AnswerSheetPage[] = [];
+  for (const image of assignment.answerImages) {
+    const fullUrl = signedAnswerUrl(image);
+    const thumbUrl = signedAnswerUrl(image, 400);
+    if (!fullUrl || !thumbUrl) {
+      return { error: "Cloudinary is not configured on the server, so the photos cannot be shown." };
+    }
+    pages.push({
+      id: image.id,
+      position: image.position,
+      thumbUrl,
+      fullUrl,
+      width: image.width,
+      height: image.height,
+    });
+  }
+
+  return { pages, uploadedAt: assignment.answersUploadedAt?.toISOString() ?? null };
 }

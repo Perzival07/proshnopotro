@@ -18,8 +18,11 @@ export function buildWhatsAppLink(
     : base;
 }
 
-/** The message a student sends when submitting a written paper's answers. */
-export function answersMessage(testTitle: string, studentName?: string | null) {
+/**
+ * The message a student sends once their answer photos are uploaded. The
+ * photos themselves live in the portal; this only tells the tutor to look.
+ */
+export function workDoneMessage(testTitle: string, studentName?: string | null) {
   const who = studentName?.trim() ? ` I am ${studentName.trim()}.` : "";
-  return `Hello Sir, here are my answers for "${testTitle}".${who}`;
+  return `Work done. I have uploaded my answers for "${testTitle}".${who}`;
 }

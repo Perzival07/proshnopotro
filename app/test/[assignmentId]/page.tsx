@@ -10,6 +10,7 @@ import { formatDate } from "@/lib/utils";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { attemptDeadline, formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
 import { closeExpiredAttempts } from "@/lib/close-expired";
+import { UPLOAD_WINDOW_MINUTES, uploadState } from "@/lib/answer-upload";
 import { AlertTriangle, ArrowLeft, Calendar, Shield, Timer } from "lucide-react";
 import Link from "next/link";
 
@@ -30,6 +31,8 @@ export default async function TestConfirmationPage({ params }: PageProps) {
       studentEmail: true,
       dueAt: true,
       startedAt: true,
+      endedAt: true,
+      answersUploadedAt: true,
       status: true,
       test: {
         select: {
@@ -66,24 +69,32 @@ export default async function TestConfirmationPage({ params }: PageProps) {
 
   // A window that ran out while the student was away is closed here, so the
   // record catches up before the page decides what to show them.
-  await closeExpiredAttempts([assignment]);
+  const autoClosed = await closeExpiredAttempts([assignment]);
+  const current = autoClosed.has(assignment.id)
+    ? { ...assignment, status: "SUBMITTED" as const, endedAt: attemptDeadline(assignment) }
+    : assignment;
 
-  const isSubmitted = isAssignmentSubmitted(assignment);
-  const isInactive = !assignment.test.active;
+  const isSubmitted = isAssignmentSubmitted(current);
+  const isInactive = !current.test.active;
 
   // Covers both the tutor's deadline and, once started, this student's own
   // window -- either one ending puts the paper out of reach.
-  const outOfTime = isTimeUp(assignment);
+  const outOfTime = isTimeUp(current);
 
-  // If closed or already submitted, redirect to dashboard
-  if (isSubmitted || outOfTime || isInactive) {
+  // A finished attempt whose answers are not uploaded yet comes back here for
+  // the upload, and only that -- the paper itself stays closed.
+  const awaitingUpload = isSubmitted && uploadState(current) === "OPEN";
+
+  // Otherwise, if closed or already submitted, redirect to dashboard
+  if (!awaitingUpload && (isSubmitted || outOfTime || isInactive)) {
     redirect("/");
   }
 
   const timed = isTimed(assignment);
   // Only a started attempt has a live clock; before that the countdown has
   // nothing to count and the student still sees the limit stated below.
-  const endsAt = timed && assignment.startedAt ? attemptDeadline(assignment) : null;
+  const endsAt =
+    !awaitingUpload && timed && assignment.startedAt ? attemptDeadline(assignment) : null;
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-brand-page">
@@ -180,6 +191,12 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                     timer keeps running throughout.
                   </p>
                 )}
+                <p className="text-xs leading-relaxed font-medium">
+                  When you finish or the time runs out, the paper closes. You then
+                  have {UPLOAD_WINDOW_MINUTES} minutes to photograph every page of
+                  your answers and upload them &mdash; you can upload only once.
+                  Then send &ldquo;Work done&rdquo; to your tutor on WhatsApp.
+                </p>
                 <p className="text-[11px] opacity-80 leading-normal">
                   Make sure your internet connection is stable before opening the test.
                 </p>
@@ -196,6 +213,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 initialEndsAt={endsAt?.toISOString() ?? null}
                 initialServerNow={endsAt ? new Date().toISOString() : null}
                 proctored={assignment.test.proctored}
+                initialPhase={awaitingUpload ? "upload" : "exam"}
               />
             </div>
           </div>

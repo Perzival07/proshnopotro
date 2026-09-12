@@ -12,17 +12,23 @@ import { isAssignmentSubmitted } from "./assignment-status";
 /**
  * The columns that put a finished attempt back in front of the student.
  *
- * All four have to move together. A leftover `startedAt` is an expired window,
+ * All of them have to move together. A leftover `startedAt` is an expired window,
  * so a timed test would auto-submit itself the moment the student opened it
  * and the reassignment would appear to do nothing; a leftover `tabSwitches`
  * tally would start the retake already on its final warning; a leftover
- * `autoSubmitted` would label the fresh attempt as one the timer ended.
+ * `autoSubmitted` would label the fresh attempt as one the timer ended; and a
+ * leftover upload stamp would refuse the retake's answer photos.
+ *
+ * Scalars only, so it works in `updateMany` too. The old attempt's photo rows
+ * must be deleted alongside it -- see `clearAnswerImages`.
  */
 export const REOPEN_DATA = {
   status: "ASSIGNED",
   startedAt: null,
   autoSubmitted: false,
   tabSwitches: 0,
+  endedAt: null,
+  answersUploadedAt: null,
 } as const;
 
 /**

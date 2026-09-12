@@ -9,6 +9,8 @@ import { normalizeEmail } from "@/lib/utils";
  * quietly split the roster into groups that look identical on screen.
  */
 export const CLASS_OPTIONS = [
+  "Class 6",
+  "Class 7",
   "Class 8",
   "Class 9",
   "Class 10",

@@ -157,7 +157,9 @@ export function ReassignModal({
               </span>
             </p>
             <p className="pl-5">
-              The countdown and the tab-switch tally both start again from zero.
+              The countdown and the tab-switch tally both start again from zero,
+              and any answer photos they uploaded are removed so they can upload
+              again.
             </p>
           </div>
 

@@ -7,6 +7,16 @@ import { revalidatePath } from "next/cache";
 import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { attemptDeadline, isTimed, isTimeUp, remainingMs } from "@/lib/exam-timer";
 import { isProctored, registerSwitch, warningMessage } from "@/lib/proctoring";
+import {
+  answerFolder,
+  canSaveUpload,
+  isInAnswerFolder,
+  MAX_ANSWER_IMAGES,
+  uploadClosesAt,
+  uploadState,
+  type UploadState,
+} from "@/lib/answer-upload";
+import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
 
 export interface FormResolutionResult {
   /**
@@ -23,6 +33,8 @@ export interface FormResolutionResult {
    * hand the student extra time or cut them short.
    */
   serverNow?: string;
+  /** The attempt is over, so the page should move on to the answer upload. */
+  ended?: boolean;
   error?: string;
 }
 
@@ -60,7 +72,7 @@ export async function resolveSecureFormUrl(
 
   // 2. Submission status verification
   if (isAssignmentSubmitted(assignment)) {
-    return { error: "This assessment has already been submitted." };
+    return { error: "This assessment has already been submitted.", ended: true };
   }
 
   // 3. Test active status verification
@@ -73,11 +85,14 @@ export async function resolveSecureFormUrl(
   //    the window closed must not hand the paper back, so this is checked
   //    against the stored `startedAt` rather than anything the client sent.
   if (isTimeUp(assignment)) {
-    await closeOutAssignment(assignment.id, isTimed(assignment));
+    // The attempt ended at its deadline, not now: a student coming back hours
+    // later must not be handed a fresh upload window.
+    await closeOutAssignment(assignment.id, isTimed(assignment), attemptDeadline(assignment));
     return {
       error: isTimed(assignment)
         ? "Your time for this assessment is up. It has been submitted automatically."
         : "The deadline for this assessment has passed.",
+      ended: true,
     };
   }
 
@@ -145,11 +160,20 @@ async function ensureStarted(assignment: {
   return fresh?.startedAt ?? now;
 }
 
-/** Marks an assignment submitted, recording whether the timer did it. */
-async function closeOutAssignment(assignmentId: string, auto: boolean) {
-  await prisma.assignment.update({
-    where: { id: assignmentId },
-    data: { status: "SUBMITTED", autoSubmitted: auto },
+/**
+ * Marks an assignment submitted, recording whether the timer did it and when
+ * the attempt ended -- the answer upload window runs from that instant.
+ *
+ * Guarded on status so an attempt already closed keeps its original end time.
+ */
+async function closeOutAssignment(
+  assignmentId: string,
+  auto: boolean,
+  endedAt: Date = new Date()
+) {
+  await prisma.assignment.updateMany({
+    where: { id: assignmentId, status: "ASSIGNED" },
+    data: { status: "SUBMITTED", autoSubmitted: auto, endedAt },
   });
 
   revalidatePath(`/test/${assignmentId}`);
@@ -203,7 +227,12 @@ export async function markStudentSubmission(
   }
 
   try {
-    await closeOutAssignment(assignmentId, trigger === "TIMER");
+    // The timer's attempt ended at the deadline, however late the request.
+    await closeOutAssignment(
+      assignmentId,
+      trigger === "TIMER",
+      trigger === "TIMER" ? attemptDeadline(assignment) : new Date()
+    );
     return { success: true };
   } catch (err) {
     console.error("Failed to mark student submission:", err);
@@ -287,4 +316,173 @@ export async function recordTabSwitch(
     submitted: false,
     message: warningMessage(outcome),
   };
+}
+
+// ─────────────────────────────────────────────────────────────
+// ANSWER UPLOAD
+// ─────────────────────────────────────────────────────────────
+
+/** Loads an assignment the signed-in student owns, or explains why not. */
+async function loadOwnAssignment(assignmentId: string) {
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) {
+    return { error: "Authentication required. Please sign in again." } as const;
+  }
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      test: { select: { durationMinutes: true } },
+      result: { select: { id: true } },
+      _count: { select: { answerImages: true } },
+    },
+  });
+
+  if (!assignment) return { error: "Assignment not found." } as const;
+  if (assignment.studentEmail.toLowerCase() !== sessionUser.email.trim().toLowerCase()) {
+    return { error: "Unauthorized." } as const;
+  }
+  return { assignment } as const;
+}
+
+export interface AnswerUploadStatus {
+  state?: UploadState;
+  /** When the one-time upload closes. */
+  closesAt?: string;
+  /** The server clock, so the page can correct for a skewed browser clock. */
+  serverNow?: string;
+  /** Pages already saved, once uploaded. */
+  pageCount?: number;
+  error?: string;
+}
+
+/** What the upload panel should show: open, already done, or too late. */
+export async function getAnswerUploadStatus(
+  assignmentId: string
+): Promise<AnswerUploadStatus> {
+  const loaded = await loadOwnAssignment(assignmentId);
+  if ("error" in loaded) return { error: loaded.error };
+  const { assignment } = loaded;
+
+  const closes = uploadClosesAt(assignment);
+  return {
+    state: uploadState(assignment),
+    closesAt: closes?.toISOString(),
+    serverNow: new Date().toISOString(),
+    pageCount: assignment._count.answerImages,
+  };
+}
+
+export interface SignatureResult {
+  upload?: UploadSignature;
+  error?: string;
+}
+
+/**
+ * A short-lived permission to upload straight to Cloudinary, pinned to this
+ * assignment's folder. Only issued while the window is open and nothing has
+ * been saved yet.
+ */
+export async function getAnswerUploadSignature(
+  assignmentId: string
+): Promise<SignatureResult> {
+  const loaded = await loadOwnAssignment(assignmentId);
+  if ("error" in loaded) return { error: loaded.error };
+  const { assignment } = loaded;
+
+  const state = uploadState(assignment);
+  if (state === "UPLOADED") return { error: "Your answers have already been uploaded." };
+  if (state === "NOT_ENDED") return { error: "Finish the assessment before uploading your answers." };
+  if (state === "EXPIRED") return { error: "The time to upload your answers is over." };
+
+  const upload = signAnswerUpload(answerFolder(assignment.id));
+  if (!upload) {
+    console.error("Cloudinary is not configured: set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.");
+    return { error: "Uploads are not set up yet. Please tell your tutor." };
+  }
+  return { upload };
+}
+
+export interface UploadedPage {
+  publicId: string;
+  version: number;
+  format: string;
+  width?: number | null;
+  height?: number | null;
+  bytes?: number | null;
+}
+
+/**
+ * Records the uploaded pages. This is the one-time step: the stamp is claimed
+ * with a conditional write, so two taps or two tabs cannot both save a set.
+ */
+export async function saveAnswerUploads(
+  assignmentId: string,
+  pages: UploadedPage[]
+): Promise<{ success?: true; pageCount?: number; error?: string }> {
+  const loaded = await loadOwnAssignment(assignmentId);
+  if ("error" in loaded) return { error: loaded.error };
+  const { assignment } = loaded;
+
+  if (assignment.answersUploadedAt) {
+    return { error: "Your answers have already been uploaded." };
+  }
+  if (!canSaveUpload(assignment)) {
+    return { error: "The time to upload your answers is over." };
+  }
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    return { error: "Add at least one photo of your answers." };
+  }
+  if (pages.length > MAX_ANSWER_IMAGES) {
+    return { error: `You can upload at most ${MAX_ANSWER_IMAGES} pages.` };
+  }
+
+  for (const page of pages) {
+    if (
+      typeof page?.publicId !== "string" ||
+      !isInAnswerFolder(page.publicId, assignment.id) ||
+      !Number.isInteger(page.version) ||
+      typeof page.format !== "string" ||
+      !/^[a-z0-9]{2,5}$/i.test(page.format)
+    ) {
+      return { error: "One of the uploaded pages could not be verified. Please try again." };
+    }
+  }
+
+  const toInt = (n: unknown) =>
+    typeof n === "number" && Number.isFinite(n) ? Math.round(n) : null;
+
+  try {
+    const saved = await prisma.$transaction(async (tx) => {
+      const claimed = await tx.assignment.updateMany({
+        where: { id: assignment.id, answersUploadedAt: null },
+        data: { answersUploadedAt: new Date() },
+      });
+      if (claimed.count === 0) return false;
+
+      await tx.answerImage.createMany({
+        data: pages.map((page, index) => ({
+          assignmentId: assignment.id,
+          publicId: page.publicId,
+          version: page.version,
+          format: page.format.toLowerCase(),
+          width: toInt(page.width),
+          height: toInt(page.height),
+          bytes: toInt(page.bytes),
+          position: index,
+        })),
+      });
+      return true;
+    });
+
+    if (!saved) return { error: "Your answers have already been uploaded." };
+  } catch (err) {
+    console.error("Failed to save answer uploads:", err);
+    return { error: "Your photos were sent but could not be saved. Please press Upload again." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin/roster");
+  return { success: true, pageCount: pages.length };
 }

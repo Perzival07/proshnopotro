@@ -37,9 +37,11 @@ import {
   AlertTriangle,
   EyeOff,
   RotateCcw,
+  Images,
 } from "lucide-react";
 import { EnterMarksModal, StudentGradeTarget } from "@/components/admin/EnterMarksModal";
 import { ReassignModal, ReassignTarget } from "@/components/admin/ReassignModal";
+import { AnswerSheetsModal, AnswerSheetsTarget } from "@/components/admin/AnswerSheetsModal";
 import { toggleAssignmentStatus } from "./actions";
 
 interface TestOption {
@@ -57,6 +59,9 @@ export interface RosterAssignment {
   status: "ASSIGNED" | "SUBMITTED";
   autoSubmitted: boolean;
   tabSwitches: number;
+  /** When the student's answer photos were uploaded, if they have been. */
+  answersUploadedAt: Date | null;
+  answerPageCount: number;
   user: {
     id: string;
     name: string | null;
@@ -108,6 +113,19 @@ export function RosterClient({
 
   // Reassign Modal State
   const [reassignTarget, setReassignTarget] = useState<ReassignTarget | null>(null);
+
+  // Answer Sheets Viewer State
+  const [answersTarget, setAnswersTarget] = useState<AnswerSheetsTarget | null>(null);
+
+  const handleOpenAnswers = (assignment: RosterAssignment) => {
+    setAnswersTarget({
+      assignmentId: assignment.id,
+      studentEmail: assignment.studentEmail,
+      studentName: assignment.user?.name || null,
+      testTitle: currentTest?.title || "Assessment",
+      pageCount: assignment.answerPageCount,
+    });
+  };
 
   const currentTest = tests.find((t) => t.id === selectedTestId);
 
@@ -267,6 +285,7 @@ export function RosterClient({
       "Score",
       "Max Score",
       "Submitted At",
+      "Answer Pages",
       "Assigned At",
       "Deadline",
     ];
@@ -281,6 +300,7 @@ export function RosterClient({
       a.result ? a.result.score : "",
       a.result ? a.result.maxScore : "",
       a.result ? new Date(a.result.submittedAt).toISOString() : "",
+      a.answerPageCount,
       new Date(a.assignedAt).toISOString(),
       new Date(a.dueAt).toISOString(),
     ]);
@@ -493,6 +513,18 @@ export function RosterClient({
                     <span className="font-mono text-xs font-bold text-[#085041]">
                       {a.result ? `${a.result.score} / ${a.result.maxScore}` : ""}
                     </span>
+                    {a.answerPageCount > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => handleOpenAnswers(a)}
+                        aria-label="View uploaded answers"
+                        className="h-9 gap-1.5 border-emerald-600/30 bg-emerald-50 px-3 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100"
+                      >
+                        <Images className="h-3 w-3" />
+                        <span>Answers ({a.answerPageCount})</span>
+                      </Button>
+                    )}
                     {isSubmitted && (
                       <Button
                         size="sm"
@@ -703,6 +735,18 @@ export function RosterClient({
                       <div className="flex items-center justify-end gap-1.5">
                         {/* Only a finished attempt can be handed back; an open
                             one is changed by moving its deadline. */}
+                        {a.answerPageCount > 0 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleOpenAnswers(a)}
+                            title="View the student's uploaded answer sheets"
+                            className="h-7 gap-1.5 border-emerald-600/30 bg-emerald-50 px-2.5 text-[11px] font-medium text-emerald-800 hover:bg-emerald-100"
+                          >
+                            <Images className="h-3 w-3" />
+                            <span>Answers ({a.answerPageCount})</span>
+                          </Button>
+                        )}
                         {isSubmitted && (
                           <Button
                             size="sm"
@@ -838,6 +882,12 @@ export function RosterClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Answer Sheets Viewer */}
+      <AnswerSheetsModal
+        target={answersTarget}
+        onClose={() => setAnswersTarget(null)}
+      />
 
       {/* Reassign Modal */}
       <ReassignModal

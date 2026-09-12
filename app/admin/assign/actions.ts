@@ -183,6 +183,8 @@ export async function assignTestToStudents(
       // A surviving Result reads as submitted everywhere, so the reopened test
       // would still be locked; the score has to go with the attempt.
       prisma.result.deleteMany({ where: { assignmentId: { in: ids } } }),
+      // The retake uploads its own photos; the old attempt's go with it.
+      prisma.answerImage.deleteMany({ where: { assignmentId: { in: ids } } }),
       prisma.assignment.updateMany({
         where: { id: { in: ids } },
         data: { ...REOPEN_DATA, dueAt, assignedAt: new Date() },

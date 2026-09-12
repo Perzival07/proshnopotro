@@ -23,7 +23,7 @@ describe("canReassign", () => {
 });
 
 describe("REOPEN_DATA", () => {
-  it("clears the clock, the tally and the auto-submit flag together", () => {
+  it("clears the clock, the tally, the auto-submit flag and the upload together", () => {
     // Each of these left behind breaks the retake in its own way, so the set
     // is asserted whole rather than field by field.
     expect(REOPEN_DATA).toEqual({
@@ -31,6 +31,8 @@ describe("REOPEN_DATA", () => {
       startedAt: null,
       autoSubmitted: false,
       tabSwitches: 0,
+      endedAt: null,
+      answersUploadedAt: null,
     });
   });
 });

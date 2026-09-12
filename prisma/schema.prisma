@@ -20,8 +20,9 @@ enum AssignmentStatus {
 
 /// How a test's question paper is delivered.
 /// GOOGLE_FORM: answered online in the form itself.
-/// GOOGLE_DOC:  a written paper the student reads, answers on paper, and
-///              sends back over WhatsApp.
+/// GOOGLE_DOC:  a written paper the student reads and answers on paper.
+/// Either way, once the attempt ends the student photographs their answer
+/// sheets and uploads them once (see AnswerImage).
 enum TestFormat {
   GOOGLE_FORM
   GOOGLE_DOC
@@ -128,14 +129,42 @@ model Assignment {
   /// How many times this student left the exam tab. Counted on the server so
   /// a reload cannot wipe the tally.
   tabSwitches  Int              @default(0)
+  /// When the attempt closed -- by the student, the timer or the tab guard.
+  /// The one-time answer upload window runs from here.
+  endedAt      DateTime?
+  /// Stamped when the student's answer photos were saved. Set once: a second
+  /// upload is refused while this is filled in.
+  answersUploadedAt DateTime?
 
   test         Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
   result       Result?
+  answerImages AnswerImage[]
 
   @@unique([testId, studentEmail])
   @@index([studentEmail])
   @@index([testId])
   @@index([status])
+}
+
+/// One photographed answer sheet page, stored in Cloudinary as an
+/// authenticated asset -- it can only be viewed through a signed URL the
+/// server issues to the tutor.
+model AnswerImage {
+  id           String     @id @default(cuid())
+  assignmentId String
+  publicId     String
+  version      Int
+  format       String
+  width        Int?
+  height       Int?
+  bytes        Int?
+  /// Page order as the student arranged them.
+  position     Int
+  createdAt    DateTime   @default(now())
+
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId])
 }
 
 model Result {

@@ -28,6 +28,7 @@ export default async function AdminRosterPage({ searchParams }: RosterPageProps)
     const rawAssignments = await prisma.assignment.findMany({
       where: { testId: selectedTestId },
       include: {
+        _count: { select: { answerImages: true } },
         result: {
           select: {
             id: true,
@@ -64,6 +65,8 @@ export default async function AdminRosterPage({ searchParams }: RosterPageProps)
       status: a.status,
       autoSubmitted: a.autoSubmitted,
       tabSwitches: a.tabSwitches,
+      answersUploadedAt: a.answersUploadedAt,
+      answerPageCount: a._count.answerImages,
       user: userMap.get(a.studentEmail.toLowerCase()) || null,
       result: a.result,
     }));
