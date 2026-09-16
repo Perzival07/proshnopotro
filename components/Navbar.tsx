@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, ShieldCheck, BookOpen, Layers } from "lucide-react";
+import { LogOut, ShieldCheck, BookOpen, Layers, NotebookText, Users } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 interface NavbarProps {
@@ -47,6 +47,33 @@ export function Navbar({ user }: NavbarProps) {
         <div className="flex items-center gap-6">
           <LogoLockup variant="white" href={isAdmin && pathname.startsWith("/admin") ? "/admin/tests" : "/"} />
           
+          {/* A student's two places: their tests and their notes. Hidden on
+              phones, where the same links sit in the avatar menu. */}
+          {!isAdmin && user && (
+            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-white/20">
+              <Link
+                href="/"
+                className={`text-xs uppercase font-heading tracking-wider px-2.5 py-1 rounded transition-colors ${
+                  pathname === "/"
+                    ? "bg-white/20 text-white font-semibold"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                My Tests
+              </Link>
+              <Link
+                href="/notes"
+                className={`text-xs uppercase font-heading tracking-wider px-2.5 py-1 rounded transition-colors ${
+                  pathname.startsWith("/notes")
+                    ? "bg-white/20 text-white font-semibold"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                Notes
+              </Link>
+            </div>
+          )}
+
           {/* Quick link if Admin */}
           {isAdmin && (
             <div className="hidden md:flex items-center gap-2 pl-4 border-l border-white/20">
@@ -112,12 +139,40 @@ export function Navbar({ user }: NavbarProps) {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
 
+                {/* On a phone this menu is the only navigation a student has,
+                    so both of their pages have to be reachable from it. */}
+                <DropdownMenuItem asChild>
+                  <Link href="/" className="flex items-center gap-2 text-xs">
+                    <BookOpen className="h-4 w-4 text-brand-navy" />
+                    <span>My Tests</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/notes" className="flex items-center gap-2 text-xs">
+                    <NotebookText className="h-4 w-4 text-brand-navy" />
+                    <span>Notes</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+
                 {isAdmin && (
                   <>
                     <DropdownMenuItem asChild>
                       <Link href="/admin/tests" className="flex items-center gap-2 text-xs">
                         <ShieldCheck className="h-4 w-4 text-brand-navy" />
                         <span>Manage Tests</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/notes" className="flex items-center gap-2 text-xs">
+                        <NotebookText className="h-4 w-4 text-brand-navy" />
+                        <span>Manage Notes</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/classrooms" className="flex items-center gap-2 text-xs">
+                        <Users className="h-4 w-4 text-brand-navy" />
+                        <span>Classrooms</span>
                       </Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>

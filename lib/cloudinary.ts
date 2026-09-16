@@ -97,3 +97,86 @@ export function signedAnswerUrl(
       : {}),
   });
 }
+
+// ─────────────────────────────────────────────────────────────
+// NOTE FILES
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Signs a direct browser upload of note files, pinned to one note's folder.
+ *
+ * The same signature serves both Cloudinary endpoints: `resource_type` lives
+ * in the URL path, not in the signed parameters, so photos can go to /image
+ * and PDFs to /raw without a second round trip for another signature.
+ */
+export function signNoteUpload(folder: string): UploadSignature | null {
+  return signAnswerUpload(folder);
+}
+
+export interface StoredNoteFile {
+  publicId: string;
+  version: number;
+  format: string;
+  resourceType: string;
+}
+
+/**
+ * A signed link to one note file, or to a thumbnail of it.
+ *
+ * Note files are uploaded as `authenticated`, exactly like answer sheets, so
+ * a link that leaks is the only way in -- and these links are minted per
+ * request for a student the note is actually shared with.
+ *
+ * Raw files (PDFs) carry their extension inside the public id and cannot be
+ * transformed, so `width` is ignored for them.
+ */
+export function signedNoteUrl(
+  file: StoredNoteFile,
+  options: { width?: number; download?: boolean } = {}
+): string | null {
+  const c = getCloudinary();
+  if (!c) return null;
+
+  const isRaw = file.resourceType === "raw";
+  const transformation = [
+    ...(options.width && !isRaw
+      ? [{ width: options.width, crop: "limit", quality: "auto", fetch_format: "auto" }]
+      : []),
+    ...(options.download ? [{ flags: "attachment" }] : []),
+  ];
+
+  return c.cloudinary.url(file.publicId, {
+    resource_type: isRaw ? "raw" : "image",
+    type: ANSWER_DELIVERY_TYPE,
+    sign_url: true,
+    secure: true,
+    version: file.version,
+    // A raw public id already ends in ".pdf"; appending the format again
+    // would ask Cloudinary for "ch7.pdf.pdf", which does not exist.
+    ...(isRaw ? {} : { format: file.format }),
+    ...(transformation.length ? { transformation } : {}),
+  });
+}
+
+/**
+ * Removes a note file from Cloudinary.
+ *
+ * Best effort by design: the database row is the record of what a student can
+ * see, so a failed destroy must not stop the tutor deleting a note. It only
+ * leaves a stored file nobody has a link to.
+ */
+export async function destroyNoteFile(file: StoredNoteFile): Promise<boolean> {
+  const c = getCloudinary();
+  if (!c) return false;
+  try {
+    await c.cloudinary.uploader.destroy(file.publicId, {
+      resource_type: file.resourceType === "raw" ? "raw" : "image",
+      type: ANSWER_DELIVERY_TYPE,
+      invalidate: true,
+    });
+    return true;
+  } catch (err) {
+    console.error("Failed to remove a note file from Cloudinary:", err);
+    return false;
+  }
+}

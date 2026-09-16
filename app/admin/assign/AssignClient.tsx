@@ -26,10 +26,12 @@ import {
 import { assignTestToStudents, AssignResult } from "./actions";
 import { toDateTimeLocalValue } from "@/lib/utils";
 import { AtomMark } from "@/components/brand/AtomMark";
+import Link from "next/link";
 import {
   UserPlus,
   Calendar,
   Users,
+  School,
   Mail,
   CheckCircle2,
   AlertCircle,
@@ -54,12 +56,21 @@ interface StudentOption {
   phone: string | null;
 }
 
+interface ClassroomOption {
+  id: string;
+  name: string;
+  subject: string | null;
+  /** The batch's members, lower-cased, in the order they were added. */
+  memberEmails: string[];
+}
+
 interface AssignClientProps {
   tests: TestOption[];
   students: StudentOption[];
+  classrooms: ClassroomOption[];
 }
 
-export function AssignClient({ tests, students }: AssignClientProps) {
+export function AssignClient({ tests, students, classrooms }: AssignClientProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const initialTestId = searchParams.get("testId") || (tests[0]?.id ?? "");
@@ -75,7 +86,18 @@ export function AssignClient({ tests, students }: AssignClientProps) {
   }, []);
 
   const [dueDate, setDueDate] = useState(defaultDueDate);
-  const [assignMode, setAssignMode] = useState<"TABLE" | "BULK_PASTE">("TABLE");
+  const [assignMode, setAssignMode] = useState<"TABLE" | "BULK_PASTE" | "CLASSROOM">(
+    "TABLE"
+  );
+
+  // Mode C: a whole classroom at once
+  const [selectedClassroomId, setSelectedClassroomId] = useState<string>(
+    classrooms[0]?.id ?? ""
+  );
+  const selectedClassroom = useMemo(
+    () => classrooms.find((c) => c.id === selectedClassroomId) ?? null,
+    [classrooms, selectedClassroomId]
+  );
 
   // Mode A: Student Table Selection
   const [selectedStudentEmails, setSelectedStudentEmails] = useState<string[]>([]);
@@ -148,10 +170,18 @@ export function AssignClient({ tests, students }: AssignClientProps) {
     setLoading(true);
 
     const emailsToProcess =
-      assignMode === "TABLE" ? selectedStudentEmails : parsedBulkEmails;
+      assignMode === "TABLE"
+        ? selectedStudentEmails
+        : assignMode === "CLASSROOM"
+          ? (selectedClassroom?.memberEmails ?? [])
+          : parsedBulkEmails;
 
     if (emailsToProcess.length === 0) {
-      setErrorMessage("Please select or paste at least one email address.");
+      setErrorMessage(
+        assignMode === "CLASSROOM"
+          ? "That classroom has no students in it yet. Add some under Classrooms first."
+          : "Please select or paste at least one email address."
+      );
       setLoading(false);
       return;
     }
@@ -297,6 +327,19 @@ export function AssignClient({ tests, students }: AssignClientProps) {
               >
                 <Users className="h-3.5 w-3.5 text-brand-blue" />
                 <span>Registered Students ({students.length})</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setAssignMode("CLASSROOM")}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  assignMode === "CLASSROOM"
+                    ? "bg-white text-brand-navy font-semibold shadow-xs border border-brand-border"
+                    : "text-brand-ink/70 hover:text-brand-navy"
+                }`}
+              >
+                <School className="h-3.5 w-3.5 text-brand-blue" />
+                <span>Whole Classroom ({classrooms.length})</span>
               </button>
 
               <button
@@ -465,6 +508,84 @@ export function AssignClient({ tests, students }: AssignClientProps) {
             </div>
           )}
 
+          {/* Option C: a whole classroom, in one go */}
+          {assignMode === "CLASSROOM" && (
+            <div className="space-y-3">
+              {classrooms.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-brand-border bg-brand-page p-6 text-center">
+                  <School className="mx-auto h-7 w-7 text-brand-blue/60" />
+                  <p className="mt-2 text-xs font-semibold text-brand-navy">
+                    No classrooms yet
+                  </p>
+                  <p className="mx-auto mt-1 max-w-sm text-[11px] text-brand-ink/65">
+                    Create a batch under{" "}
+                    <Link href="/admin/classrooms" className="font-medium text-brand-blue hover:underline">
+                      Classrooms
+                    </Link>{" "}
+                    and every student in it can be given a test in one click.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="select-classroom" className="text-xs font-semibold text-brand-navy">
+                      Choose a classroom
+                    </Label>
+                    <Select value={selectedClassroomId} onValueChange={setSelectedClassroomId}>
+                      <SelectTrigger id="select-classroom" className="mt-1.5 h-10">
+                        <SelectValue placeholder="Select a classroom..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {classrooms.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            <span className="font-medium text-brand-navy">{c.name}</span>
+                            <span className="ml-2 text-xs text-brand-ink/50">
+                              ({c.memberEmails.length} student
+                              {c.memberEmails.length === 1 ? "" : "s"})
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {selectedClassroom && (
+                    <div className="rounded-lg border border-brand-border bg-brand-page p-3">
+                      {selectedClassroom.memberEmails.length === 0 ? (
+                        <p className="text-xs text-amber-700">
+                          This classroom has no students in it yet. Add some under Classrooms
+                          first.
+                        </p>
+                      ) : (
+                        <>
+                          <p className="text-xs font-medium text-brand-navy">
+                            {selectedClassroom.memberEmails.length} student
+                            {selectedClassroom.memberEmails.length === 1 ? "" : "s"} will get
+                            this test.
+                          </p>
+                          <div className="mt-2 flex max-h-32 flex-wrap gap-1.5 overflow-y-auto">
+                            {selectedClassroom.memberEmails.map((email) => (
+                              <span
+                                key={email}
+                                className="rounded-full border border-brand-border bg-white px-2 py-0.5 font-mono text-[11px] text-brand-ink/75"
+                              >
+                                {email}
+                              </span>
+                            ))}
+                          </div>
+                          <p className="mt-2 text-[11px] text-brand-ink/50">
+                            Students already holding an unfinished copy are skipped, as
+                            always.
+                          </p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           {/* Option B: Bulk Email Paste */}
           {assignMode === "BULK_PASTE" && (
             <div className="space-y-3">
@@ -549,7 +670,11 @@ export function AssignClient({ tests, students }: AssignClientProps) {
                     Assign to{" "}
                     {assignMode === "TABLE"
                       ? `${selectedStudentEmails.length} Selected Students`
-                      : `${parsedBulkEmails.length} Email Addresses`}
+                      : assignMode === "CLASSROOM"
+                        ? `${selectedClassroom?.name ?? "a classroom"} (${
+                            selectedClassroom?.memberEmails.length ?? 0
+                          })`
+                        : `${parsedBulkEmails.length} Email Addresses`}
                   </span>
                 </>
               )}

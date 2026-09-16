@@ -9,7 +9,9 @@ import { deriveCardStatus } from "@/lib/assignment-status";
 import { closeExpiredAttempts } from "@/lib/close-expired";
 import { attemptDeadline } from "@/lib/exam-timer";
 import { uploadState } from "@/lib/answer-upload";
-import { BookOpen } from "lucide-react";
+import { countVisibleNotes, getStudentClassrooms } from "@/lib/note-access";
+import { BookOpen, NotebookText, Users } from "lucide-react";
+import Link from "next/link";
 import { InstallAppCard } from "@/components/pwa/InstallApp";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +33,12 @@ export default async function StudentDashboardPage() {
       { dueAt: "asc" },
     ],
   });
+
+  // The batches this student is in, and what is waiting for them there.
+  const [classrooms, noteCount] = await Promise.all([
+    getStudentClassrooms(user.email),
+    countVisibleNotes(user.email),
+  ]);
 
   // Any timed attempt whose window ran out while the student was away is
   // closed here, so the dashboard they land on is already truthful.
@@ -68,6 +76,22 @@ export default async function StudentDashboardPage() {
             <p className="text-body text-brand-ink/70 mt-1 text-sm">
               Your assigned assessments for Classes by Koustav.
             </p>
+
+            {/* The batches this student learns with. Their notes and tests
+                arrive through these, so they are named on the dashboard. */}
+            {classrooms.length > 0 && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {classrooms.map((classroom) => (
+                  <span
+                    key={classroom.id}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-brand-border bg-white px-2.5 py-1 text-[11px] font-medium text-brand-ink/80"
+                  >
+                    <Users className="h-3 w-3 text-brand-blue" />
+                    {classroom.name}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Quick summary chips */}
@@ -85,6 +109,16 @@ export default async function StudentDashboardPage() {
                 <strong className="text-brand-navy font-semibold">{submittedCount}</strong> Completed
               </span>
             </div>
+
+            <Link
+              href="/notes"
+              className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-white border border-brand-border shadow-xs transition-colors hover:bg-brand-tint focus-ring"
+            >
+              <NotebookText className="h-3.5 w-3.5 text-brand-blue" />
+              <span className="text-xs font-medium text-brand-ink/80">
+                <strong className="text-brand-navy font-semibold">{noteCount}</strong> Notes
+              </span>
+            </Link>
           </div>
         </div>
 

@@ -33,20 +33,20 @@ enum TestFormat {
 // ─────────────────────────────────────────────────────────────
 
 model User {
-  id              String       @id @default(cuid())
+  id              String    @id @default(cuid())
   name            String?
-  email           String       @unique
+  email           String    @unique
   emailVerified   DateTime?
   image           String?
-  role            Role         @default(STUDENT)
+  role            Role      @default(STUDENT)
   phone           String?
-  className       String?      // e.g. "Class 10", "Class 12"
-  profileComplete Boolean      @default(false)
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
+  className       String? // e.g. "Class 10", "Class 12"
+  profileComplete Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  accounts        Account[]
-  sessions        Session[]
+  accounts Account[]
+  sessions Session[]
 
   @@index([email])
 }
@@ -94,20 +94,20 @@ model VerificationToken {
 // ─────────────────────────────────────────────────────────────
 
 model Test {
-  id          String       @id @default(cuid())
-  title       String
-  subject     String
-  description String?      @db.Text
-  iconName    String       @default("BookOpen")
-  format      TestFormat   @default(GOOGLE_FORM)
-  formUrl     String       @db.Text             // Question paper URL. Never exposed to client HTML.
+  id              String     @id @default(cuid())
+  title           String
+  subject         String
+  description     String?    @db.Text
+  iconName        String     @default("BookOpen")
+  format          TestFormat @default(GOOGLE_FORM)
+  formUrl         String     @db.Text // Question paper URL. Never exposed to client HTML.
   /// Minutes a student gets once they open the paper. null = untimed.
   durationMinutes Int?
   /// Warn the student when they leave the exam tab, and submit on the third.
-  proctored   Boolean      @default(true)
-  active      Boolean      @default(true)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  proctored       Boolean    @default(true)
+  active          Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   assignments Assignment[]
 
@@ -115,28 +115,28 @@ model Test {
 }
 
 model Assignment {
-  id           String           @id @default(cuid())
-  testId       String
-  studentEmail String           // Lowercase normalized email (allows pre-assignment before user signs in)
-  assignedAt   DateTime         @default(now())
-  dueAt        DateTime
+  id                String           @id @default(cuid())
+  testId            String
+  studentEmail      String // Lowercase normalized email (allows pre-assignment before user signs in)
+  assignedAt        DateTime         @default(now())
+  dueAt             DateTime
   /// Stamped the first time the student opens the paper. The countdown for a
   /// timed test runs from here, so a reload or a second device cannot restart it.
-  startedAt    DateTime?
-  status       AssignmentStatus @default(ASSIGNED)
+  startedAt         DateTime?
+  status            AssignmentStatus @default(ASSIGNED)
   /// True when the timer or the tab guard ended it, not the student.
-  autoSubmitted Boolean         @default(false)
+  autoSubmitted     Boolean          @default(false)
   /// How many times this student left the exam tab. Counted on the server so
   /// a reload cannot wipe the tally.
-  tabSwitches  Int              @default(0)
+  tabSwitches       Int              @default(0)
   /// When the attempt closed -- by the student, the timer or the tab guard.
   /// The one-time answer upload window runs from here.
-  endedAt      DateTime?
+  endedAt           DateTime?
   /// Stamped when the student's answer photos were saved. Set once: a second
   /// upload is refused while this is filled in.
   answersUploadedAt DateTime?
 
-  test         Test             @relation(fields: [testId], references: [id], onDelete: Cascade)
+  test         Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
   result       Result?
   answerImages AnswerImage[]
 
@@ -150,7 +150,7 @@ model Assignment {
 /// authenticated asset -- it can only be viewed through a signed URL the
 /// server issues to the tutor.
 model AnswerImage {
-  id           String     @id @default(cuid())
+  id           String   @id @default(cuid())
   assignmentId String
   publicId     String
   version      Int
@@ -160,22 +160,141 @@ model AnswerImage {
   bytes        Int?
   /// Page order as the student arranged them.
   position     Int
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime @default(now())
 
-  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
   @@index([assignmentId])
 }
 
 model Result {
-  id            String     @id @default(cuid())
-  assignmentId  String     @unique
-  submittedAt   DateTime   @default(now())
+  id            String   @id @default(cuid())
+  assignmentId  String   @unique
+  submittedAt   DateTime @default(now())
   score         Float
   maxScore      Float
-  responseEmail String     // Email reported in Google Forms response sheet
+  responseEmail String // Email reported in Google Forms response sheet
 
-  assignment    Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
   @@index([assignmentId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// CLASSROOMS & NOTES
+// ─────────────────────────────────────────────────────────────
+
+/// A group of students the tutor teaches together.
+///
+/// Deliberately separate from `User.className`: that field records which year
+/// a student is in ("Class 12 - Science"), while a classroom is a batch the
+/// tutor actually runs ("Physics Batch A - Mon/Wed"). A student sits in one
+/// class and in as many classrooms as the tutor puts them in.
+model Classroom {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  subject     String?
+  description String?  @db.Text
+  iconName    String   @default("GraduationCap")
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members ClassroomMember[]
+  notes   NoteClassroom[]
+
+  @@index([active])
+}
+
+/// One student's place in a classroom.
+///
+/// Held by email, like Assignment, so the tutor can put a student in a batch
+/// before they have ever signed in.
+model ClassroomMember {
+  id           String   @id @default(cuid())
+  classroomId  String
+  studentEmail String
+  addedAt      DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, studentEmail])
+  @@index([studentEmail])
+  @@index([classroomId])
+}
+
+/// A set of notes the tutor shares: some files, a link, or both.
+model Note {
+  id          String    @id @default(cuid())
+  title       String
+  subject     String
+  description String?   @db.Text
+  iconName    String    @default("FileText")
+  /// An optional companion link -- a lecture recording, a Drive folder.
+  linkUrl     String?   @db.Text
+  /// When this becomes visible to the students it is shared with. null while
+  /// it is still a draft; a future time means every student in the batch sees
+  /// it at the same moment, not whenever the tutor happened to finish it.
+  publishedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  files      NoteFile[]
+  classrooms NoteClassroom[]
+  students   NoteStudent[]
+
+  @@index([publishedAt])
+}
+
+/// One uploaded file belonging to a note, stored in Cloudinary as an
+/// authenticated asset -- reachable only through a signed URL the server
+/// issues to a student the note is shared with.
+model NoteFile {
+  id           String   @id @default(cuid())
+  noteId       String
+  publicId     String
+  version      Int
+  format       String
+  /// Cloudinary's resource type: "image" for photos, "raw" for PDFs.
+  resourceType String   @default("image")
+  /// The name the tutor's file had, so the student downloads something
+  /// recognisable rather than a public id.
+  originalName String
+  bytes        Int?
+  width        Int?
+  height       Int?
+  /// Order the tutor arranged the files in.
+  position     Int
+  createdAt    DateTime @default(now())
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
+}
+
+/// A note shared with a whole classroom.
+model NoteClassroom {
+  id          String @id @default(cuid())
+  noteId      String
+  classroomId String
+
+  note      Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, classroomId])
+  @@index([classroomId])
+  @@index([noteId])
+}
+
+/// A note shared with one named student, on top of any classrooms.
+model NoteStudent {
+  id           String @id @default(cuid())
+  noteId       String
+  studentEmail String
+
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, studentEmail])
+  @@index([studentEmail])
+  @@index([noteId])
 }

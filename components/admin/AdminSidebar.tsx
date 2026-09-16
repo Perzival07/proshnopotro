@@ -10,6 +10,8 @@ import {
   UploadCloud,
   Users,
   GraduationCap,
+  NotebookText,
+  School,
   ChevronRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -33,6 +35,18 @@ export const NAV_ITEMS = [
     href: "/admin/students",
     icon: GraduationCap,
     description: "Add, edit or remove students",
+  },
+  {
+    name: "Classrooms",
+    href: "/admin/classrooms",
+    icon: School,
+    description: "Group students into batches",
+  },
+  {
+    name: "Notes",
+    href: "/admin/notes",
+    icon: NotebookText,
+    description: "Share study material with a class",
   },
   {
     name: "Test Rosters",
