@@ -184,12 +184,21 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                   </p>
                 )}
                 {assignment.test.proctored && (
-                  <p className="text-xs leading-relaxed font-medium">
-                    Stay on this tab once the paper opens. Switching to another tab,
-                    another window or another app is recorded. You get one warning;
-                    the second time, your assessment is submitted automatically. Your
-                    timer keeps running throughout.
-                  </p>
+                  <>
+                    <p className="text-xs leading-relaxed font-medium">
+                      Stay on this tab once the paper opens. Switching to another tab,
+                      another window or another app is recorded. You get one warning;
+                      the second time, your assessment is submitted automatically. Your
+                      timer keeps running throughout.
+                    </p>
+                    <p className="text-xs leading-relaxed font-medium">
+                      This assessment is camera-proctored. Your browser will ask for
+                      the camera when you open the paper; it stays on until you finish,
+                      and you will see yourself in the corner of the screen. No video is
+                      saved or sent anywhere &mdash; the camera is there so you can see
+                      that the assessment is being supervised.
+                    </p>
+                  </>
                 )}
                 <p className="text-xs leading-relaxed font-medium">
                   When you finish or the time runs out, the paper closes. You then

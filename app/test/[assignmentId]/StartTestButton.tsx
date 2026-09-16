@@ -12,6 +12,10 @@ import type { TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { TabGuard } from "@/components/student/TabGuard";
 import { AnswerUploadPanel } from "@/components/student/AnswerUploadPanel";
+import {
+  ProctorCameraBadge,
+  useProctorCamera,
+} from "@/components/student/ProctorCamera";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   ExternalLink,
@@ -103,6 +107,13 @@ export function StartTestButton({
   // closing panel has to say which, since the student can tell the difference.
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
 
+  // The camera is on for exactly as long as the paper is: opened, proctored,
+  // not yet finished. Nothing it sees is captured or sent anywhere -- it is
+  // shown back to the student so that being watched is visible rather than
+  // claimed.
+  const cameraActive = proctored && opened && !timeUp;
+  const camera = useProctorCamera(cameraActive);
+
   const handleGuardSubmitted = useCallback((message: string) => {
     setGuardMessage(message);
     setTimeUp(true);
@@ -152,15 +163,29 @@ export function StartTestButton({
     setLoading(true);
     setError(null);
 
+    // Asked for here, on the student's own click, rather than in an effect
+    // once the paper is up: a permission prompt that appears out of nowhere
+    // over a question paper is one a student dismisses without reading. A
+    // refusal does not block the attempt -- it leaves the badge saying so.
+    if (proctored) {
+      await camera.start();
+    }
+
     const res = await resolveSecureFormUrl(assignmentId);
     setLoading(false);
 
+    // Both of these leave without opening the paper, so the camera granted a
+    // moment ago has to be handed straight back: the badge that explains why
+    // it is on is only rendered once the paper is up, and a light burning
+    // behind no explanation at all is the one outcome to avoid.
     if (res.ended) {
       // The attempt closed while they were away; go straight to the upload.
+      camera.stop();
       setTimeUp(true);
       return;
     }
     if (res.error || !res.embedUrl) {
+      camera.stop();
       setError(res.error || "Could not load the question paper.");
       return;
     }
@@ -241,6 +266,15 @@ export function StartTestButton({
           assignmentId={assignmentId}
           active={opened && !timeUp && !submitting}
           onSubmitted={handleGuardSubmitted}
+        />
+      )}
+
+      {cameraActive && (
+        <ProctorCameraBadge
+          stream={camera.stream}
+          status={camera.status}
+          error={camera.error}
+          onRetry={() => void camera.start()}
         />
       )}
 
