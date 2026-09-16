@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Dialog,
   DialogContent,
@@ -15,11 +15,30 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { SubjectIcon, SUBJECT_ICONS } from "@/components/SubjectIcon";
-import { createTest, updateTest } from "./actions";
+import {
+  createTest,
+  getPaperPreviewUrl,
+  getPaperUploadSignature,
+  updateTest,
+} from "./actions";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { AlertCircle, Link as LinkIcon, FileText, ClipboardList, Timer } from "lucide-react";
+import {
+  AlertCircle,
+  Link as LinkIcon,
+  FileText,
+  FileType2,
+  ClipboardList,
+  Timer,
+  Upload,
+  ExternalLink,
+} from "lucide-react";
 import type { TestFormat } from "@/lib/test-resource";
 import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
+import type { UploadedPaper } from "@/lib/question-paper";
+import type { CompressProgress } from "@/lib/compress-pdf";
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
+import { MAX_PDF_BYTES, describeSaving, looksLikePdf } from "@/lib/pdf-compression";
+import { formatBytes } from "@/lib/notes";
 
 interface TestModalProps {
   isOpen: boolean;
@@ -32,6 +51,10 @@ interface TestModalProps {
     iconName: string;
     format: TestFormat;
     formUrl: string;
+    paperPublicId: string | null;
+    paperVersion: number | null;
+    paperName: string | null;
+    paperBytes: number | null;
     durationMinutes: number | null;
     proctored: boolean;
     active: boolean;
@@ -46,6 +69,14 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [iconName, setIconName] = useState("Atom");
   const [format, setFormat] = useState<TestFormat>("GOOGLE_FORM");
   const [formUrl, setFormUrl] = useState("");
+  // The uploaded PDF paper, once it is safely in Cloudinary.
+  const [paper, setPaper] = useState<UploadedPaper | null>(null);
+  // "8.2 MB → 1.4 MB" for a paper uploaded in this sitting.
+  const [paperSaving, setPaperSaving] = useState<string | null>(null);
+  // What the PDF upload is doing right now; null when idle.
+  const [paperStatus, setPaperStatus] = useState<string | null>(null);
+  const [openingPaper, setOpeningPaper] = useState(false);
+  const paperInputRef = useRef<HTMLInputElement>(null);
   // Held as a string so the field can be genuinely empty, which is what
   // "no time limit" means -- a number state would coerce that to 0.
   const [durationMinutes, setDurationMinutes] = useState("");
@@ -62,6 +93,16 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setIconName(testToEdit.iconName || "BookOpen");
       setFormat(testToEdit.format || "GOOGLE_FORM");
       setFormUrl(testToEdit.formUrl);
+      setPaper(
+        testToEdit.paperPublicId && testToEdit.paperVersion
+          ? {
+              publicId: testToEdit.paperPublicId,
+              version: testToEdit.paperVersion,
+              name: testToEdit.paperName || "question-paper.pdf",
+              bytes: testToEdit.paperBytes ?? 0,
+            }
+          : null
+      );
       setDurationMinutes(
         testToEdit.durationMinutes ? String(testToEdit.durationMinutes) : ""
       );
@@ -74,12 +115,80 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setIconName("Atom");
       setFormat("GOOGLE_FORM");
       setFormUrl("");
+      setPaper(null);
       setDurationMinutes("");
       setProctored(true);
       setActive(true);
     }
+    setPaperSaving(null);
+    setPaperStatus(null);
     setError(null);
   }, [testToEdit, isOpen]);
+
+  const handlePaperFile = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    if (!looksLikePdf(file)) {
+      setError(`${file.name} is not a PDF.`);
+      return;
+    }
+
+    setPaperStatus("Reading the PDF\u2026");
+    try {
+      // Compressed before it leaves the browser: a scanned paper is often
+      // several MB a page, and every student downloads it on a phone.
+      // Loaded on demand: pdf-lib and pdf.js are heavy, and most visits to
+      // this page never touch a PDF.
+      const { compressPdf } = await import("@/lib/compress-pdf");
+      const compressed = await compressPdf(file, (p) => setPaperStatus(progressText(p)));
+
+      setPaperStatus("Uploading\u2026");
+      const signed = await getPaperUploadSignature();
+      if (signed.error || !signed.upload) {
+        setError(signed.error || "Could not start the upload.");
+        return;
+      }
+      const body = await uploadToCloudinary(signed.upload, compressed.blob, file.name, "raw");
+
+      setPaper({
+        publicId: body.public_id,
+        version: body.version,
+        name: file.name,
+        bytes: body.bytes ?? compressed.bytes,
+      });
+      setPaperSaving(describeSaving(compressed.originalBytes, compressed.bytes));
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "The PDF could not be uploaded.");
+    } finally {
+      setPaperStatus(null);
+    }
+  };
+
+  const openSavedPaper = async () => {
+    if (!testToEdit) return;
+    // Opened before the await so pop-up blockers see it as the tap's own window.
+    const tab = window.open("", "_blank");
+    setOpeningPaper(true);
+    try {
+      const res = await getPaperPreviewUrl(testToEdit.id);
+      if (res.url && tab) tab.location.href = res.url;
+      else {
+        tab?.close();
+        setError(res.error || "Could not open the paper.");
+      }
+    } finally {
+      setOpeningPaper(false);
+    }
+  };
+
+  const isPdf = format === "PDF";
+  const paperBusy = paperStatus !== null;
+  // Only the paper already saved on this test can be opened from here; a fresh
+  // upload is the file the tutor just picked, so they have it in hand.
+  const paperIsSaved = Boolean(
+    paper && testToEdit?.paperPublicId && paper.publicId === testToEdit.paperPublicId
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,6 +202,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       iconName,
       format,
       formUrl,
+      paper: isPdf ? paper : null,
       durationMinutes,
       proctored,
       active,
@@ -112,14 +222,14 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && !paperBusy && onClose()}>
       <DialogContent className="max-w-xl max-h-[90dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {isEditing ? "Edit Assessment Test" : "Create New Assessment Test"}
           </DialogTitle>
           <DialogDescription>
-            Configure the test directory record and link your private Google Form URL.
+            Configure the test record, then link a Google Form or Doc, or upload the paper as a PDF.
           </DialogDescription>
         </DialogHeader>
 
@@ -209,7 +319,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             <Label className="text-xs font-semibold text-brand-navy">
               Test Type <span className="text-red-500">*</span>
             </Label>
-            <div className="mt-1.5 grid grid-cols-2 gap-2">
+            <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
               {(
                 [
                   {
@@ -223,6 +333,12 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                     icon: FileText,
                     title: "Google Doc",
                     hint: "Written paper, answers uploaded as photos",
+                  },
+                  {
+                    value: "PDF" as const,
+                    icon: FileType2,
+                    title: "PDF upload",
+                    hint: "Upload the paper; it is compressed first",
                   },
                 ]
               ).map((opt) => {
@@ -252,38 +368,118 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             </div>
           </div>
 
-          <div>
-            <div className="flex items-center justify-between">
-              <Label htmlFor="form-url" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
-                <LinkIcon className="h-3.5 w-3.5 text-brand-blue" />
-                <span>
-                  {format === "GOOGLE_FORM" ? "Google Form URL" : "Google Doc URL"}{" "}
-                  <span className="text-red-500">*</span>
+          {isPdf ? (
+            <div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
+                  <FileType2 className="h-3.5 w-3.5 text-brand-blue" />
+                  <span>
+                    Question Paper PDF <span className="text-red-500">*</span>
+                  </span>
+                </Label>
+                <span className="text-[10px] text-brand-ink/50 italic">
+                  Only students sitting the test can open it
                 </span>
-              </Label>
-              <span className="text-[10px] text-brand-ink/50 italic">
-                Never leaked to student HTML
-              </span>
+              </div>
+
+              <input
+                ref={paperInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="hidden"
+                onChange={(e) => {
+                  void handlePaperFile(e.target.files?.[0]);
+                  e.target.value = "";
+                }}
+              />
+
+              {paperBusy ? (
+                <div className="mt-1 flex items-center gap-2 rounded-lg border border-brand-border bg-brand-page p-3 text-xs text-brand-ink/75">
+                  <AtomMark size={16} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+                  <span>{paperStatus}</span>
+                </div>
+              ) : paper ? (
+                <div className="mt-1 flex items-center gap-3 rounded-lg border border-brand-border bg-white p-2.5">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md border border-brand-border bg-brand-page">
+                    <FileType2 className="h-5 w-5 text-brand-blue" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium text-brand-ink">{paper.name}</p>
+                    <p className="text-[11px] text-brand-ink/55">
+                      {paperSaving
+                        ? `Compressed: ${paperSaving}`
+                        : formatBytes(paper.bytes) || "Uploaded"}
+                    </p>
+                  </div>
+                  {paperIsSaved && (
+                    <button
+                      type="button"
+                      onClick={openSavedPaper}
+                      disabled={openingPaper}
+                      className="inline-flex h-9 shrink-0 items-center gap-1 rounded-md px-2 text-[11px] font-medium text-brand-blue hover:bg-brand-tint disabled:opacity-60"
+                    >
+                      <ExternalLink className="h-3 w-3" />
+                      Open
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => paperInputRef.current?.click()}
+                    className="inline-flex h-9 shrink-0 items-center rounded-md px-2 text-[11px] font-medium text-brand-navy hover:bg-brand-tint"
+                  >
+                    Replace
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => paperInputRef.current?.click()}
+                  className="mt-1 flex w-full flex-col items-center gap-1 rounded-lg border border-dashed border-brand-border bg-brand-page p-4 text-center transition-colors hover:border-brand-blue/60 hover:bg-brand-tint"
+                >
+                  <Upload className="h-5 w-5 text-brand-blue" />
+                  <span className="text-xs font-semibold text-brand-navy">Choose a PDF</span>
+                </button>
+              )}
+              <p className="mt-1 text-[11px] text-brand-ink/55">
+                The PDF is compressed in your browser before it uploads, and must come
+                out under {formatBytes(MAX_PDF_BYTES)}. Students read it inside the
+                portal and cannot download it from there.
+              </p>
             </div>
-            <Input
-              id="form-url"
-              type="url"
-              placeholder={
-                format === "GOOGLE_FORM"
-                  ? "https://docs.google.com/forms/d/e/.../viewform"
-                  : "https://docs.google.com/document/d/.../edit"
-              }
-              value={formUrl}
-              onChange={(e) => setFormUrl(e.target.value)}
-              required
-              className="mt-1 font-mono text-xs"
-            />
-            <p className="mt-1 text-[11px] text-brand-ink/55">
-              {format === "GOOGLE_FORM"
-                ? "Share the form so anyone with the link can respond, and paste the full docs.google.com/forms/\u2026 address \u2014 forms.gle short links cannot be shown inside the portal."
-                : "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error."}
-            </p>
-          </div>
+          ) : (
+            <div>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="form-url" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
+                  <LinkIcon className="h-3.5 w-3.5 text-brand-blue" />
+                  <span>
+                    {format === "GOOGLE_FORM" ? "Google Form URL" : "Google Doc URL"}{" "}
+                    <span className="text-red-500">*</span>
+                  </span>
+                </Label>
+                <span className="text-[10px] text-brand-ink/50 italic">
+                  Never leaked to student HTML
+                </span>
+              </div>
+              <Input
+                id="form-url"
+                type="url"
+                placeholder={
+                  format === "GOOGLE_FORM"
+                    ? "https://docs.google.com/forms/d/e/.../viewform"
+                    : "https://docs.google.com/document/d/.../edit"
+                }
+                value={formUrl}
+                onChange={(e) => setFormUrl(e.target.value)}
+                required
+                className="mt-1 font-mono text-xs"
+              />
+              <p className="mt-1 text-[11px] text-brand-ink/55">
+                {format === "GOOGLE_FORM"
+                  ? "Share the form so anyone with the link can respond, and paste the full docs.google.com/forms/\u2026 address \u2014 forms.gle short links cannot be shown inside the portal."
+                  : "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error."}
+              </p>
+            </div>
+          )}
 
           <div>
             <Label
@@ -349,13 +545,18 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               type="button"
               variant="outline"
               onClick={onClose}
-              disabled={loading}
+              disabled={loading || paperBusy}
             >
               Cancel
             </Button>
             <Button
               type="submit"
-              disabled={loading || !title.trim() || !formUrl.trim()}
+              disabled={
+                loading ||
+                paperBusy ||
+                !title.trim() ||
+                (isPdf ? !paper : !formUrl.trim())
+              }
               className="bg-brand-navy hover:bg-brand-navy/90 text-white"
             >
               {loading ? (
@@ -374,4 +575,15 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       </DialogContent>
     </Dialog>
   );
+}
+
+function progressText(progress: CompressProgress): string {
+  switch (progress.stage) {
+    case "reading":
+      return "Reading the PDF\u2026";
+    case "optimizing":
+      return "Compressing\u2026";
+    case "redrawing":
+      return `Compressing page ${progress.page} of ${progress.pages}\u2026`;
+  }
 }

@@ -22,6 +22,7 @@ import {
   Plus,
   Search,
   FileText,
+  FileType2,
   ClipboardList,
   Edit2,
   Power,
@@ -42,6 +43,10 @@ interface TestItem {
   iconName: string;
   format: TestFormat;
   formUrl: string;
+  paperPublicId: string | null;
+  paperVersion: number | null;
+  paperName: string | null;
+  paperBytes: number | null;
   durationMinutes: number | null;
   proctored: boolean;
   active: boolean;
@@ -270,17 +275,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                   {test.subject}
                 </span>
                 <span className="inline-flex items-center gap-1">
-                  {test.format === "GOOGLE_DOC" ? (
-                    <>
-                      <FileText className="h-3 w-3" />
-                      Written
-                    </>
-                  ) : (
-                    <>
-                      <ClipboardList className="h-3 w-3" />
-                      Form
-                    </>
-                  )}
+                  <FormatLabel format={test.format} />
                 </span>
                 {test.durationMinutes ? (
                   <span className="inline-flex items-center gap-1 text-brand-blue">
@@ -427,17 +422,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                         {test.subject}
                       </span>
                       <span className="inline-flex w-fit items-center gap-1 text-[10px] font-medium text-brand-ink/60">
-                        {test.format === "GOOGLE_DOC" ? (
-                          <>
-                            <FileText className="h-3 w-3" />
-                            Written
-                          </>
-                        ) : (
-                          <>
-                            <ClipboardList className="h-3 w-3" />
-                            Form
-                          </>
-                        )}
+                        <FormatLabel format={test.format} />
                         {test.durationMinutes ? (
                           <span className="inline-flex items-center gap-1 text-brand-blue">
                             <Timer className="h-3 w-3" />
@@ -572,5 +557,31 @@ export function TestsClient({ tests }: TestsClientProps) {
         testToEdit={testToEdit}
       />
     </div>
+  );
+}
+
+/** How the question paper is delivered, in a word, for the list rows. */
+function FormatLabel({ format }: { format: TestFormat }) {
+  if (format === "PDF") {
+    return (
+      <>
+        <FileType2 className="h-3 w-3" />
+        PDF
+      </>
+    );
+  }
+  if (format === "GOOGLE_DOC") {
+    return (
+      <>
+        <FileText className="h-3 w-3" />
+        Written
+      </>
+    );
+  }
+  return (
+    <>
+      <ClipboardList className="h-3 w-3" />
+      Form
+    </>
   );
 }

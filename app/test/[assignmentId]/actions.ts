@@ -16,7 +16,16 @@ import {
   uploadState,
   type UploadState,
 } from "@/lib/answer-upload";
-import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
+import { signAnswerUpload, signedNoteUrl, type UploadSignature } from "@/lib/cloudinary";
+import { paperFile } from "@/lib/question-paper";
+
+function signedPaperUrl(test: {
+  paperPublicId: string | null;
+  paperVersion: number | null;
+}): string | null {
+  const file = paperFile(test);
+  return file && signedNoteUrl(file);
+}
 
 export interface FormResolutionResult {
   /**
@@ -96,12 +105,18 @@ export async function resolveSecureFormUrl(
     };
   }
 
-  if (!assignment.test.formUrl) {
+  const format = assignment.test.format as TestFormat;
+
+  if (format !== "PDF" && !assignment.test.formUrl) {
     return { error: "The question paper link is not configured. Please contact your tutor." };
   }
 
-  const format = assignment.test.format as TestFormat;
-  const embedUrl = toEmbedUrl(assignment.test.formUrl, format);
+  // An uploaded PDF has no public address at all: the link is signed here,
+  // for this attempt, and the page draws it rather than handing it over.
+  const embedUrl =
+    format === "PDF"
+      ? signedPaperUrl(assignment.test)
+      : toEmbedUrl(assignment.test.formUrl, format);
 
   if (!embedUrl) {
     return {

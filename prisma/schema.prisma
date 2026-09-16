@@ -21,11 +21,13 @@ enum AssignmentStatus {
 /// How a test's question paper is delivered.
 /// GOOGLE_FORM: answered online in the form itself.
 /// GOOGLE_DOC:  a written paper the student reads and answers on paper.
-/// Either way, once the attempt ends the student photographs their answer
+/// PDF:         a written paper the tutor uploaded as a PDF (see Test.paper*).
+/// Whichever it is, once the attempt ends the student photographs their answer
 /// sheets and uploads them once (see AnswerImage).
 enum TestFormat {
   GOOGLE_FORM
   GOOGLE_DOC
+  PDF
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -100,7 +102,14 @@ model Test {
   description     String?    @db.Text
   iconName        String     @default("BookOpen")
   format          TestFormat @default(GOOGLE_FORM)
-  formUrl         String     @db.Text // Question paper URL. Never exposed to client HTML.
+  formUrl         String     @db.Text // Question paper URL. Never exposed to client HTML. Empty for PDF.
+  /// An uploaded PDF paper, stored in Cloudinary as an authenticated raw file
+  /// that opens only through a link signed for a student sitting the test.
+  paperPublicId   String?
+  paperVersion    Int?
+  /// The tutor's file name, so the admin list says which paper it is.
+  paperName       String?
+  paperBytes      Int?
   /// Minutes a student gets once they open the paper. null = untimed.
   durationMinutes Int?
   /// Warn the student when they leave the exam tab, and submit on the third.

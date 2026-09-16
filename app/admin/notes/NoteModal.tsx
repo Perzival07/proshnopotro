@@ -24,6 +24,8 @@ import { AtomMark } from "@/components/brand/AtomMark";
 import { SubjectIcon, SUBJECT_ICONS } from "@/components/SubjectIcon";
 import { StudentPicker, type PickableStudent } from "@/components/admin/StudentPicker";
 import { shrinkImage } from "@/lib/shrink-image";
+import { uploadToCloudinary } from "@/lib/cloudinary-upload";
+import { MAX_PDF_BYTES, MAX_PDF_SOURCE_BYTES } from "@/lib/pdf-compression";
 import {
   ACCEPTED_FILE_TYPES,
   formatBytes,
@@ -92,7 +94,12 @@ export function NoteModal({
   const [studentEmails, setStudentEmails] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
+  const [uploading, setUploading] = useState<{
+    done: number;
+    total: number;
+    /** Set while a PDF is being compressed, before it is sent. */
+    detail?: string;
+  } | null>(null);
   const [removingFileId, setRemovingFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -236,37 +243,54 @@ export function NoteModal({
           setError(`${original.name} is not a picture format the portal can store.`);
           continue;
         }
-        if (original.size > MAX_NOTE_FILE_BYTES) {
+        // A PDF may start larger than the limit: it only has to fit once
+        // compressed, and a scan usually shrinks several times over.
+        const sizeLimit = isPdfFile ? MAX_PDF_SOURCE_BYTES : MAX_NOTE_FILE_BYTES;
+        if (original.size > sizeLimit) {
           setError(
             `${original.name} is ${formatBytes(original.size)}; files must be under ${formatBytes(
-              MAX_NOTE_FILE_BYTES
+              sizeLimit
             )}.`
           );
           continue;
         }
 
-        // Photos are shrunk in the browser: a 12-megapixel snap of a
-        // blackboard becomes a few hundred KB and stays readable. PDFs are
-        // sent exactly as they are.
-        const blob = isPdfFile ? original : await shrinkImage(original);
+        // Everything is shrunk in the browser before it is sent. A 12-megapixel
+        // snap of a blackboard becomes a few hundred KB and stays readable; a
+        // PDF is re-saved compactly, and a scanned one has its pages redrawn
+        // at a sensible resolution (see compress-pdf.ts).
+        let blob: Blob;
+        if (isPdfFile) {
+          try {
+            const { compressPdf } = await import("@/lib/compress-pdf");
+            const compressed = await compressPdf(original, (p) =>
+              setUploading({
+                done: i,
+                total: accepted.length,
+                detail:
+                  p.stage === "redrawing"
+                    ? `Compressing ${original.name}, page ${p.page} of ${p.pages}`
+                    : `Compressing ${original.name}`,
+              })
+            );
+            blob = compressed.blob;
+          } catch (err) {
+            setError(err instanceof Error ? err.message : `${original.name} could not be compressed.`);
+            continue;
+          } finally {
+            setUploading({ done: i, total: accepted.length });
+          }
+        } else {
+          blob = await shrinkImage(original);
+        }
         const format = isPdfFile ? "pdf" : "jpg";
 
-        const form = new FormData();
-        form.append("file", blob, isPdfFile ? original.name : `${original.name}.jpg`);
-        form.append("api_key", sig.apiKey);
-        form.append("timestamp", String(sig.timestamp));
-        form.append("signature", sig.signature);
-        form.append("folder", sig.folder);
-        form.append("type", sig.type);
-
-        const res = await fetch(
-          `https://api.cloudinary.com/v1_1/${sig.cloudName}/${isPdfFile ? "raw" : "image"}/upload`,
-          { method: "POST", body: form }
+        const body = await uploadToCloudinary(
+          sig,
+          blob,
+          isPdfFile ? original.name : `${original.name}.jpg`,
+          isPdfFile ? "raw" : "image"
         );
-        const body = await res.json().catch(() => null);
-        if (!res.ok || !body?.public_id) {
-          throw new Error(body?.error?.message || `${original.name} did not upload.`);
-        }
 
         uploaded.push({
           publicId: body.public_id,
@@ -471,16 +495,22 @@ export function NoteModal({
               <div className="flex items-center gap-2 rounded-lg border border-brand-border bg-brand-page p-3 text-xs text-brand-ink/75">
                 <AtomMark size={16} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
                 <span>
-                  Uploading file {Math.min(uploading.done + 1, uploading.total)} of{" "}
-                  {uploading.total}…
+                  {uploading.detail ? (
+                    <>{uploading.detail}…</>
+                  ) : (
+                    <>
+                      Uploading file {Math.min(uploading.done + 1, uploading.total)} of{" "}
+                      {uploading.total}…
+                    </>
+                  )}
                 </span>
               </div>
             )}
 
             {files.length === 0 && !uploading ? (
               <p className="rounded-lg border border-dashed border-brand-border bg-brand-page p-4 text-center text-xs text-brand-ink/60">
-                No files yet. Photos are shrunk before they are uploaded; PDFs go up as they
-                are, under {formatBytes(MAX_NOTE_FILE_BYTES)} each.
+                No files yet. Photos and PDFs are compressed before they are uploaded, and
+                must come out under {formatBytes(MAX_PDF_BYTES)} each.
               </p>
             ) : (
               <ul className="space-y-2">

@@ -1,16 +1,26 @@
 /**
  * Turning a tutor-pasted Google URL into something the student page can use.
  *
- * Two shapes are supported:
+ * Three shapes are supported:
  *   GOOGLE_FORM - answered online, inside the form.
  *   GOOGLE_DOC  - a written paper: read it, answer on paper, send it back.
+ *   PDF         - a written paper the tutor uploaded (see question-paper.ts).
+ *                 It has no URL to convert, so the functions below that take
+ *                 a URL deal only in the two Google formats.
  *
  * Google serves different URLs for viewing and for embedding, and the viewing
  * URL refuses to render in an iframe. The conversions below are what make an
  * in-page preview possible at all.
  */
 
-export type TestFormat = "GOOGLE_FORM" | "GOOGLE_DOC";
+export type TestFormat = "GOOGLE_FORM" | "GOOGLE_DOC" | "PDF";
+
+export const TEST_FORMATS: readonly TestFormat[] = ["GOOGLE_FORM", "GOOGLE_DOC", "PDF"];
+
+/** A paper the student reads and answers on paper, rather than online. */
+export function isWrittenPaper(format: TestFormat): boolean {
+  return format !== "GOOGLE_FORM";
+}
 
 /** Accepts the URL shapes Google actually hands out for forms. */
 export function isGoogleFormUrl(url: string): boolean {
@@ -44,6 +54,7 @@ export function isGoogleDocUrl(url: string): boolean {
 }
 
 export function isValidResourceUrl(url: string, format: TestFormat): boolean {
+  if (format === "PDF") return false;
   return format === "GOOGLE_FORM" ? isGoogleFormUrl(url) : isGoogleDocUrl(url);
 }
 
@@ -52,6 +63,7 @@ export function isValidResourceUrl(url: string, format: TestFormat): boolean {
  * (a forms.gle shortlink, for instance), so callers can fall back to a button.
  */
 export function toEmbedUrl(url: string, format: TestFormat): string | null {
+  if (format === "PDF") return null;
   let u: URL;
   try {
     u = new URL(url.trim());
@@ -81,4 +93,5 @@ export function toEmbedUrl(url: string, format: TestFormat): string | null {
 export const FORMAT_LABELS: Record<TestFormat, string> = {
   GOOGLE_FORM: "Google Form (answered online)",
   GOOGLE_DOC: "Google Doc (written paper)",
+  PDF: "PDF (written paper)",
 };

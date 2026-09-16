@@ -8,7 +8,7 @@ import {
   exitFullscreen,
   isNativeFullscreen,
 } from "@/lib/fullscreen";
-import type { TestFormat } from "@/lib/test-resource";
+import { isWrittenPaper, type TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { TabGuard } from "@/components/student/TabGuard";
 import { AnswerUploadPanel } from "@/components/student/AnswerUploadPanel";
@@ -16,6 +16,7 @@ import {
   ProctorCameraBadge,
   useProctorCamera,
 } from "@/components/student/ProctorCamera";
+import { PdfPaper } from "@/components/student/PdfPaper";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   ExternalLink,
@@ -156,7 +157,9 @@ export function StartTestButton({
     };
   }, [expanded, collapse]);
 
-  const isDoc = testFormat === "GOOGLE_DOC";
+  // A Google Doc or an uploaded PDF: read on screen, answered on paper.
+  const isDoc = isWrittenPaper(testFormat);
+  const isPdf = testFormat === "PDF";
   const paperNoun = isDoc ? "Question Paper" : "Google Form";
 
   const handleOpen = async () => {
@@ -408,16 +411,24 @@ export function StartTestButton({
                 </div>
               )}
 
-              <iframe
-                src={embedUrl}
-                title={isDoc ? "Question paper" : "Assessment form"}
-                // dvh, not vh: on mobile Safari `vh` counts the space behind
-                // the URL bar, so a 70vh frame ran off the bottom of the screen.
-                className={expanded ? "flex-1 w-full border-0" : "h-[60dvh] w-full border-0 sm:h-[70vh]"}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-              />
+              {isPdf ? (
+                <PdfPaper
+                  url={embedUrl}
+                  title="Question paper"
+                  className={expanded ? "min-h-0 flex-1 w-full" : "h-[60dvh] w-full sm:h-[70vh]"}
+                />
+              ) : (
+                <iframe
+                  src={embedUrl}
+                  title={isDoc ? "Question paper" : "Assessment form"}
+                  // dvh, not vh: on mobile Safari `vh` counts the space behind
+                  // the URL bar, so a 70vh frame ran off the bottom of the screen.
+                  className={expanded ? "flex-1 w-full border-0" : "h-[60dvh] w-full border-0 sm:h-[70vh]"}
+                  loading="lazy"
+                  referrerPolicy="no-referrer"
+                  sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+                />
+              )}
             </div>
           )}
 
