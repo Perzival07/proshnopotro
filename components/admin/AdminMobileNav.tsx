@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { NAV_ITEMS } from "./AdminSidebar";
-import { Menu, X } from "lucide-react";
+import { ExternalLink, Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
 
@@ -125,7 +125,14 @@ export function AdminMobileNav() {
               </div>
             </div>
 
-            <div className="mt-auto border-t border-white/15 p-3">
+            <div className="mt-auto space-y-2 border-t border-white/15 p-3">
+              <Link
+                href="/"
+                className="flex w-full items-center gap-3 rounded-lg bg-white/10 px-3 py-3 text-[13px] font-medium text-white/90 transition-colors hover:bg-white/15"
+              >
+                <ExternalLink className="h-4 w-4 shrink-0 text-[#87CEEB]" />
+                <span>Switch to Student View</span>
+              </Link>
               <InstallAppNavButton />
             </div>
           </nav>
