@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { fullscreenElement } from "@/lib/fullscreen";
 import { recordTabSwitch } from "@/app/test/[assignmentId]/actions";
 import { Button } from "@/components/ui/button";
 import { EyeOff } from "lucide-react";
@@ -70,7 +72,9 @@ export function TabGuard({ assignmentId, active, onSubmitted }: TabGuardProps) {
 
   if (!warning) return null;
 
-  return (
+  // Native fullscreen paints nothing outside the full-screen element, so a
+  // warning raised while the paper is full screen is placed inside it.
+  return createPortal(
     // Above the full-screen paper overlay (z-50), so the warning is not buried
     // underneath the very thing the student is sitting in.
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-navy/70 p-4 backdrop-blur-sm">
@@ -103,6 +107,7 @@ export function TabGuard({ assignmentId, active, onSubmitted }: TabGuardProps) {
           Return to my assessment
         </Button>
       </div>
-    </div>
+    </div>,
+    fullscreenElement(document) ?? document.body
   );
 }

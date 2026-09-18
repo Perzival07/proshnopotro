@@ -5,6 +5,7 @@ import { requireCompleteStudent } from "@/lib/auth-utils";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
+import { NotePdfViewer } from "@/components/student/NotePdfViewer";
 import { getVisibleNote } from "@/lib/note-access";
 import { signedNoteUrl } from "@/lib/cloudinary";
 import { toEmbedUrl } from "@/lib/test-resource";
@@ -109,14 +110,7 @@ export default async function StudentNotePage({
         {pdfPreviewUrl && (
           <section className="mt-8">
             <h2 className="mb-3 font-heading text-sm font-semibold text-brand-navy">PDF</h2>
-            <iframe
-              src={pdfPreviewUrl}
-              title={`${note.title} (PDF)`}
-              className="h-[70dvh] w-full rounded-xl border border-brand-border bg-white"
-              loading="lazy"
-              referrerPolicy="no-referrer"
-              allow="autoplay"
-            />
+            <NotePdfViewer src={pdfPreviewUrl} title={note.title} />
           </section>
         )}
 

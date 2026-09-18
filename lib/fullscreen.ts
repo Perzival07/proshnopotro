@@ -61,3 +61,8 @@ export async function exitFullscreen(doc: FullscreenDocument): Promise<void> {
 export function isNativeFullscreen(doc: FullscreenDocument): boolean {
   return Boolean(doc.fullscreenElement || doc.webkitFullscreenElement);
 }
+
+/** The element currently in native fullscreen, if any. */
+export function fullscreenElement(doc: FullscreenDocument): Element | null {
+  return doc.fullscreenElement || doc.webkitFullscreenElement || null;
+}

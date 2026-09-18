@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
-import {
-  enterFullscreen,
-  exitFullscreen,
-  isNativeFullscreen,
-} from "@/lib/fullscreen";
+import { exitFullscreen } from "@/lib/fullscreen";
 import { isWrittenPaper, type TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { TabGuard } from "@/components/student/TabGuard";
 import { AnswerUploadPanel } from "@/components/student/AnswerUploadPanel";
+import { FullscreenFrame, useFullscreen } from "@/components/student/FullscreenFrame";
 import {
   ProctorCameraBadge,
   useProctorCamera,
@@ -23,9 +20,6 @@ import {
   TimerOff,
   ShieldAlert,
   CheckCircle2,
-  Maximize2,
-  Minimize2,
-  X,
 } from "lucide-react";
 
 interface StartTestButtonProps {
@@ -79,8 +73,8 @@ export function StartTestButton({
   // Resolved only after the server has authorised this student, so the link
   // still never appears in the page's initial HTML.
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
-  const [expanded, setExpanded] = useState(false);
-  const previewRef = useRef<HTMLDivElement>(null);
+  const fullscreen = useFullscreen();
+  const { expanded, collapse } = fullscreen;
 
   // Timing comes from the server -- both on load (a resumed attempt) and from
   // the resolve call that starts the clock. It is stored as a single instant
@@ -119,42 +113,6 @@ export function StartTestButton({
     setTimeUp(true);
     if (typeof document !== "undefined") void exitFullscreen(document);
   }, []);
-
-  const collapse = useCallback(() => {
-    setExpanded(false);
-    if (typeof document !== "undefined") void exitFullscreen(document);
-  }, []);
-
-  const expand = useCallback(() => {
-    setExpanded(true);
-    // Native fullscreen hides the browser chrome where it is allowed; the CSS
-    // overlay below covers the cases where it is not (notably iOS Safari).
-    void enterFullscreen(previewRef.current);
-  }, []);
-
-  // Escape closes it, and leaving native fullscreen (browser UI, F11) keeps
-  // our overlay in step rather than stranding it.
-  useEffect(() => {
-    if (!expanded) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") collapse();
-    };
-    const onFsChange = () => {
-      if (!isNativeFullscreen(document)) setExpanded(false);
-    };
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("fullscreenchange", onFsChange);
-    document.addEventListener("webkitfullscreenchange", onFsChange);
-    // Stop the page behind the overlay from scrolling.
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("fullscreenchange", onFsChange);
-      document.removeEventListener("webkitfullscreenchange", onFsChange);
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [expanded, collapse]);
 
   // A Google Doc or a Drive PDF: read on screen, answered on paper.
   const isDoc = isWrittenPaper(testFormat);
@@ -238,6 +196,15 @@ export function StartTestButton({
       <ExamCountdown deadlineMs={deadlineMs} onExpire={handleExpire} expired={timeUp} />
     ) : null;
 
+  const cameraBadge = cameraActive ? (
+    <ProctorCameraBadge
+      stream={camera.stream}
+      status={camera.status}
+      error={camera.error}
+      onRetry={() => void camera.start()}
+    />
+  ) : null;
+
   const handleFinish = async () => {
     setConfirmingFinish(false);
     setSubmitting(true);
@@ -270,14 +237,9 @@ export function StartTestButton({
         />
       )}
 
-      {cameraActive && (
-        <ProctorCameraBadge
-          stream={camera.stream}
-          status={camera.status}
-          error={camera.error}
-          onRetry={() => void camera.start()}
-        />
-      )}
+      {/* Native full screen paints only the paper's own element, so while
+          the paper is full screen the badge moves inside it (see below). */}
+      {!expanded && cameraBadge}
 
       {error && (
         <div className="p-3.5 text-xs bg-red-50 text-red-800 border border-red-200 rounded-lg flex items-center gap-2.5 text-left">
@@ -357,69 +319,15 @@ export function StartTestButton({
 
           {/* In-page preview */}
           {embedUrl && (
-            <div
-              ref={previewRef}
-              className={
-                expanded
-                  ? "fixed inset-0 z-50 flex h-[100dvh] flex-col bg-white"
-                  : "overflow-hidden rounded-xl border border-brand-border bg-white shadow-card"
-              }
-            >
-              <div className="flex items-center justify-between gap-2 border-b border-brand-border bg-brand-page px-3 py-2">
-                <span className="truncate text-[11px] font-semibold text-brand-navy">
-                  {isDoc ? "Question paper" : "Assessment form"}
-                  {expanded && <span className="ml-2 font-normal text-brand-ink/60">Press Esc to exit</span>}
-                </span>
-
-                <div className="flex shrink-0 items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={expanded ? collapse : expand}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-brand-blue hover:underline"
-                  >
-                    {expanded ? (
-                      <>
-                        <Minimize2 className="h-3 w-3" />
-                        Exit full screen
-                      </>
-                    ) : (
-                      <>
-                        <Maximize2 className="h-3 w-3" />
-                        Full screen
-                      </>
-                    )}
-                  </button>
-
-                  {expanded && (
-                    <button
-                      type="button"
-                      onClick={collapse}
-                      aria-label="Close full screen"
-                      className="rounded p-1 text-brand-ink/70 transition-colors hover:bg-brand-tint hover:text-brand-navy"
-                    >
-                      <X className="h-4 w-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {expanded && countdown && (
-                <div className="border-b border-brand-border bg-brand-page px-3 py-2">
-                  {countdown}
-                </div>
-              )}
-
-              <iframe
-                src={embedUrl}
-                title={isDoc ? "Question paper" : "Assessment form"}
-                // dvh, not vh: on mobile Safari `vh` counts the space behind
-                // the URL bar, so a 70vh frame ran off the bottom of the screen.
-                className={expanded ? "flex-1 w-full border-0" : "h-[60dvh] w-full border-0 sm:h-[70vh]"}
-                loading="lazy"
-                referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-              />
-            </div>
+            <FullscreenFrame
+              fullscreen={fullscreen}
+              src={embedUrl}
+              title={isDoc ? "Question paper" : "Assessment form"}
+              label={isDoc ? "Question paper" : "Assessment form"}
+              toolbar={countdown}
+              overlay={cameraBadge}
+              sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+            />
           )}
 
           <div className="p-4 bg-sky-50 text-sky-950 border border-sky-200 rounded-xl flex items-start gap-3 text-left">
