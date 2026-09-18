@@ -202,9 +202,10 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 )}
                 <p className="text-xs leading-relaxed font-medium">
                   When you finish or the time runs out, the paper closes. You then
-                  have {UPLOAD_WINDOW_MINUTES} minutes to photograph every page of
-                  your answers and upload them &mdash; you can upload only once.
-                  Then send &ldquo;Work done&rdquo; to your tutor on WhatsApp.
+                  have {UPLOAD_WINDOW_MINUTES} minutes to photograph your answers
+                  and upload them &mdash; you can upload only once, or finish without
+                  uploading. Leaving the page closes the upload. After uploading, send
+                  &ldquo;Work done&rdquo; to your tutor on WhatsApp.
                 </p>
                 <p className="text-[11px] opacity-80 leading-normal">
                   Make sure your internet connection is stable before opening the test.

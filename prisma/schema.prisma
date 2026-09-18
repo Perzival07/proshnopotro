@@ -143,7 +143,8 @@ model Assignment {
   /// The one-time answer upload window runs from here.
   endedAt           DateTime?
   /// Stamped when the student's answer photos were saved. Set once: a second
-  /// upload is refused while this is filled in.
+  /// upload is refused while this is filled in. Also stamped, with no pages,
+  /// when the student finished without uploading or left the upload page.
   answersUploadedAt DateTime?
 
   test         Test          @relation(fields: [testId], references: [id], onDelete: Cascade)

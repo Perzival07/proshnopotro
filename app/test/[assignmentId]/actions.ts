@@ -487,3 +487,28 @@ export async function saveAnswerUploads(
   revalidatePath("/admin/roster");
   return { success: true, pageCount: pages.length };
 }
+
+/**
+ * Ends the upload with nothing saved: the student chose to finish without
+ * uploading, or left the page. It takes the same one-time claim a real upload
+ * does, so once this lands no upload can follow, and an upload that already
+ * landed is left alone.
+ */
+export async function closeAnswerUpload(
+  assignmentId: string
+): Promise<{ success?: true; error?: string }> {
+  const loaded = await loadOwnAssignment(assignmentId);
+  if ("error" in loaded) return { error: loaded.error };
+  const { assignment } = loaded;
+
+  if (uploadState(assignment) !== "OPEN") return { success: true };
+
+  await prisma.assignment.updateMany({
+    where: { id: assignment.id, answersUploadedAt: null },
+    data: { answersUploadedAt: new Date() },
+  });
+
+  revalidatePath("/");
+  revalidatePath("/admin/roster");
+  return { success: true };
+}

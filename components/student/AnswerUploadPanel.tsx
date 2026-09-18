@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
+  closeAnswerUpload,
   getAnswerUploadSignature,
   getAnswerUploadStatus,
   saveAnswerUploads,
@@ -43,6 +44,7 @@ type Phase =
   | "loading"
   | "capture"
   | "confirm"
+  | "skip"
   | "uploading"
   | "done"
   | "expired"
@@ -57,6 +59,10 @@ type Phase =
  * server issues; only when every page has arrived is the set saved, and that
  * save is the one-time step. A failure before it leaves the student free to
  * try again.
+ *
+ * Uploading is optional: the student can finish without it. Leaving the page
+ * -- back, a link, closing the tab -- also ends the upload, so it is only ever
+ * open while the student is sitting in front of it.
  */
 export function AnswerUploadPanel({
   assignmentId,
@@ -79,6 +85,9 @@ export function AnswerUploadPanel({
   const galleryRef = useRef<HTMLInputElement>(null);
   const pagesRef = useRef<Page[]>([]);
   pagesRef.current = pages;
+  const phaseRef = useRef<Phase>(phase);
+  phaseRef.current = phase;
+  const leaveTimerRef = useRef<number | null>(null);
 
   // Object URLs hold the photo in memory until revoked.
   useEffect(
@@ -122,6 +131,36 @@ export function AnswerUploadPanel({
     void loadStatus();
   }, [loadStatus]);
 
+  // Leaving the page ends the upload. `pagehide` covers a reload, closing the
+  // tab and leaving the site; the unmount covers back and every other in-app
+  // navigation, which never unload the page. Switching apps is deliberately
+  // not counted: on a phone, taking the photos is itself a trip to the camera.
+  useEffect(() => {
+    // React's development double-mount unmounts and remounts at once; the
+    // remount cancels the "leave" that unmount scheduled.
+    if (leaveTimerRef.current !== null) window.clearTimeout(leaveTimerRef.current);
+    let closed = false;
+    const leave = () => {
+      if (closed) return;
+      const current = phaseRef.current;
+      if (current === "done" || current === "expired" || current === "error") return;
+      closed = true;
+      navigator.sendBeacon(`/test/${assignmentId}/close-upload`);
+    };
+    // Coming back through the browser's back-forward cache restores a page
+    // whose upload was closed on the way out; ask the server what is true now.
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) void loadStatus();
+    };
+    window.addEventListener("pagehide", leave);
+    window.addEventListener("pageshow", onPageShow);
+    return () => {
+      window.removeEventListener("pagehide", leave);
+      window.removeEventListener("pageshow", onPageShow);
+      leaveTimerRef.current = window.setTimeout(leave, 0);
+    };
+  }, [assignmentId, loadStatus]);
+
   // The upload window's countdown. Display only; the server enforces it.
   useEffect(() => {
     if (closesAtMs === null) return;
@@ -132,7 +171,9 @@ export function AnswerUploadPanel({
   }, [closesAtMs]);
 
   const windowOver =
-    remaining !== null && remaining <= 0 && (phase === "capture" || phase === "confirm");
+    remaining !== null &&
+    remaining <= 0 &&
+    (phase === "capture" || phase === "confirm" || phase === "skip");
 
   useEffect(() => {
     if (windowOver) setPhase("expired");
@@ -246,6 +287,26 @@ export function AnswerUploadPanel({
     }
   };
 
+  const finishWithoutUpload = async () => {
+    setError(null);
+    setPhase("uploading");
+    setProgress({ done: 0, total: 0 });
+    try {
+      const res = await closeAnswerUpload(assignmentId);
+      if (res.error) {
+        setError(res.error);
+        setPhase("skip");
+        return;
+      }
+      setSavedCount(0);
+      setPhase("done");
+      router.refresh();
+    } catch {
+      setError("Could not reach the server. Check your internet and try again.");
+      setPhase("skip");
+    }
+  };
+
   const whatsappHref = buildWhatsAppLink(TUTOR_WHATSAPP, workDoneMessage(testTitle, studentName));
   const busy = processing > 0;
 
@@ -260,7 +321,11 @@ export function AnswerUploadPanel({
         {/* Header */}
         <div className="border-b border-brand-border bg-brand-page px-5 py-4">
           <h2 id="answer-upload-title" className="font-heading text-base font-bold text-brand-navy">
-            {phase === "done" ? "Answers uploaded" : "Upload your answers"}
+            {phase !== "done"
+              ? "Upload your answers"
+              : savedCount > 0
+                ? "Answers uploaded"
+                : "Assessment complete"}
           </h2>
           <p className="mt-0.5 truncate text-[11px] text-brand-ink/60">{testTitle}</p>
           {endedMessage && phase !== "done" && (
@@ -302,7 +367,7 @@ export function AnswerUploadPanel({
             </div>
           )}
 
-          {(phase === "capture" || phase === "confirm") && (
+          {(phase === "capture" || phase === "confirm" || phase === "skip") && (
             <>
               <div className="flex items-center justify-between gap-3 rounded-lg border border-[#F3DCB5] bg-[#FAEEDA] px-3 py-2 text-[#633806]">
                 <span className="text-[11px] font-semibold">Upload closes in</span>
@@ -314,7 +379,8 @@ export function AnswerUploadPanel({
               <p className="text-xs leading-relaxed text-brand-ink/80">
                 Take a clear photo of <strong>every page</strong> of your answers, in order.
                 You can upload <strong>only once</strong>, so check that all pages are here
-                before you press Upload.
+                before you press Upload. Uploading is optional, and leaving this page
+                closes it.
               </p>
 
               {/* Hidden inputs: one opens the camera, one the photo library. */}
@@ -415,7 +481,9 @@ export function AnswerUploadPanel({
             <div className="space-y-3 py-8 text-center">
               <AtomMark size={32} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
               <p className="font-heading text-sm font-semibold text-brand-navy">
-                Uploading page {Math.min(progress.done + 1, progress.total)} of {progress.total}&hellip;
+                {progress.total === 0
+                  ? "Finishing\u2026"
+                  : `Uploading page ${Math.min(progress.done + 1, progress.total)} of ${progress.total}\u2026`}
               </p>
               <div className="mx-auto h-2 w-full max-w-xs overflow-hidden rounded-full bg-brand-tint">
                 <div
@@ -427,7 +495,19 @@ export function AnswerUploadPanel({
             </div>
           )}
 
-          {phase === "done" && (
+          {phase === "done" && savedCount === 0 && (
+            <div className="space-y-2 py-6 text-center">
+              <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
+              <p className="font-heading text-sm font-semibold text-brand-navy">
+                Your assessment is complete
+              </p>
+              <p className="text-xs text-brand-ink/70">
+                No answers were uploaded for this test.
+              </p>
+            </div>
+          )}
+
+          {phase === "done" && savedCount > 0 && (
             <div className="space-y-4 py-4 text-center">
               <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-600" />
               <div className="space-y-1">
@@ -454,18 +534,50 @@ export function AnswerUploadPanel({
         {/* Footer actions */}
         <div className="border-t border-brand-border bg-white px-5 py-4">
           {phase === "capture" && (
-            <Button
-              type="button"
-              onClick={() => setPhase("confirm")}
-              disabled={pages.length === 0 || busy}
-              size="lg"
-              className="w-full gap-2 bg-emerald-600 font-semibold text-white hover:bg-emerald-700"
-            >
-              <UploadCloud className="h-5 w-5" />
-              {pages.length === 0
-                ? "Add your pages to upload"
-                : `Upload ${pages.length} ${pages.length === 1 ? "page" : "pages"}`}
-            </Button>
+            <div className="space-y-2">
+              <Button
+                type="button"
+                onClick={() => setPhase("confirm")}
+                disabled={pages.length === 0 || busy}
+                size="lg"
+                className="w-full gap-2 bg-emerald-600 font-semibold text-white hover:bg-emerald-700"
+              >
+                <UploadCloud className="h-5 w-5" />
+                {pages.length === 0
+                  ? "Add your pages to upload"
+                  : `Upload ${pages.length} ${pages.length === 1 ? "page" : "pages"}`}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setPhase("skip")}
+                disabled={busy}
+                className="w-full text-xs font-medium text-brand-ink/70"
+              >
+                Finish without uploading
+              </Button>
+            </div>
+          )}
+
+          {phase === "skip" && (
+            <div className="space-y-3">
+              <p className="text-center text-xs font-medium text-brand-navy">
+                Finish without uploading? You will not be able to upload answers for this
+                test later.
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" variant="outline" onClick={() => setPhase("capture")}>
+                  Go back
+                </Button>
+                <Button
+                  type="button"
+                  onClick={finishWithoutUpload}
+                  className="bg-brand-navy font-semibold text-white hover:bg-brand-navy/90"
+                >
+                  Yes, finish
+                </Button>
+              </div>
+            </div>
           )}
 
           {phase === "confirm" && (

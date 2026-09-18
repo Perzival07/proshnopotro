@@ -259,7 +259,7 @@ export function StartTestButton({
               <p className="leading-relaxed">
                 {submitting
                   ? "Submitting your assessment\u2026"
-                  : "The question paper is closed. Upload photos of your answers to finish."}
+                  : "The question paper is closed. Upload photos of your answers, or finish without uploading."}
               </p>
             </div>
           </div>

@@ -5,17 +5,21 @@ import { attemptDeadline, isTimed } from "./exam-timer";
  * The one-time answer upload.
  *
  * Once an attempt ends -- the student finishing, the timer, or the tab guard --
- * the paper closes and the student photographs their answer sheets. They get a
- * single upload, and only for a short window after the end: long enough to
- * photograph a handful of pages on a slow connection, short enough that the
- * time after the bell cannot be spent still writing.
+ * the paper closes and the student may photograph their answer sheets. They get
+ * a single upload, and only for a very short window after the end, so the time
+ * after the bell cannot be spent still writing.
+ *
+ * Uploading is optional. The upload also closes for good, with nothing saved,
+ * when the student chooses to finish without it or leaves the page. Both are
+ * recorded by stamping `answersUploadedAt` with no pages attached, which ends
+ * the upload through the same one-time claim a real upload makes.
  *
  * Every rule is a pure function of the assignment and `now`, so the server
  * (which enforces them) and the page (which only displays them) agree.
  */
 
 /** Minutes after the attempt ends that the upload stays open. */
-export const UPLOAD_WINDOW_MINUTES = 30;
+export const UPLOAD_WINDOW_MINUTES = 2;
 
 /**
  * Extra time the server still accepts a save that was signed inside the
