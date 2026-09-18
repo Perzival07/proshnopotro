@@ -121,41 +121,56 @@ export interface StoredNoteFile {
 }
 
 /**
- * A signed link to one note file, or to a thumbnail of it.
+ * A signed CDN link to one note photo, or to a thumbnail of it.
  *
  * Note files are uploaded as `authenticated`, exactly like answer sheets, so
  * a link that leaks is the only way in -- and these links are minted per
  * request for a student the note is actually shared with.
  *
- * Raw files (PDFs) carry their extension inside the public id and cannot be
- * transformed, so `width` is ignored for them.
+ * Photos only. A PDF's CDN link is refused whenever the account blocks PDF
+ * delivery, so PDFs go through `fetchNoteFile` instead.
  */
 export function signedNoteUrl(
   file: StoredNoteFile,
-  options: { width?: number; download?: boolean } = {}
+  options: { width?: number } = {}
 ): string | null {
   const c = getCloudinary();
   if (!c) return null;
 
-  const isRaw = file.resourceType === "raw";
-  const transformation = [
-    ...(options.width && !isRaw
-      ? [{ width: options.width, crop: "limit", quality: "auto", fetch_format: "auto" }]
-      : []),
-    ...(options.download ? [{ flags: "attachment" }] : []),
-  ];
-
   return c.cloudinary.url(file.publicId, {
-    resource_type: isRaw ? "raw" : "image",
+    resource_type: "image",
     type: ANSWER_DELIVERY_TYPE,
     sign_url: true,
     secure: true,
     version: file.version,
-    // A raw public id already ends in ".pdf"; appending the format again
-    // would ask Cloudinary for "ch7.pdf.pdf", which does not exist.
-    ...(isRaw ? {} : { format: file.format }),
-    ...(transformation.length ? { transformation } : {}),
+    format: file.format,
+    ...(options.width
+      ? {
+          transformation: [
+            { width: options.width, crop: "limit", quality: "auto", fetch_format: "auto" },
+          ],
+        }
+      : {}),
   });
+}
+
+/**
+ * Reads a stored note file through Cloudinary's download API.
+ *
+ * Unlike a CDN link, the API is not subject to the account's PDF delivery
+ * block. It is signed with the API secret and expires in a minute, and it is
+ * only ever requested by the server, so the address never reaches a browser.
+ * Null when Cloudinary is not configured.
+ */
+export async function fetchNoteFile(file: StoredNoteFile): Promise<Response | null> {
+  const c = getCloudinary();
+  if (!c) return null;
+  const url = c.cloudinary.utils.private_download_url(file.publicId, "", {
+    resource_type: file.resourceType === "raw" ? "raw" : "image",
+    type: ANSWER_DELIVERY_TYPE,
+    expires_at: Math.floor(Date.now() / 1000) + 60,
+  });
+  return fetch(url, { cache: "no-store" });
 }
 
 /**

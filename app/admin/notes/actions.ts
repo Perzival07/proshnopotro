@@ -8,6 +8,7 @@ import {
   isAllowedNoteFormat,
   isInNoteFolder,
   MAX_NOTE_FILES,
+  noteFileHref,
   noteFolder,
   publishBlocker,
   resourceTypeFor,
@@ -267,7 +268,7 @@ export interface NoteFileView {
   resourceType: string;
   bytes: number | null;
   position: number;
-  /** Signed link to the file itself. */
+  /** Link to the file itself: signed for photos, the portal's file route for PDFs. */
   url: string | null;
   /** Signed link to a small preview, for images only. */
   thumbUrl: string | null;
@@ -275,6 +276,7 @@ export interface NoteFileView {
 
 function toFileView(file: {
   id: string;
+  noteId: string;
   originalName: string;
   format: string;
   resourceType: string;
@@ -291,7 +293,7 @@ function toFileView(file: {
     resourceType: file.resourceType,
     bytes: file.bytes,
     position: file.position,
-    url: signedNoteUrl(file),
+    url: isRaw ? noteFileHref(file.noteId, file.id) : signedNoteUrl(file),
     thumbUrl: isRaw ? null : signedNoteUrl(file, { width: 400 }),
   };
 }

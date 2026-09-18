@@ -229,90 +229,112 @@ export function NoteModal({
       }
       const sig = signed.upload;
 
+      // Each file stands on its own. One that is refused or fails to send is
+      // reported and skipped, and the rest are still recorded -- otherwise a
+      // failure on file 3 of 5 would leave files 1 and 2 stored in Cloudinary
+      // but missing from the note.
       const uploaded: UploadedNoteFile[] = [];
+      const problems: string[] = [];
       for (let i = 0; i < accepted.length; i++) {
         const original = accepted[i];
-        const extension = (original.name.split(".").pop() || "").toLowerCase();
-        const isPdfFile = original.type === "application/pdf" || extension === "pdf";
+        try {
+          const extension = (original.name.split(".").pop() || "").toLowerCase();
+          const isPdfFile = original.type === "application/pdf" || extension === "pdf";
 
-        if (!isPdfFile && !original.type.startsWith("image/")) {
-          setError(`${original.name} is not a photo or a PDF, so it was skipped.`);
-          continue;
-        }
-        if (!isPdfFile && extension && !isAllowedNoteFormat(extension)) {
-          setError(`${original.name} is not a picture format the portal can store.`);
-          continue;
-        }
-        // A PDF may start larger than the limit: it only has to fit once
-        // compressed, and a scan usually shrinks several times over.
-        const sizeLimit = isPdfFile ? MAX_PDF_SOURCE_BYTES : MAX_NOTE_FILE_BYTES;
-        if (original.size > sizeLimit) {
-          setError(
-            `${original.name} is ${formatBytes(original.size)}; files must be under ${formatBytes(
-              sizeLimit
-            )}.`
-          );
-          continue;
-        }
-
-        // Everything is shrunk in the browser before it is sent. A 12-megapixel
-        // snap of a blackboard becomes a few hundred KB and stays readable; a
-        // PDF is re-saved compactly, and a scanned one has its pages redrawn
-        // at a sensible resolution (see compress-pdf.ts).
-        let blob: Blob;
-        if (isPdfFile) {
-          try {
-            const { compressPdf } = await import("@/lib/compress-pdf");
-            const compressed = await compressPdf(original, (p) =>
-              setUploading({
-                done: i,
-                total: accepted.length,
-                detail:
-                  p.stage === "redrawing"
-                    ? `Compressing ${original.name}, page ${p.page} of ${p.pages}`
-                    : `Compressing ${original.name}`,
-              })
-            );
-            blob = compressed.blob;
-          } catch (err) {
-            setError(err instanceof Error ? err.message : `${original.name} could not be compressed.`);
+          if (!isPdfFile && !original.type.startsWith("image/")) {
+            problems.push(`${original.name} is not a photo or a PDF, so it was skipped.`);
             continue;
-          } finally {
-            setUploading({ done: i, total: accepted.length });
           }
-        } else {
-          blob = await shrinkImage(original);
+          if (!isPdfFile && extension && !isAllowedNoteFormat(extension)) {
+            problems.push(`${original.name} is not a picture format the portal can store.`);
+            continue;
+          }
+          // A PDF may start larger than the limit: it only has to fit once
+          // compressed, and a scan usually shrinks several times over.
+          const sizeLimit = isPdfFile ? MAX_PDF_SOURCE_BYTES : MAX_NOTE_FILE_BYTES;
+          if (original.size > sizeLimit) {
+            problems.push(
+              `${original.name} is ${formatBytes(original.size)}; files must be under ${formatBytes(
+                sizeLimit
+              )}.`
+            );
+            continue;
+          }
+
+          // Everything is shrunk in the browser before it is sent. A
+          // 12-megapixel snap of a blackboard becomes a few hundred KB and
+          // stays readable; a PDF is re-saved compactly, and a scanned one has
+          // its pages redrawn at a sensible resolution (see compress-pdf.ts).
+          let blob: Blob;
+          if (isPdfFile) {
+            try {
+              const { compressPdf } = await import("@/lib/compress-pdf");
+              const compressed = await compressPdf(original, (p) =>
+                setUploading({
+                  done: i,
+                  total: accepted.length,
+                  detail:
+                    p.stage === "redrawing"
+                      ? `Compressing ${original.name}, page ${p.page} of ${p.pages}`
+                      : `Compressing ${original.name}`,
+                })
+              );
+              blob = compressed.blob;
+            } catch (err) {
+              problems.push(
+                err instanceof Error ? err.message : `${original.name} could not be compressed.`
+              );
+              continue;
+            } finally {
+              setUploading({ done: i, total: accepted.length });
+            }
+          } else {
+            blob = await shrinkImage(original);
+          }
+          const format = isPdfFile ? "pdf" : "jpg";
+
+          const body = await uploadToCloudinary(
+            sig,
+            blob,
+            isPdfFile ? original.name : `${original.name}.jpg`,
+            isPdfFile ? "raw" : "image"
+          );
+
+          uploaded.push({
+            publicId: body.public_id,
+            version: body.version,
+            format,
+            originalName: original.name,
+            bytes: body.bytes ?? original.size,
+            width: body.width,
+            height: body.height,
+          });
+        } catch (err) {
+          console.error(err);
+          const reason = err instanceof Error ? err.message : "";
+          problems.push(
+            !reason
+              ? `${original.name} did not upload. Please try it again.`
+              : reason.includes(original.name)
+                ? reason
+                : `${original.name} did not upload: ${reason}`
+          );
+        } finally {
+          setUploading({ done: i + 1, total: accepted.length });
         }
-        const format = isPdfFile ? "pdf" : "jpg";
-
-        const body = await uploadToCloudinary(
-          sig,
-          blob,
-          isPdfFile ? original.name : `${original.name}.jpg`,
-          isPdfFile ? "raw" : "image"
-        );
-
-        uploaded.push({
-          publicId: body.public_id,
-          version: body.version,
-          format,
-          originalName: original.name,
-          bytes: body.bytes ?? original.size,
-          width: body.width,
-          height: body.height,
-        });
-        setUploading({ done: i + 1, total: accepted.length });
       }
 
-      if (uploaded.length === 0) return;
-
-      const saved = await saveNoteFiles(id, uploaded);
-      if (saved.error) {
-        setError(saved.error);
-        return;
+      if (uploaded.length > 0) {
+        const saved = await saveNoteFiles(id, uploaded);
+        if (saved.error) {
+          problems.unshift(saved.error);
+        } else {
+          setFiles(saved.files ?? []);
+          onSaved();
+        }
       }
-      setFiles(saved.files ?? []);
-      onSaved();
+
+      if (problems.length > 0) setError(problems.join(" "));
     } catch (err) {
       console.error(err);
       setError(

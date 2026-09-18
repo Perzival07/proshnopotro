@@ -1,11 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   cleanFileName,
+  contentDisposition,
   formatBytes,
   isAllowedNoteFormat,
   isInNoteFolder,
   isNoteVisible,
   isValidNoteLink,
+  noteFileHref,
   noteFolder,
   noteState,
   publishBlocker,
@@ -31,7 +33,7 @@ describe("isAllowedNoteFormat", () => {
 });
 
 describe("resourceTypeFor", () => {
-  it("stores PDFs as raw so account-level PDF blocking cannot hide them", () => {
+  it("stores PDFs as raw, byte for byte", () => {
     expect(resourceTypeFor("pdf")).toBe("raw");
     expect(resourceTypeFor(".PDF")).toBe("raw");
   });
@@ -152,5 +154,36 @@ describe("cleanFileName", () => {
   it("falls back rather than storing an empty name", () => {
     expect(cleanFileName("")).toBe("file");
     expect(cleanFileName("   ")).toBe("file");
+  });
+});
+
+describe("noteFileHref", () => {
+  it("points at the portal's own file route, never at Cloudinary", () => {
+    expect(noteFileHref("note1", "file1")).toBe("/notes/note1/files/file1");
+    expect(noteFileHref("note1", "file1", { download: true })).toBe(
+      "/notes/note1/files/file1?download=1"
+    );
+  });
+});
+
+describe("contentDisposition", () => {
+  it("opens in the browser, or saves, under the tutor's file name", () => {
+    expect(contentDisposition("ch7.pdf", false)).toBe(
+      `inline; filename="ch7.pdf"; filename*=UTF-8''ch7.pdf`
+    );
+    expect(contentDisposition("board work.pdf", true)).toBe(
+      `attachment; filename="board work.pdf"; filename*=UTF-8''board%20work.pdf`
+    );
+  });
+
+  it("keeps a non-English name in filename* and an ASCII stand-in in filename", () => {
+    const header = contentDisposition("পদার্থ.pdf", false);
+    expect(header).toContain(`filename*=UTF-8''${encodeURIComponent("পদার্থ.pdf")}`);
+    expect(header).toMatch(/filename="_+\.pdf"/);
+  });
+
+  it("cannot be broken out of by quotes or a path in the name", () => {
+    expect(contentDisposition('../a"b\\c.pdf', true)).toMatch(/^attachment; filename="c\.pdf"/);
+    expect(contentDisposition("it's (1).pdf", true)).toContain("filename*=UTF-8''it%27s%20%281%29.pdf");
   });
 });

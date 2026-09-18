@@ -46,12 +46,12 @@ export function isAllowedNoteFormat(format: string): boolean {
 /**
  * Which Cloudinary resource type a file is stored under.
  *
- * PDFs go up as `raw`, not as `image`. Cloudinary can rasterize a PDF, which
- * would give a nice first-page thumbnail, but delivery of PDFs through the
- * image pipeline is switched off by default on new accounts -- so that path
- * would leave students looking at a note they cannot open, for a reason
- * nothing in this app could explain. `raw` is delivered whatever the account
- * settings say, and the browser opens it in its own PDF viewer.
+ * PDFs go up as `raw`, which Cloudinary stores byte for byte; photos go up as
+ * `image`, which can be thumbnailed. Storing PDFs as `raw` does NOT get them
+ * past the account's "Allow delivery of PDF and ZIP files" switch -- with it
+ * off (the default on free plans) every CDN link to a PDF is refused with a
+ * 401, raw or not. So PDFs are never linked to directly: they are handed out
+ * by this app's own file route, which reads them through Cloudinary's API.
  */
 export function resourceTypeFor(format: string): "image" | "raw" {
   return cleanFormat(format) === "pdf" ? "raw" : "image";
@@ -59,6 +59,36 @@ export function resourceTypeFor(format: string): "image" | "raw" {
 
 export function isPdf(format: string): boolean {
   return resourceTypeFor(format) === "raw";
+}
+
+/**
+ * The portal's own address for one note file. The route behind it checks the
+ * viewer may see the note before it sends anything.
+ */
+export function noteFileHref(
+  noteId: string,
+  fileId: string,
+  options: { download?: boolean } = {}
+): string {
+  const path = `/notes/${encodeURIComponent(noteId)}/files/${encodeURIComponent(fileId)}`;
+  return options.download ? `${path}?download=1` : path;
+}
+
+/**
+ * A Content-Disposition header that keeps the tutor's file name.
+ *
+ * `filename` must be plain ASCII, so it carries a stand-in with anything else
+ * replaced; `filename*` carries the real name, which every current browser
+ * prefers -- a Bengali file name is saved as written.
+ */
+export function contentDisposition(name: string, download: boolean): string {
+  const clean = cleanFileName(name);
+  const ascii = clean.replace(/[^\x20-\x7E]|["\\]/g, "_");
+  const encoded = encodeURIComponent(clean).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
+  );
+  return `${download ? "attachment" : "inline"}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
 }
 
 /** The Cloudinary folder one note's files live in. */

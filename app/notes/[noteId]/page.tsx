@@ -7,7 +7,7 @@ import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { getVisibleNote } from "@/lib/note-access";
 import { signedNoteUrl } from "@/lib/cloudinary";
-import { formatBytes, isPdf } from "@/lib/notes";
+import { formatBytes, isPdf, noteFileHref } from "@/lib/notes";
 import { formatDate } from "@/lib/utils";
 import {
   ArrowLeft,
@@ -33,18 +33,22 @@ export default async function StudentNotePage({
   const note = await getVisibleNote(user.email, params.noteId);
   if (!note) notFound();
 
-  // Links are minted per request and only for a student the note is shared
-  // with, so nothing openable is ever baked into the page for anyone else.
-  const files = note.files.map((file) => ({
-    id: file.id,
-    name: file.originalName,
-    format: file.format,
-    bytes: file.bytes,
-    isPdf: isPdf(file.format),
-    url: signedNoteUrl(file),
-    thumbUrl: isPdf(file.format) ? null : signedNoteUrl(file, { width: 600 }),
-    downloadUrl: signedNoteUrl(file, { download: true }),
-  }));
+  // Photo links are minted per request and only for a student the note is
+  // shared with, so nothing openable is ever baked into the page for anyone
+  // else. PDFs go through the portal's own file route, which checks the same.
+  const files = note.files.map((file) => {
+    const pdf = isPdf(file.format);
+    return {
+      id: file.id,
+      name: file.originalName,
+      format: file.format,
+      bytes: file.bytes,
+      isPdf: pdf,
+      url: pdf ? noteFileHref(note.id, file.id) : signedNoteUrl(file),
+      thumbUrl: pdf ? null : signedNoteUrl(file, { width: 600 }),
+      downloadUrl: pdf ? noteFileHref(note.id, file.id, { download: true }) : null,
+    };
+  });
 
   const images = files.filter((f) => !f.isPdf);
   const documents = files.filter((f) => f.isPdf);
@@ -155,9 +159,8 @@ export default async function StudentNotePage({
                   {file.downloadUrl && (
                     <a
                       href={file.downloadUrl}
-                      // A cross-origin link cannot be forced to save with the
-                      // download attribute, so the saving is asked for in the
-                      // signed URL itself.
+                      // The file route answers ?download=1 with an attachment
+                      // header, which saves under the tutor's file name.
                       className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-border text-brand-navy transition-colors hover:bg-brand-tint"
                       aria-label={`Download ${file.name}`}
                     >
