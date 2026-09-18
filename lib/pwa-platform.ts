@@ -62,16 +62,3 @@ export const INSTALL_STEPS: Record<Exclude<InstallPlatform, "PROMPT_ONLY">, stri
   ANDROID_MENU: "Open the browser menu (⋮), then tap “Install” or “Add to Home screen”.",
   UNSUPPORTED: "Open this site in Google Chrome or Microsoft Edge to install it as an app.",
 };
-
-/** How long a dismissed install offer stays hidden. */
-export const INSTALL_DISMISS_DAYS = 30;
-
-export function isDismissalActive(
-  dismissedAt: string | null,
-  now: Date = new Date()
-): boolean {
-  if (!dismissedAt) return false;
-  const at = Date.parse(dismissedAt);
-  if (Number.isNaN(at)) return false;
-  return now.getTime() - at < INSTALL_DISMISS_DAYS * 86_400_000;
-}

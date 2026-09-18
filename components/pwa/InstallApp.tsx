@@ -6,48 +6,27 @@ import { Button } from "@/components/ui/button";
 import {
   detectInstallPlatform,
   INSTALL_STEPS,
-  isDismissalActive,
   type InstallPlatform,
 } from "@/lib/pwa-platform";
 import { isRunningStandalone, promptInstall, useInstallPrompt } from "./PwaSetup";
-import { Download, X } from "lucide-react";
-
-const DISMISS_KEY = "pwa-install-dismissed-at";
-
-function readDismissed(): string | null {
-  try {
-    return window.localStorage.getItem(DISMISS_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function writeDismissed() {
-  try {
-    window.localStorage.setItem(DISMISS_KEY, new Date().toISOString());
-  } catch {
-    // Private mode: the card simply comes back next visit.
-  }
-}
+import { Download } from "lucide-react";
 
 /**
  * Everything the install offer needs to decide whether to show. Worked out
- * after mount: the user agent, display mode and storage exist only in the
- * browser, and guessing during render would mismatch the server HTML.
+ * after mount: the user agent and display mode exist only in the browser, and
+ * guessing during render would mismatch the server HTML.
  */
 function useInstallOffer() {
   const { canPrompt, installed } = useInstallPrompt();
   const [env, setEnv] = useState<{
     platform: InstallPlatform;
     standalone: boolean;
-    dismissed: boolean;
   } | null>(null);
 
   useEffect(() => {
     setEnv({
       platform: detectInstallPlatform(navigator.userAgent, navigator.maxTouchPoints),
       standalone: isRunningStandalone(),
-      dismissed: isDismissalActive(readDismissed()),
     });
   }, []);
 
@@ -64,25 +43,19 @@ function useInstallOffer() {
     canPrompt: canPrompt && !appleManual,
     steps,
     platform: env?.platform,
-    dismissed: env?.dismissed ?? false,
-    dismiss: () => {
-      writeDismissed();
-      setEnv((e) => (e ? { ...e, dismissed: true } : e));
-    },
   };
 }
 
 /**
- * A dismissible card offering to install the portal. Shown on the sign-in
- * page and the student dashboard; hidden inside the installed app itself.
+ * A card offering to install the portal, shown on the sign-in page and the
+ * student dashboard. It cannot be dismissed: it stays until the portal is
+ * installed, and is hidden only inside the installed app itself.
  */
 export function InstallAppCard({ className = "" }: { className?: string }) {
   const offer = useInstallOffer();
 
-  // A browser that cannot install at all is not worth a card on every visit;
-  // the steps for it still appear in the tutor's sidebar button.
-  if (!offer.ready || offer.dismissed) return null;
-  if (!offer.canPrompt && (!offer.steps || offer.platform === "UNSUPPORTED")) return null;
+  if (!offer.ready) return null;
+  if (!offer.canPrompt && !offer.steps) return null;
 
   return (
     <div
@@ -115,15 +88,6 @@ export function InstallAppCard({ className = "" }: { className?: string }) {
           </Button>
         )}
       </div>
-
-      <button
-        type="button"
-        onClick={offer.dismiss}
-        aria-label="Hide install offer"
-        className="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-brand-ink/50 transition-colors hover:bg-brand-tint hover:text-brand-navy"
-      >
-        <X className="h-4 w-4" />
-      </button>
     </div>
   );
 }

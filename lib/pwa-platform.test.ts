@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { detectInstallPlatform, isDismissalActive, INSTALL_DISMISS_DAYS } from "./pwa-platform";
+import { detectInstallPlatform } from "./pwa-platform";
 
 const UA = {
   iphoneSafari:
@@ -62,26 +62,5 @@ describe("detectInstallPlatform", () => {
 
   it("points desktop Firefox at Chrome or Edge", () => {
     expect(detectInstallPlatform(UA.windowsFirefox)).toBe("UNSUPPORTED");
-  });
-});
-
-describe("isDismissalActive", () => {
-  const now = new Date("2026-09-13T12:00:00.000Z");
-
-  it("is inactive when never dismissed", () => {
-    expect(isDismissalActive(null, now)).toBe(false);
-  });
-
-  it("hides the offer for the dismissal period", () => {
-    expect(isDismissalActive("2026-09-01T12:00:00.000Z", now)).toBe(true);
-  });
-
-  it("offers again after the period", () => {
-    const past = new Date(now.getTime() - (INSTALL_DISMISS_DAYS + 1) * 86_400_000);
-    expect(isDismissalActive(past.toISOString(), now)).toBe(false);
-  });
-
-  it("ignores a corrupted value", () => {
-    expect(isDismissalActive("not a date", now)).toBe(false);
   });
 });

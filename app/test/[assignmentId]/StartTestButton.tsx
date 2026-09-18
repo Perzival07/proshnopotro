@@ -20,6 +20,7 @@ import {
   TimerOff,
   ShieldAlert,
   CheckCircle2,
+  Video,
 } from "lucide-react";
 
 interface StartTestButtonProps {
@@ -97,6 +98,10 @@ export function StartTestButton({
   // The student pressed Finish, as opposed to the clock or the guard ending it.
   const [finishedEarly, setFinishedEarly] = useState(false);
   const [confirmingFinish, setConfirmingFinish] = useState(false);
+  // A proctored paper asks for the camera every time it is opened, before the
+  // browser does. The browser remembers an earlier "Allow" and stays silent,
+  // so without this step a returning student would never be asked at all.
+  const [askingCamera, setAskingCamera] = useState(false);
   // Set when the tab guard, rather than the clock, ended the attempt -- the
   // closing panel has to say which, since the student can tell the difference.
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
@@ -118,7 +123,16 @@ export function StartTestButton({
   const isDoc = isWrittenPaper(testFormat);
   const paperNoun = isDoc ? "Question Paper" : "Google Form";
 
+  const handleOpenClick = () => {
+    if (proctored) {
+      setAskingCamera(true);
+      return;
+    }
+    void handleOpen();
+  };
+
   const handleOpen = async () => {
+    setAskingCamera(false);
     setLoading(true);
     setError(null);
 
@@ -241,6 +255,52 @@ export function StartTestButton({
           the paper is full screen the badge moves inside it (see below). */}
       {!expanded && cameraBadge}
 
+      {askingCamera && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-brand-navy/70 p-4 backdrop-blur-sm">
+          <div
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="camera-permission-title"
+            className="w-full max-w-md rounded-2xl border border-brand-border bg-white p-6 text-left shadow-xl"
+          >
+            <div className="flex items-start gap-3.5">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-tint text-brand-navy">
+                <Video className="h-6 w-6" />
+              </div>
+              <div className="space-y-1.5">
+                <h2
+                  id="camera-permission-title"
+                  className="font-heading text-base font-bold text-brand-navy"
+                >
+                  Allow your camera
+                </h2>
+                <p className="text-xs leading-relaxed text-brand-ink/80">
+                  This test is camera-proctored. Your camera turns on when the paper
+                  opens and stays on until you finish; you will see yourself in the
+                  corner of the screen. No video is saved or sent anywhere.
+                </p>
+                <p className="text-xs leading-relaxed text-brand-ink/80">
+                  If your browser asks, choose <strong>Allow this time</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-2 gap-2">
+              <Button type="button" variant="outline" onClick={() => setAskingCamera(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleOpen()}
+                className="bg-brand-navy font-semibold text-white hover:bg-brand-navy/90"
+              >
+                Allow camera
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="p-3.5 text-xs bg-red-50 text-red-800 border border-red-200 rounded-lg flex items-center gap-2.5 text-left">
           <AlertCircle className="h-4 w-4 shrink-0 text-red-600" />
@@ -290,7 +350,7 @@ export function StartTestButton({
 
           <Button
             id="start-assessment-btn"
-            onClick={handleOpen}
+            onClick={handleOpenClick}
             disabled={loading}
             size="lg"
             className="w-full bg-brand-navy hover:bg-brand-navy/90 text-white font-medium py-3 px-6 shadow-md transition-all flex items-center justify-center gap-2"
