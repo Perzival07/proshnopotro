@@ -3,12 +3,7 @@
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
-import {
-  TEST_FORMATS,
-  isValidResourceUrl,
-  toEmbedUrl,
-  type TestFormat,
-} from "@/lib/test-resource";
+import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { parseDurationMinutes } from "@/lib/exam-timer";
 import { destroyNoteFile } from "@/lib/cloudinary";
 import { NO_PAPER, paperFile } from "@/lib/question-paper";
@@ -18,7 +13,7 @@ export interface TestInput {
   subject: string;
   description?: string;
   iconName: string;
-  format: TestFormat;
+  /** The question paper link. Its type is worked out from the link itself. */
   formUrl: string;
   /** Minutes the student gets once they open the paper. Blank/null = untimed. */
   durationMinutes?: number | string | null;
@@ -26,35 +21,38 @@ export interface TestInput {
   active?: boolean;
 }
 
-/** Shared validation for create and update. Returns an error string or null. */
-function validateTestInput(data: TestInput): string | null {
-  if (!TEST_FORMATS.includes(data.format)) {
-    return "Choose whether this is a Google Form, a Google Doc or a PDF.";
-  }
+/**
+ * Shared validation for create and update. Returns an error, or the paper's
+ * type as read from its link -- the server decides the type, never the form.
+ */
+function validateTestInput(data: TestInput): { error: string } | { format: TestFormat } {
   if (!data.title.trim() || !data.subject.trim()) {
-    return "Title and Subject are required.";
+    return { error: "Title and Subject are required." };
   }
   const duration = parseDurationMinutes(data.durationMinutes);
-  if (duration.error) return duration.error;
+  if (duration.error) return { error: duration.error };
 
   if (!data.formUrl.trim()) {
-    return "The question paper URL is required.";
+    return { error: "The question paper link is required." };
   }
-  if (!isValidResourceUrl(data.formUrl, data.format)) {
-    return data.format === "GOOGLE_FORM"
-      ? "That does not look like a Google Form link (expected docs.google.com/forms/... or forms.gle/...)."
-      : data.format === "PDF"
-        ? "That does not look like a Google Drive file link (expected drive.google.com/file/d/...). Upload the PDF to Drive and paste its share link."
-        : "That does not look like a Google Doc link (expected docs.google.com/document/...).";
+  const format = detectTestFormat(data.formUrl);
+  if (!format) {
+    return {
+      error:
+        "That link is not a Google Form, a Google Doc or a Google Drive file. Paste a docs.google.com/forms/..., docs.google.com/document/... or drive.google.com/file/d/... link.",
+    };
   }
   // The paper is shown inside the portal and nowhere else, so a link that
   // cannot be embedded would leave the student with nothing to open.
-  if (!toEmbedUrl(data.formUrl, data.format)) {
-    return data.format === "GOOGLE_FORM"
-      ? "A forms.gle short link cannot be displayed inside the portal. Open the form, choose Send \u2192 link, and paste the full docs.google.com/forms/... address."
-      : "That Google Doc link cannot be displayed inside the portal. Paste the standard docs.google.com/document/... address.";
+  if (!toEmbedUrl(data.formUrl, format)) {
+    return {
+      error:
+        format === "GOOGLE_FORM"
+          ? "A forms.gle short link cannot be displayed inside the portal. Open the form, choose Send \u2192 link, and paste the full docs.google.com/forms/... address."
+          : "That Google Doc link cannot be displayed inside the portal. Paste the standard docs.google.com/document/... address.",
+    };
   }
-  return null;
+  return { format };
 }
 
 /**
@@ -70,8 +68,8 @@ async function discardPaper(paper: { paperPublicId: string | null; paperVersion:
 export async function createTest(data: TestInput) {
   await requireAdmin();
 
-  const invalid = validateTestInput(data);
-  if (invalid) return { error: invalid };
+  const checked = validateTestInput(data);
+  if ("error" in checked) return { error: checked.error };
 
   try {
     const test = await prisma.test.create({
@@ -80,7 +78,7 @@ export async function createTest(data: TestInput) {
         subject: data.subject.trim(),
         description: data.description?.trim() || null,
         iconName: data.iconName || "BookOpen",
-        format: data.format,
+        format: checked.format,
         formUrl: data.formUrl.trim(),
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         proctored: data.proctored ?? true,
@@ -101,8 +99,8 @@ export async function createTest(data: TestInput) {
 export async function updateTest(id: string, data: TestInput) {
   await requireAdmin();
 
-  const invalid = validateTestInput(data);
-  if (invalid) return { error: invalid };
+  const checked = validateTestInput(data);
+  if ("error" in checked) return { error: checked.error };
 
   try {
     const previous = await prisma.test.findUnique({
@@ -117,7 +115,7 @@ export async function updateTest(id: string, data: TestInput) {
         subject: data.subject.trim(),
         description: data.description?.trim() || null,
         iconName: data.iconName || "BookOpen",
-        format: data.format,
+        format: checked.format,
         formUrl: data.formUrl.trim(),
         // Papers are links now; an older uploaded file is dropped.
         ...NO_PAPER,

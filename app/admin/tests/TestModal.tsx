@@ -25,7 +25,7 @@ import {
   ClipboardList,
   Timer,
 } from "lucide-react";
-import type { TestFormat } from "@/lib/test-resource";
+import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
 
 interface TestModalProps {
@@ -51,7 +51,6 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [subject, setSubject] = useState("Physics");
   const [description, setDescription] = useState("");
   const [iconName, setIconName] = useState("Atom");
-  const [format, setFormat] = useState<TestFormat>("GOOGLE_FORM");
   const [formUrl, setFormUrl] = useState("");
   // Held as a string so the field can be genuinely empty, which is what
   // "no time limit" means -- a number state would coerce that to 0.
@@ -67,7 +66,6 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setSubject(testToEdit.subject);
       setDescription(testToEdit.description || "");
       setIconName(testToEdit.iconName || "BookOpen");
-      setFormat(testToEdit.format || "GOOGLE_FORM");
       setFormUrl(testToEdit.formUrl);
       setDurationMinutes(
         testToEdit.durationMinutes ? String(testToEdit.durationMinutes) : ""
@@ -79,7 +77,6 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setSubject("Physics");
       setDescription("");
       setIconName("Atom");
-      setFormat("GOOGLE_FORM");
       setFormUrl("");
       setDurationMinutes("");
       setProctored(true);
@@ -99,7 +96,6 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       subject,
       description,
       iconName,
-      format,
       formUrl,
       durationMinutes,
       proctored,
@@ -127,7 +123,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             {isEditing ? "Edit Assessment Test" : "Create New Assessment Test"}
           </DialogTitle>
           <DialogDescription>
-            Configure the test record, then link a Google Form, a Google Doc, or a PDF on Google Drive.
+            Configure the test record, then paste the link to a Google Form, a Google Doc, or a PDF on Google Drive.
           </DialogDescription>
         </DialogHeader>
 
@@ -214,98 +210,28 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
           </div>
 
           <div>
-            <Label className="text-xs font-semibold text-brand-navy">
-              Test Type <span className="text-red-500">*</span>
-            </Label>
-            <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {(
-                [
-                  {
-                    value: "GOOGLE_FORM" as const,
-                    icon: ClipboardList,
-                    title: "Google Form",
-                    hint: "Answered online in the form",
-                  },
-                  {
-                    value: "GOOGLE_DOC" as const,
-                    icon: FileText,
-                    title: "Google Doc",
-                    hint: "Written paper, answers uploaded as photos",
-                  },
-                  {
-                    value: "PDF" as const,
-                    icon: FileType2,
-                    title: "PDF link",
-                    hint: "A PDF on Google Drive, read in the portal",
-                  },
-                ]
-              ).map((opt) => {
-                const Icon = opt.icon;
-                const selected = format === opt.value;
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setFormat(opt.value)}
-                    className={`flex flex-col items-start gap-0.5 rounded-lg border p-3 text-left transition-colors ${
-                      selected
-                        ? "border-brand-blue bg-brand-tint text-brand-navy shadow-xs"
-                        : "border-brand-border bg-white text-brand-ink/70 hover:border-brand-blue/50"
-                    }`}
-                  >
-                    <span className="flex items-center gap-1.5 text-xs font-semibold">
-                      <Icon className="h-3.5 w-3.5 text-brand-blue" />
-                      {opt.title}
-                    </span>
-                    <span className="text-[10px] leading-snug text-brand-ink/60">
-                      {opt.hint}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="form-url" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
-                  <LinkIcon className="h-3.5 w-3.5 text-brand-blue" />
-                  <span>
-                    {format === "GOOGLE_FORM"
-                      ? "Google Form URL"
-                      : format === "PDF"
-                        ? "Google Drive PDF link"
-                        : "Google Doc URL"}{" "}
-                    <span className="text-red-500">*</span>
-                  </span>
-                </Label>
-                <span className="text-[10px] text-brand-ink/50 italic">
-                  Never leaked to student HTML
+            <div className="flex items-center justify-between">
+              <Label htmlFor="form-url" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
+                <LinkIcon className="h-3.5 w-3.5 text-brand-blue" />
+                <span>
+                  Question Paper Link <span className="text-red-500">*</span>
                 </span>
-              </div>
-              <Input
-                id="form-url"
-                type="url"
-                placeholder={
-                  format === "GOOGLE_FORM"
-                    ? "https://docs.google.com/forms/d/e/.../viewform"
-                    : format === "PDF"
-                      ? "https://drive.google.com/file/d/.../view"
-                      : "https://docs.google.com/document/d/.../edit"
-                }
-                value={formUrl}
-                onChange={(e) => setFormUrl(e.target.value)}
-                required
-                className="mt-1 font-mono text-xs"
-              />
-              <p className="mt-1 text-[11px] text-brand-ink/55">
-                {format === "GOOGLE_FORM"
-                  ? "Share the form so anyone with the link can respond, and paste the full docs.google.com/forms/\u2026 address \u2014 forms.gle short links cannot be shown inside the portal."
-                  : format === "PDF"
-                    ? "Upload the PDF to Google Drive, share it as \u201cAnyone with the link \u2192 Viewer\u201d, and paste the link. PDFs are not uploaded to the portal."
-                    : "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error."}
-              </p>
+              </Label>
+              <span className="text-[10px] text-brand-ink/50 italic">
+                Never leaked to student HTML
+              </span>
             </div>
+            <Input
+              id="form-url"
+              type="url"
+              placeholder="Paste a Google Form, Google Doc or Google Drive PDF link"
+              value={formUrl}
+              onChange={(e) => setFormUrl(e.target.value)}
+              required
+              className="mt-1 font-mono text-xs"
+            />
+            <LinkTypeHint url={formUrl} />
+          </div>
 
           <div>
             <Label
@@ -395,5 +321,78 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const LINK_TYPES: Record<
+  TestFormat,
+  { icon: React.ElementType; title: string; hint: string; share: string }
+> = {
+  GOOGLE_FORM: {
+    icon: ClipboardList,
+    title: "Google Form",
+    hint: "answered online in the form",
+    share: "Share the form so anyone with the link can respond.",
+  },
+  GOOGLE_DOC: {
+    icon: FileText,
+    title: "Google Doc",
+    hint: "written paper, answers uploaded as photos",
+    share: "Share the doc as \u201cAnyone with the link \u2192 Viewer\u201d, or students will see a permission error.",
+  },
+  PDF: {
+    icon: FileType2,
+    title: "PDF on Google Drive",
+    hint: "written paper, read in the portal",
+    share: "Share the file as \u201cAnyone with the link \u2192 Viewer\u201d. PDFs are not uploaded to the portal.",
+  },
+};
+
+/**
+ * Says what kind of paper the pasted link is, as the tutor types. Display
+ * only: the server reads the type from the link again when the test is saved.
+ */
+function LinkTypeHint({ url }: { url: string }) {
+  if (!url.trim()) {
+    return (
+      <p className="mt-1 text-[11px] text-brand-ink/55">
+        The test type is worked out from the link: a Google Form is answered online; a
+        Google Doc or a PDF on Google Drive is a written paper.
+      </p>
+    );
+  }
+
+  const format = detectTestFormat(url);
+  if (!format) {
+    return (
+      <p className="mt-1 flex items-start gap-1.5 text-[11px] text-red-700">
+        <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
+        <span>
+          Not a Google Form, Google Doc or Google Drive file link. Paste the full
+          docs.google.com/forms/&hellip;, docs.google.com/document/&hellip; or
+          drive.google.com/file/d/&hellip; address.
+        </span>
+      </p>
+    );
+  }
+
+  const type = LINK_TYPES[format];
+  const Icon = type.icon;
+  const embeddable = toEmbedUrl(url, format) !== null;
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      <span className="inline-flex items-center gap-1.5 rounded-full border border-brand-blue/30 bg-brand-tint px-2.5 py-1 text-[11px] font-medium text-brand-navy">
+        <Icon className="h-3.5 w-3.5 text-brand-blue" />
+        <span>
+          <strong className="font-semibold">{type.title}</strong> &middot; {type.hint}
+        </span>
+      </span>
+      <p className={`text-[11px] ${embeddable ? "text-brand-ink/55" : "text-red-700"}`}>
+        {embeddable
+          ? type.share
+          : "A forms.gle short link cannot be shown inside the portal. Open the form, choose Send \u2192 link, and paste the full docs.google.com/forms/\u2026 address."}
+      </p>
+    </div>
   );
 }

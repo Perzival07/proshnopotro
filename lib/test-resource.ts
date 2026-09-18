@@ -74,6 +74,18 @@ export function isDriveFileUrl(url: string): boolean {
   return driveFileId(url) !== null;
 }
 
+/**
+ * What kind of paper a pasted link is, or null when it is none of the three.
+ * The tutor pastes one link and never picks a type: the link itself says
+ * which it is, so the two can never disagree.
+ */
+export function detectTestFormat(url: string): TestFormat | null {
+  if (isGoogleFormUrl(url)) return "GOOGLE_FORM";
+  if (isGoogleDocUrl(url)) return "GOOGLE_DOC";
+  if (isDriveFileUrl(url)) return "PDF";
+  return null;
+}
+
 export function isValidResourceUrl(url: string, format: TestFormat): boolean {
   if (format === "PDF") return isDriveFileUrl(url);
   return format === "GOOGLE_FORM" ? isGoogleFormUrl(url) : isGoogleDocUrl(url);

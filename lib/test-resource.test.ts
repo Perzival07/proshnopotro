@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  driveFileId, isGoogleFormUrl, isGoogleDocUrl, isValidResourceUrl, toEmbedUrl,
+  detectTestFormat, driveFileId, isGoogleFormUrl, isGoogleDocUrl, isValidResourceUrl, toEmbedUrl,
 } from "./test-resource";
 
 const FORM = "https://docs.google.com/forms/d/e/1FAIpQLSc/viewform";
@@ -106,4 +106,27 @@ describe("Google Drive PDF links", () => {
     expect(toEmbedUrl(SHARE, "PDF")).toBe(`https://drive.google.com/file/d/${ID}/preview`);
     expect(toEmbedUrl(DOC, "PDF")).toBeNull();
   });
+});
+
+describe("detectTestFormat", () => {
+  it("reads a form link as a Google Form", () => {
+    expect(detectTestFormat(FORM)).toBe("GOOGLE_FORM");
+    expect(detectTestFormat("https://forms.gle/abc123")).toBe("GOOGLE_FORM");
+  });
+  it("reads docs, slides and sheets as a Google Doc", () => {
+    expect(detectTestFormat(DOC)).toBe("GOOGLE_DOC");
+    expect(detectTestFormat("https://docs.google.com/presentation/d/x/edit")).toBe("GOOGLE_DOC");
+  });
+  it("reads a Drive file link as a PDF", () => {
+    expect(detectTestFormat("https://drive.google.com/file/d/1AbCdEfGhIjK/view?usp=sharing")).toBe("PDF");
+    expect(detectTestFormat("https://drive.google.com/open?id=1AbCdEfGhIjK")).toBe("PDF");
+  });
+  it.each([
+    "",
+    "not a url",
+    "https://example.com/paper.pdf",
+    "https://drive.google.com/drive/folders/1AbCdEfGhIjK",
+    "http://docs.google.com/document/d/x/edit",
+    "https://docs.google.com.evil.com/forms/d/e/x/viewform",
+  ])("recognises nothing in %j", (u) => expect(detectTestFormat(u)).toBeNull());
 });
