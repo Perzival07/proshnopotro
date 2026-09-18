@@ -1,8 +1,13 @@
 /**
- * Shown while a student page's data loads -- the dashboard, notes, a test --
+ * Shown while a student page's data loads -- the dashboard and the notes --
  * so tapping a link on a slow phone connection answers at once.
+ *
+ * Deliberately not used for the test page. A loading boundary above a page
+ * makes every server action that revalidates swap the page for this skeleton
+ * and back, which remounts it and throws away its state -- on the test page
+ * that closed the open question paper.
  */
-export default function Loading() {
+export function PageSkeleton() {
   return (
     <div className="min-h-screen bg-brand-page" aria-busy="true" aria-label="Loading">
       <div className="h-16 border-b border-brand-border bg-white" />

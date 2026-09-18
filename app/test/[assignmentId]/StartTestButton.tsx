@@ -362,9 +362,7 @@ export function StartTestButton({
               </div>
             ) : (
               <>
-                <span>
-                  {deadlineMs !== null ? `Return to ${paperNoun}` : `View ${paperNoun}`}
-                </span>
+                <span>View {paperNoun}</span>
                 <ExternalLink className="h-4 w-4" />
               </>
             )}
