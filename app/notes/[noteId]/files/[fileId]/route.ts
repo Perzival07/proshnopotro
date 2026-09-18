@@ -2,8 +2,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getVerifiedSession } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { getVisibleNote } from "@/lib/note-access";
-import { fetchNoteFile, signedNoteUrl } from "@/lib/cloudinary";
-import { contentDisposition } from "@/lib/notes";
+import { signedNoteUrl } from "@/lib/cloudinary";
+import { pdfResponse } from "@/lib/pdf-response";
 
 export const dynamic = "force-dynamic";
 
@@ -39,42 +39,9 @@ export async function GET(
       : new NextResponse("File storage is not set up.", { status: 503 });
   }
 
-  let upstream: Response | null;
-  try {
-    upstream = await fetchNoteFile(file);
-  } catch (error) {
-    console.error("Could not reach Cloudinary for a note file:", error);
-    return new NextResponse("This file could not be loaded. Please try again.", {
-      status: 502,
-    });
-  }
-  if (!upstream) {
-    return new NextResponse("File storage is not set up.", { status: 503 });
-  }
-  if (!upstream.ok || !upstream.body) {
-    console.error(
-      `Cloudinary refused note file ${file.id}: ${upstream.status} ${
-        upstream.headers.get("x-cld-error") ?? ""
-      }`
-    );
-    return new NextResponse("This file could not be loaded. Please try again.", {
-      status: 502,
-    });
-  }
-
-  const download = request.nextUrl.searchParams.get("download") === "1";
-  const headers = new Headers({
-    "Content-Type": "application/pdf",
-    "Content-Disposition": contentDisposition(file.originalName, download),
-    // Only ever for the person who asked: a shared cache must not hand one
-    // student's notes to the next visitor.
-    "Cache-Control": "private, no-store",
-    "X-Content-Type-Options": "nosniff",
+  return pdfResponse(file, file.originalName, {
+    download: request.nextUrl.searchParams.get("download") === "1",
   });
-  // Streamed rather than buffered, so a 10 MB PDF is never held in memory.
-  // No Content-Length on purpose: Vercel caps a function's response at 4.5 MB
-  // unless it is streamed, and a fixed length would forfeit the exemption.
-  return new NextResponse(upstream.body, { status: 200, headers });
 }
 
 async function findFileFor(

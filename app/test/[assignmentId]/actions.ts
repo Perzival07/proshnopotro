@@ -16,15 +16,19 @@ import {
   uploadState,
   type UploadState,
 } from "@/lib/answer-upload";
-import { signAnswerUpload, signedNoteUrl, type UploadSignature } from "@/lib/cloudinary";
+import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
 import { paperFile } from "@/lib/question-paper";
 
-function signedPaperUrl(test: {
-  paperPublicId: string | null;
-  paperVersion: number | null;
-}): string | null {
-  const file = paperFile(test);
-  return file && signedNoteUrl(file);
+/**
+ * The portal's own address for this attempt's PDF paper. Cloudinary will not
+ * serve a PDF to a browser, so the paper route reads it on the server, and
+ * only while the attempt is open.
+ */
+function paperUrl(
+  assignmentId: string,
+  test: { paperPublicId: string | null; paperVersion: number | null }
+): string | null {
+  return paperFile(test) ? `/test/${encodeURIComponent(assignmentId)}/paper` : null;
 }
 
 export interface FormResolutionResult {
@@ -111,11 +115,11 @@ export async function resolveSecureFormUrl(
     return { error: "The question paper link is not configured. Please contact your tutor." };
   }
 
-  // An uploaded PDF has no public address at all: the link is signed here,
-  // for this attempt, and the page draws it rather than handing it over.
+  // An uploaded PDF has no public address at all: it is served by the
+  // portal, for this attempt, and the page draws it rather than handing it over.
   const embedUrl =
     format === "PDF"
-      ? signedPaperUrl(assignment.test)
+      ? paperUrl(assignment.id, assignment.test)
       : toEmbedUrl(assignment.test.formUrl, format);
 
   if (!embedUrl) {

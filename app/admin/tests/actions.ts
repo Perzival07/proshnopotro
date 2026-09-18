@@ -13,7 +13,6 @@ import { parseDurationMinutes } from "@/lib/exam-timer";
 import {
   destroyNoteFile,
   signAnswerUpload,
-  signedNoteUrl,
   type UploadSignature,
 } from "@/lib/cloudinary";
 import {
@@ -97,16 +96,16 @@ export async function getPaperUploadSignature(): Promise<{
   return { upload };
 }
 
-/** A signed link so the tutor can check the paper that is on a test. */
+/** Where the tutor can check the paper that is on a test. */
 export async function getPaperPreviewUrl(testId: string): Promise<{ url?: string; error?: string }> {
   await requireAdmin();
   const test = await prisma.test.findUnique({
     where: { id: testId },
     select: { paperPublicId: true, paperVersion: true },
   });
-  const file = test && paperFile(test);
-  const url = file && signedNoteUrl(file);
-  return url ? { url } : { error: "This test has no PDF paper to open." };
+  return test && paperFile(test)
+    ? { url: `/admin/tests/${encodeURIComponent(testId)}/paper` }
+    : { error: "This test has no PDF paper to open." };
 }
 
 /**
