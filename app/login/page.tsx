@@ -1,5 +1,5 @@
 import React, { Suspense } from "react";
-import { auth } from "@/auth";
+import { getVerifiedSession } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
 import { LogoBadge } from "@/components/brand/LogoBadge";
 import { LoginForm } from "./LoginForm";
@@ -7,13 +7,16 @@ import { Footer } from "@/components/Footer";
 import { InstallAppCard } from "@/components/pwa/InstallApp";
 
 export default async function LoginPage() {
-  const session = await auth();
+  // Read from the database, not the session cookie: the cookie's copy of the
+  // role is only refreshed at sign-in, and a student promoted since then
+  // should still land on the admin console.
+  const user = await getVerifiedSession();
 
-  if (session?.user) {
-    if (session.user.role === "ADMIN") {
+  if (user) {
+    if (user.role === "ADMIN") {
       redirect("/admin/tests");
     }
-    if (!session.user.profileComplete) {
+    if (!user.profileComplete) {
       redirect("/onboarding");
     }
     redirect("/");

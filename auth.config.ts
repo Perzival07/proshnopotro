@@ -141,8 +141,12 @@ export const authConfig: NextAuthConfig = {
         }
       }
 
-      // Re-fetch latest DB profile attributes to maintain high-security server trust
-      if (token.email) {
+      // Copy the profile from the database at sign-in and on an explicit
+      // update only. Doing it on every request cost a database round trip per
+      // page for nothing: every access decision already goes through
+      // getVerifiedSession, which reads the database itself, so a stale copy
+      // here can never grant anything.
+      if (token.email && (user || trigger === "update")) {
         const dbUser = await prisma.user.findUnique({
           where: { email: token.email as string },
           select: {
