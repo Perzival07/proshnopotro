@@ -25,7 +25,6 @@ import { SubjectIcon, SUBJECT_ICONS } from "@/components/SubjectIcon";
 import { StudentPicker, type PickableStudent } from "@/components/admin/StudentPicker";
 import { shrinkImage } from "@/lib/shrink-image";
 import { uploadToCloudinary } from "@/lib/cloudinary-upload";
-import { MAX_PDF_BYTES, MAX_PDF_SOURCE_BYTES } from "@/lib/pdf-compression";
 import {
   ACCEPTED_FILE_TYPES,
   formatBytes,
@@ -94,12 +93,7 @@ export function NoteModal({
   const [studentEmails, setStudentEmails] = useState<string[]>([]);
 
   const [saving, setSaving] = useState(false);
-  const [uploading, setUploading] = useState<{
-    done: number;
-    total: number;
-    /** Set while a PDF is being compressed, before it is sent. */
-    detail?: string;
-  } | null>(null);
+  const [uploading, setUploading] = useState<{ done: number; total: number } | null>(null);
   const [removingFileId, setRemovingFileId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -239,66 +233,36 @@ export function NoteModal({
         const original = accepted[i];
         try {
           const extension = (original.name.split(".").pop() || "").toLowerCase();
-          const isPdfFile = original.type === "application/pdf" || extension === "pdf";
 
-          if (!isPdfFile && !original.type.startsWith("image/")) {
-            problems.push(`${original.name} is not a photo or a PDF, so it was skipped.`);
+          if (original.type === "application/pdf" || extension === "pdf") {
+            problems.push(
+              `${original.name} is a PDF. PDFs are not uploaded: put it on Google Drive and paste its link in the link field above.`
+            );
             continue;
           }
-          if (!isPdfFile && extension && !isAllowedNoteFormat(extension)) {
+          if (!original.type.startsWith("image/")) {
+            problems.push(`${original.name} is not a photo, so it was skipped.`);
+            continue;
+          }
+          if (extension && !isAllowedNoteFormat(extension)) {
             problems.push(`${original.name} is not a picture format the portal can store.`);
             continue;
           }
-          // A PDF may start larger than the limit: it only has to fit once
-          // compressed, and a scan usually shrinks several times over.
-          const sizeLimit = isPdfFile ? MAX_PDF_SOURCE_BYTES : MAX_NOTE_FILE_BYTES;
-          if (original.size > sizeLimit) {
+          if (original.size > MAX_NOTE_FILE_BYTES) {
             problems.push(
               `${original.name} is ${formatBytes(original.size)}; files must be under ${formatBytes(
-                sizeLimit
+                MAX_NOTE_FILE_BYTES
               )}.`
             );
             continue;
           }
 
-          // Everything is shrunk in the browser before it is sent. A
-          // 12-megapixel snap of a blackboard becomes a few hundred KB and
-          // stays readable; a PDF is re-saved compactly, and a scanned one has
-          // its pages redrawn at a sensible resolution (see compress-pdf.ts).
-          let blob: Blob;
-          if (isPdfFile) {
-            try {
-              const { compressPdf } = await import("@/lib/compress-pdf");
-              const compressed = await compressPdf(original, (p) =>
-                setUploading({
-                  done: i,
-                  total: accepted.length,
-                  detail:
-                    p.stage === "redrawing"
-                      ? `Compressing ${original.name}, page ${p.page} of ${p.pages}`
-                      : `Compressing ${original.name}`,
-                })
-              );
-              blob = compressed.blob;
-            } catch (err) {
-              problems.push(
-                err instanceof Error ? err.message : `${original.name} could not be compressed.`
-              );
-              continue;
-            } finally {
-              setUploading({ done: i, total: accepted.length });
-            }
-          } else {
-            blob = await shrinkImage(original);
-          }
-          const format = isPdfFile ? "pdf" : "jpg";
+          // Shrunk in the browser before it is sent: a 12-megapixel snap of a
+          // blackboard becomes a few hundred KB and stays readable.
+          const blob = await shrinkImage(original);
+          const format = "jpg";
 
-          const body = await uploadToCloudinary(
-            sig,
-            blob,
-            isPdfFile ? original.name : `${original.name}.jpg`,
-            isPdfFile ? "raw" : "image"
-          );
+          const body = await uploadToCloudinary(sig, blob, `${original.name}.jpg`);
 
           uploaded.push({
             publicId: body.public_id,
@@ -377,8 +341,8 @@ export function NoteModal({
         <DialogHeader>
           <DialogTitle>{noteToEdit ? "Edit notes" : "New notes"}</DialogTitle>
           <DialogDescription>
-            Upload pages or a PDF, choose who gets them, then publish. Nothing reaches a
-            student until you do.
+            Upload photos of pages, link a PDF from Google Drive, choose who gets them,
+            then publish. Nothing reaches a student until you do.
           </DialogDescription>
         </DialogHeader>
 
@@ -472,15 +436,19 @@ export function NoteModal({
             <div>
               <Label htmlFor="note-link" className="flex items-center gap-1.5 text-xs font-semibold text-brand-navy">
                 <Link2 className="h-3.5 w-3.5 text-brand-blue" />
-                Companion link (optional)
+                PDF or companion link (optional)
               </Label>
               <Input
                 id="note-link"
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
-                placeholder="https://drive.google.com/… or a lecture recording"
+                placeholder="https://drive.google.com/file/d/… or a lecture recording"
                 className="mt-1.5 h-10 text-sm"
               />
+              <p className="mt-1 text-[11px] text-brand-ink/55">
+                PDFs are shared as a link, never uploaded. Put the PDF on Google Drive,
+                share it as &ldquo;Anyone with the link &rarr; Viewer&rdquo;, and paste the link here.
+              </p>
             </div>
           </section>
 
@@ -509,7 +477,7 @@ export function NoteModal({
                 className="h-9 gap-1.5 border-brand-border text-xs text-brand-navy"
               >
                 <ImagePlus className="h-3.5 w-3.5 text-brand-blue" />
-                Add photos or PDFs
+                Add photos
               </Button>
             </div>
 
@@ -517,22 +485,16 @@ export function NoteModal({
               <div className="flex items-center gap-2 rounded-lg border border-brand-border bg-brand-page p-3 text-xs text-brand-ink/75">
                 <AtomMark size={16} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
                 <span>
-                  {uploading.detail ? (
-                    <>{uploading.detail}…</>
-                  ) : (
-                    <>
-                      Uploading file {Math.min(uploading.done + 1, uploading.total)} of{" "}
-                      {uploading.total}…
-                    </>
-                  )}
+                  Uploading file {Math.min(uploading.done + 1, uploading.total)} of{" "}
+                  {uploading.total}…
                 </span>
               </div>
             )}
 
             {files.length === 0 && !uploading ? (
               <p className="rounded-lg border border-dashed border-brand-border bg-brand-page p-4 text-center text-xs text-brand-ink/60">
-                No files yet. Photos and PDFs are compressed before they are uploaded, and
-                must come out under {formatBytes(MAX_PDF_BYTES)} each.
+                No photos yet. Photos are compressed before they are uploaded, and must be
+                under {formatBytes(MAX_NOTE_FILE_BYTES)} each. For a PDF, use the link above.
               </p>
             ) : (
               <ul className="space-y-2">

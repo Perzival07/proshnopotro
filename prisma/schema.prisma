@@ -21,7 +21,7 @@ enum AssignmentStatus {
 /// How a test's question paper is delivered.
 /// GOOGLE_FORM: answered online in the form itself.
 /// GOOGLE_DOC:  a written paper the student reads and answers on paper.
-/// PDF:         a written paper the tutor uploaded as a PDF (see Test.paper*).
+/// PDF:         a written paper shared as a PDF link on Google Drive.
 /// Whichever it is, once the attempt ends the student photographs their answer
 /// sheets and uploads them once (see AnswerImage).
 enum TestFormat {
@@ -102,12 +102,13 @@ model Test {
   description     String?    @db.Text
   iconName        String     @default("BookOpen")
   format          TestFormat @default(GOOGLE_FORM)
-  formUrl         String     @db.Text // Question paper URL. Never exposed to client HTML. Empty for PDF.
-  /// An uploaded PDF paper, stored in Cloudinary as an authenticated raw file
-  /// that opens only through a link signed for a student sitting the test.
+  formUrl         String     @db.Text // Question paper URL. Never exposed to client HTML.
+  /// A PDF paper uploaded before papers became links-only, stored in Cloudinary
+  /// as an authenticated raw file. No longer written; cleared when the test is
+  /// next saved.
   paperPublicId   String?
   paperVersion    Int?
-  /// The tutor's file name, so the admin list says which paper it is.
+  /// The tutor's file name for that old upload.
   paperName       String?
   paperBytes      Int?
   /// Minutes a student gets once they open the paper. null = untimed.
@@ -264,7 +265,7 @@ model NoteFile {
   publicId     String
   version      Int
   format       String
-  /// Cloudinary's resource type: "image" for photos, "raw" for PDFs.
+  /// Cloudinary's resource type. Always "image": PDFs are shared as links.
   resourceType String   @default("image")
   /// The name the tutor's file had, so the student downloads something
   /// recognisable rather than a public id.

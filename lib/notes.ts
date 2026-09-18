@@ -2,7 +2,9 @@
  * Notes: study material the tutor shares with a classroom.
  *
  * A note is a title, an optional description, any number of uploaded pages
- * (photographed board work, a scanned worksheet, a PDF) and an optional link.
+ * (photographed board work, a scanned worksheet) and an optional link. PDFs
+ * are never uploaded: the tutor shares one through the link, from Google
+ * Drive, so the portal keeps no copy of it.
  * It is shared with whole classrooms, and with named students on top of those.
  *
  * Nothing reaches a student until the note is published. Publishing carries a
@@ -28,7 +30,7 @@ export const MAX_NOTE_TITLE = 120;
 export const MAX_NOTE_DESCRIPTION = 2000;
 
 /** What the tutor may attach. Images are re-encoded to JPEG before upload. */
-export const ACCEPTED_FILE_TYPES = "image/*,application/pdf,.pdf";
+export const ACCEPTED_FILE_TYPES = "image/*";
 
 const IMAGE_FORMATS = ["jpg", "jpeg", "png", "webp", "gif", "heic", "heif", "avif"];
 
@@ -37,58 +39,9 @@ function cleanFormat(format: string): string {
   return (format || "").trim().toLowerCase().replace(/^\./, "");
 }
 
-/** True for a file extension this portal will store as a note page. */
+/** True for a file extension this portal will store as a note page: photos only. */
 export function isAllowedNoteFormat(format: string): boolean {
-  const f = cleanFormat(format);
-  return f === "pdf" || IMAGE_FORMATS.includes(f);
-}
-
-/**
- * Which Cloudinary resource type a file is stored under.
- *
- * PDFs go up as `raw`, which Cloudinary stores byte for byte; photos go up as
- * `image`, which can be thumbnailed. Storing PDFs as `raw` does NOT get them
- * past the account's "Allow delivery of PDF and ZIP files" switch -- with it
- * off (the default on free plans) every CDN link to a PDF is refused with a
- * 401, raw or not. So PDFs are never linked to directly: they are handed out
- * by this app's own file route, which reads them through Cloudinary's API.
- */
-export function resourceTypeFor(format: string): "image" | "raw" {
-  return cleanFormat(format) === "pdf" ? "raw" : "image";
-}
-
-export function isPdf(format: string): boolean {
-  return resourceTypeFor(format) === "raw";
-}
-
-/**
- * The portal's own address for one note file. The route behind it checks the
- * viewer may see the note before it sends anything.
- */
-export function noteFileHref(
-  noteId: string,
-  fileId: string,
-  options: { download?: boolean } = {}
-): string {
-  const path = `/notes/${encodeURIComponent(noteId)}/files/${encodeURIComponent(fileId)}`;
-  return options.download ? `${path}?download=1` : path;
-}
-
-/**
- * A Content-Disposition header that keeps the tutor's file name.
- *
- * `filename` must be plain ASCII, so it carries a stand-in with anything else
- * replaced; `filename*` carries the real name, which every current browser
- * prefers -- a Bengali file name is saved as written.
- */
-export function contentDisposition(name: string, download: boolean): string {
-  const clean = cleanFileName(name);
-  const ascii = clean.replace(/[^\x20-\x7E]|["\\]/g, "_");
-  const encoded = encodeURIComponent(clean).replace(
-    /['()*]/g,
-    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`
-  );
-  return `${download ? "attachment" : "inline"}; filename="${ascii}"; filename*=UTF-8''${encoded}`;
+  return IMAGE_FORMATS.includes(cleanFormat(format));
 }
 
 /** The Cloudinary folder one note's files live in. */

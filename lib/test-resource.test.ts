@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  isGoogleFormUrl, isGoogleDocUrl, isValidResourceUrl, toEmbedUrl,
+  driveFileId, isGoogleFormUrl, isGoogleDocUrl, isValidResourceUrl, toEmbedUrl,
 } from "./test-resource";
 
 const FORM = "https://docs.google.com/forms/d/e/1FAIpQLSc/viewform";
@@ -72,5 +72,38 @@ describe("toEmbedUrl", () => {
   it("returns null on garbage or a mismatched format", () => {
     expect(toEmbedUrl("nonsense", "GOOGLE_DOC")).toBeNull();
     expect(toEmbedUrl(DOC, "GOOGLE_FORM")).toBeNull();
+  });
+});
+
+describe("Google Drive PDF links", () => {
+  const ID = "1AbCdEfGhIjKlMnOpQrStUv";
+  const SHARE = `https://drive.google.com/file/d/${ID}/view?usp=sharing`;
+
+  it("reads the file id from the links Drive hands out", () => {
+    expect(driveFileId(SHARE)).toBe(ID);
+    expect(driveFileId(`https://drive.google.com/file/d/${ID}`)).toBe(ID);
+    expect(driveFileId(`https://drive.google.com/open?id=${ID}`)).toBe(ID);
+    expect(driveFileId(`https://drive.google.com/uc?id=${ID}&export=download`)).toBe(ID);
+  });
+
+  it.each([
+    "",
+    "not a url",
+    `http://drive.google.com/file/d/${ID}/view`,
+    `https://evil.com/file/d/${ID}/view`,
+    `https://drive.google.com.evil.com/file/d/${ID}/view`,
+    "https://drive.google.com/drive/folders/1AbCdEfGhIjKlMnOp",
+    "https://drive.google.com/file/d/short/view",
+  ])("rejects %j", (u) => expect(driveFileId(u)).toBeNull());
+
+  it("is the only link a PDF test accepts", () => {
+    expect(isValidResourceUrl(SHARE, "PDF")).toBe(true);
+    expect(isValidResourceUrl(DOC, "PDF")).toBe(false);
+    expect(isValidResourceUrl(SHARE, "GOOGLE_DOC")).toBe(false);
+  });
+
+  it("embeds through Drive's preview viewer, dropping the sharing query", () => {
+    expect(toEmbedUrl(SHARE, "PDF")).toBe(`https://drive.google.com/file/d/${ID}/preview`);
+    expect(toEmbedUrl(DOC, "PDF")).toBeNull();
   });
 });

@@ -5,7 +5,6 @@ import { Footer } from "@/components/Footer";
 import { NoteCard, type NoteCardData } from "@/components/student/NoteCard";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { getStudentClassrooms, getVisibleNotes } from "@/lib/note-access";
-import { isPdf } from "@/lib/notes";
 import { BookOpen, FileText, Users } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -27,7 +26,6 @@ export default async function StudentNotesPage() {
     linkUrl: note.linkUrl,
     publishedAt: note.publishedAt,
     fileCount: note.files.length,
-    imageCount: note.files.filter((f) => !isPdf(f.format)).length,
     classroomNames: note.classrooms.map((link) => link.classroom.name),
   }));
 

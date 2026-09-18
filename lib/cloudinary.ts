@@ -103,11 +103,8 @@ export function signedAnswerUrl(
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Signs a direct browser upload of note files, pinned to one note's folder.
- *
- * The same signature serves both Cloudinary endpoints: `resource_type` lives
- * in the URL path, not in the signed parameters, so photos can go to /image
- * and PDFs to /raw without a second round trip for another signature.
+ * Signs a direct browser upload of note photos, pinned to one note's folder.
+ * PDFs are never uploaded; a note shares one as a Google Drive link.
  */
 export function signNoteUpload(folder: string): UploadSignature | null {
   return signAnswerUpload(folder);
@@ -126,9 +123,6 @@ export interface StoredNoteFile {
  * Note files are uploaded as `authenticated`, exactly like answer sheets, so
  * a link that leaks is the only way in -- and these links are minted per
  * request for a student the note is actually shared with.
- *
- * Photos only. A PDF's CDN link is refused whenever the account blocks PDF
- * delivery, so PDFs go through `fetchNoteFile` instead.
  */
 export function signedNoteUrl(
   file: StoredNoteFile,
@@ -152,25 +146,6 @@ export function signedNoteUrl(
         }
       : {}),
   });
-}
-
-/**
- * Reads a stored note file through Cloudinary's download API.
- *
- * Unlike a CDN link, the API is not subject to the account's PDF delivery
- * block. It is signed with the API secret and expires in a minute, and it is
- * only ever requested by the server, so the address never reaches a browser.
- * Null when Cloudinary is not configured.
- */
-export async function fetchNoteFile(file: StoredNoteFile): Promise<Response | null> {
-  const c = getCloudinary();
-  if (!c) return null;
-  const url = c.cloudinary.utils.private_download_url(file.publicId, "", {
-    resource_type: file.resourceType === "raw" ? "raw" : "image",
-    type: ANSWER_DELIVERY_TYPE,
-    expires_at: Math.floor(Date.now() / 1000) + 60,
-  });
-  return fetch(url, { cache: "no-store" });
 }
 
 /**

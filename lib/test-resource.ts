@@ -4,9 +4,8 @@
  * Three shapes are supported:
  *   GOOGLE_FORM - answered online, inside the form.
  *   GOOGLE_DOC  - a written paper: read it, answer on paper, send it back.
- *   PDF         - a written paper the tutor uploaded (see question-paper.ts).
- *                 It has no URL to convert, so the functions below that take
- *                 a URL deal only in the two Google formats.
+ *   PDF         - a written paper shared as a PDF on Google Drive. PDFs are
+ *                 linked, never uploaded: the portal stores no copy.
  *
  * Google serves different URLs for viewing and for embedding, and the viewing
  * URL refuses to render in an iframe. The conversions below are what make an
@@ -53,8 +52,30 @@ export function isGoogleDocUrl(url: string): boolean {
   }
 }
 
+/**
+ * The file id in a Google Drive file link, or null. Drive hands out
+ * drive.google.com/file/d/<id>/view links from "Share", and older
+ * open?id=<id> / uc?id=<id> ones still circulate.
+ */
+export function driveFileId(url: string): string | null {
+  try {
+    const u = new URL(url.trim());
+    if (u.protocol !== "https:" || u.hostname !== "drive.google.com") return null;
+    const fromPath = u.pathname.match(/^\/file\/d\/([\w-]{10,})(?:\/|$)/);
+    const id = fromPath?.[1] ?? (/^\/(open|uc)\/?$/.test(u.pathname) ? u.searchParams.get("id") : null);
+    return id && /^[\w-]{10,}$/.test(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Accepts a Google Drive file link, which is how a PDF paper is shared. */
+export function isDriveFileUrl(url: string): boolean {
+  return driveFileId(url) !== null;
+}
+
 export function isValidResourceUrl(url: string, format: TestFormat): boolean {
-  if (format === "PDF") return false;
+  if (format === "PDF") return isDriveFileUrl(url);
   return format === "GOOGLE_FORM" ? isGoogleFormUrl(url) : isGoogleDocUrl(url);
 }
 
@@ -63,7 +84,11 @@ export function isValidResourceUrl(url: string, format: TestFormat): boolean {
  * (a forms.gle shortlink, for instance), so callers can fall back to a button.
  */
 export function toEmbedUrl(url: string, format: TestFormat): string | null {
-  if (format === "PDF") return null;
+  if (format === "PDF") {
+    // Drive's own viewer, which renders the PDF on phones too.
+    const id = driveFileId(url);
+    return id ? `https://drive.google.com/file/d/${id}/preview` : null;
+  }
   let u: URL;
   try {
     u = new URL(url.trim());
@@ -93,5 +118,5 @@ export function toEmbedUrl(url: string, format: TestFormat): string | null {
 export const FORMAT_LABELS: Record<TestFormat, string> = {
   GOOGLE_FORM: "Google Form (answered online)",
   GOOGLE_DOC: "Google Doc (written paper)",
-  PDF: "PDF (written paper)",
+  PDF: "PDF link (written paper)",
 };

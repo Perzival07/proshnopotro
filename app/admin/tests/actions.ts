@@ -10,19 +10,8 @@ import {
   type TestFormat,
 } from "@/lib/test-resource";
 import { parseDurationMinutes } from "@/lib/exam-timer";
-import {
-  destroyNoteFile,
-  signAnswerUpload,
-  type UploadSignature,
-} from "@/lib/cloudinary";
-import {
-  NO_PAPER,
-  PAPER_FOLDER,
-  paperFile,
-  toPaperColumns,
-  validateUploadedPaper,
-  type UploadedPaper,
-} from "@/lib/question-paper";
+import { destroyNoteFile } from "@/lib/cloudinary";
+import { NO_PAPER, paperFile } from "@/lib/question-paper";
 
 export interface TestInput {
   title: string;
@@ -31,8 +20,6 @@ export interface TestInput {
   iconName: string;
   format: TestFormat;
   formUrl: string;
-  /** The uploaded question paper, for a PDF test. Ignored for the others. */
-  paper?: UploadedPaper | null;
   /** Minutes the student gets once they open the paper. Blank/null = untimed. */
   durationMinutes?: number | string | null;
   proctored?: boolean;
@@ -50,15 +37,15 @@ function validateTestInput(data: TestInput): string | null {
   const duration = parseDurationMinutes(data.durationMinutes);
   if (duration.error) return duration.error;
 
-  if (data.format === "PDF") return validateUploadedPaper(data.paper);
-
   if (!data.formUrl.trim()) {
     return "The question paper URL is required.";
   }
   if (!isValidResourceUrl(data.formUrl, data.format)) {
     return data.format === "GOOGLE_FORM"
       ? "That does not look like a Google Form link (expected docs.google.com/forms/... or forms.gle/...)."
-      : "That does not look like a Google Doc link (expected docs.google.com/document/...).";
+      : data.format === "PDF"
+        ? "That does not look like a Google Drive file link (expected drive.google.com/file/d/...). Upload the PDF to Drive and paste its share link."
+        : "That does not look like a Google Doc link (expected docs.google.com/document/...).";
   }
   // The paper is shown inside the portal and nowhere else, so a link that
   // cannot be embedded would leave the student with nothing to open.
@@ -70,47 +57,10 @@ function validateTestInput(data: TestInput): string | null {
   return null;
 }
 
-/** Where the question paper is, in database columns: a URL or an upload. */
-function paperSource(data: TestInput) {
-  return data.format === "PDF" && data.paper
-    ? { formUrl: "", ...toPaperColumns(data.paper) }
-    : { formUrl: data.formUrl.trim(), ...NO_PAPER };
-}
-
 /**
- * A short-lived permission to upload a question paper PDF straight to
- * Cloudinary. The browser compresses the file first.
- */
-export async function getPaperUploadSignature(): Promise<{
-  upload?: UploadSignature;
-  error?: string;
-}> {
-  await requireAdmin();
-  const upload = signAnswerUpload(PAPER_FOLDER);
-  if (!upload) {
-    console.error(
-      "Cloudinary is not configured: set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET."
-    );
-    return { error: "File uploads are not set up yet. Check the Cloudinary keys." };
-  }
-  return { upload };
-}
-
-/** Where the tutor can check the paper that is on a test. */
-export async function getPaperPreviewUrl(testId: string): Promise<{ url?: string; error?: string }> {
-  await requireAdmin();
-  const test = await prisma.test.findUnique({
-    where: { id: testId },
-    select: { paperPublicId: true, paperVersion: true },
-  });
-  return test && paperFile(test)
-    ? { url: `/admin/tests/${encodeURIComponent(testId)}/paper` }
-    : { error: "This test has no PDF paper to open." };
-}
-
-/**
- * Removes a paper that is no longer on any test. Best effort, like note
- * files: a leftover file nobody has a link to must not block saving the test.
+ * Removes a PDF that was uploaded to a test before papers became links-only.
+ * Best effort, like note files: a leftover file nobody has a link to must not
+ * block saving the test.
  */
 async function discardPaper(paper: { paperPublicId: string | null; paperVersion: number | null }) {
   const file = paperFile(paper);
@@ -131,7 +81,7 @@ export async function createTest(data: TestInput) {
         description: data.description?.trim() || null,
         iconName: data.iconName || "BookOpen",
         format: data.format,
-        ...paperSource(data),
+        formUrl: data.formUrl.trim(),
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         proctored: data.proctored ?? true,
         active: data.active ?? true,
@@ -159,7 +109,6 @@ export async function updateTest(id: string, data: TestInput) {
       where: { id },
       select: { paperPublicId: true, paperVersion: true },
     });
-    const source = paperSource(data);
 
     await prisma.test.update({
       where: { id },
@@ -169,17 +118,16 @@ export async function updateTest(id: string, data: TestInput) {
         description: data.description?.trim() || null,
         iconName: data.iconName || "BookOpen",
         format: data.format,
-        ...source,
+        formUrl: data.formUrl.trim(),
+        // Papers are links now; an older uploaded file is dropped.
+        ...NO_PAPER,
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         proctored: data.proctored ?? true,
         active: data.active ?? true,
       },
     });
 
-    // Replaced, or the test moved to a Google link: the old file is orphaned.
-    if (previous?.paperPublicId && previous.paperPublicId !== source.paperPublicId) {
-      await discardPaper(previous);
-    }
+    if (previous?.paperPublicId) await discardPaper(previous);
 
     revalidatePath("/admin/tests");
     revalidatePath("/admin/assign");

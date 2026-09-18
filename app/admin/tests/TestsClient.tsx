@@ -43,10 +43,6 @@ interface TestItem {
   iconName: string;
   format: TestFormat;
   formUrl: string;
-  paperPublicId: string | null;
-  paperVersion: number | null;
-  paperName: string | null;
-  paperBytes: number | null;
   durationMinutes: number | null;
   proctored: boolean;
   active: boolean;

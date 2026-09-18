@@ -7,13 +7,11 @@ import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { getVisibleNote } from "@/lib/note-access";
 import { signedNoteUrl } from "@/lib/cloudinary";
-import { formatBytes, isPdf, noteFileHref } from "@/lib/notes";
+import { toEmbedUrl } from "@/lib/test-resource";
 import { formatDate } from "@/lib/utils";
 import {
   ArrowLeft,
-  Download,
   ExternalLink,
-  FileText,
   ImageOff,
   Users,
 } from "lucide-react";
@@ -35,23 +33,17 @@ export default async function StudentNotePage({
 
   // Photo links are minted per request and only for a student the note is
   // shared with, so nothing openable is ever baked into the page for anyone
-  // else. PDFs go through the portal's own file route, which checks the same.
-  const files = note.files.map((file) => {
-    const pdf = isPdf(file.format);
-    return {
-      id: file.id,
-      name: file.originalName,
-      format: file.format,
-      bytes: file.bytes,
-      isPdf: pdf,
-      url: pdf ? noteFileHref(note.id, file.id) : signedNoteUrl(file),
-      thumbUrl: pdf ? null : signedNoteUrl(file, { width: 600 }),
-      downloadUrl: pdf ? noteFileHref(note.id, file.id, { download: true }) : null,
-    };
-  });
+  // else.
+  const images = note.files.map((file) => ({
+    id: file.id,
+    name: file.originalName,
+    url: signedNoteUrl(file),
+    thumbUrl: signedNoteUrl(file, { width: 600 }),
+  }));
 
-  const images = files.filter((f) => !f.isPdf);
-  const documents = files.filter((f) => f.isPdf);
+  // A PDF is shared as a Google Drive link rather than uploaded; Drive's own
+  // viewer shows it here, on phones too, so the student need not leave.
+  const pdfPreviewUrl = note.linkUrl ? toEmbedUrl(note.linkUrl, "PDF") : null;
 
   return (
     <div className="flex min-h-screen flex-col justify-between bg-brand-page">
@@ -109,68 +101,32 @@ export default async function StudentNotePage({
               className="mt-4 inline-flex items-center gap-2 rounded-lg border border-brand-border bg-white px-4 py-2.5 text-xs font-semibold text-brand-navy shadow-xs transition-colors hover:bg-brand-tint"
             >
               <ExternalLink className="h-4 w-4 text-brand-blue" />
-              Open the linked material
+              {pdfPreviewUrl ? "Open the PDF in Google Drive" : "Open the linked material"}
             </a>
           )}
         </header>
 
-        {files.length === 0 && !note.linkUrl && (
+        {pdfPreviewUrl && (
+          <section className="mt-8">
+            <h2 className="mb-3 font-heading text-sm font-semibold text-brand-navy">PDF</h2>
+            <iframe
+              src={pdfPreviewUrl}
+              title={`${note.title} (PDF)`}
+              className="h-[70dvh] w-full rounded-xl border border-brand-border bg-white"
+              loading="lazy"
+              referrerPolicy="no-referrer"
+              allow="autoplay"
+            />
+          </section>
+        )}
+
+        {images.length === 0 && !note.linkUrl && (
           <div className="mt-8 rounded-xl border border-dashed border-brand-border bg-white p-10 text-center">
             <ImageOff className="mx-auto h-8 w-8 text-brand-ink/40" />
             <p className="mt-3 text-xs text-brand-ink/70">
               There are no files in these notes yet.
             </p>
           </div>
-        )}
-
-        {documents.length > 0 && (
-          <section className="mt-8">
-            <h2 className="mb-3 font-heading text-sm font-semibold text-brand-navy">
-              Documents ({documents.length})
-            </h2>
-            <ul className="space-y-2">
-              {documents.map((file) => (
-                <li
-                  key={file.id}
-                  className="flex items-center gap-3 rounded-xl border border-brand-border bg-white p-4 shadow-xs"
-                >
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-tint">
-                    <FileText className="h-5 w-5 text-brand-navy" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-semibold text-brand-navy">
-                      {file.name}
-                    </p>
-                    <p className="mt-0.5 text-[11px] uppercase text-brand-ink/55">
-                      {file.format}
-                      {file.bytes ? ` · ${formatBytes(file.bytes)}` : ""}
-                    </p>
-                  </div>
-                  {file.url && (
-                    <a
-                      href={file.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 rounded-lg bg-brand-navy px-3 py-2 text-[11px] font-semibold text-white transition-colors hover:bg-brand-navy/90"
-                    >
-                      Open
-                    </a>
-                  )}
-                  {file.downloadUrl && (
-                    <a
-                      href={file.downloadUrl}
-                      // The file route answers ?download=1 with an attachment
-                      // header, which saves under the tutor's file name.
-                      className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-brand-border text-brand-navy transition-colors hover:bg-brand-tint"
-                      aria-label={`Download ${file.name}`}
-                    >
-                      <Download className="h-4 w-4" />
-                    </a>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </section>
         )}
 
         {images.length > 0 && (

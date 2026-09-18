@@ -249,7 +249,7 @@ export function NotesClient({ notes, classrooms, students }: NotesClientProps) {
           </h2>
           <p className="mx-auto mt-1 max-w-md text-xs text-brand-ink/70">
             {notes.length === 0
-              ? "Upload a scanned worksheet, a photo of the board or a PDF, choose a classroom, and publish it."
+              ? "Upload a photo of the board or a scanned worksheet, or link a PDF from Google Drive, choose a classroom, and publish it."
               : "Try another search, or a different state."}
           </p>
         </div>

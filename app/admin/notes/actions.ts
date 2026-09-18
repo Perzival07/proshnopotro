@@ -8,10 +8,8 @@ import {
   isAllowedNoteFormat,
   isInNoteFolder,
   MAX_NOTE_FILES,
-  noteFileHref,
   noteFolder,
   publishBlocker,
-  resourceTypeFor,
   validateNote,
   type NoteInput,
 } from "@/lib/notes";
@@ -268,15 +266,14 @@ export interface NoteFileView {
   resourceType: string;
   bytes: number | null;
   position: number;
-  /** Link to the file itself: signed for photos, the portal's file route for PDFs. */
+  /** Signed link to the photo itself. */
   url: string | null;
-  /** Signed link to a small preview, for images only. */
+  /** Signed link to a small preview. */
   thumbUrl: string | null;
 }
 
 function toFileView(file: {
   id: string;
-  noteId: string;
   originalName: string;
   format: string;
   resourceType: string;
@@ -285,7 +282,6 @@ function toFileView(file: {
   publicId: string;
   version: number;
 }): NoteFileView {
-  const isRaw = file.resourceType === "raw";
   return {
     id: file.id,
     originalName: file.originalName,
@@ -293,8 +289,8 @@ function toFileView(file: {
     resourceType: file.resourceType,
     bytes: file.bytes,
     position: file.position,
-    url: isRaw ? noteFileHref(file.noteId, file.id) : signedNoteUrl(file),
-    thumbUrl: isRaw ? null : signedNoteUrl(file, { width: 400 }),
+    url: signedNoteUrl(file),
+    thumbUrl: signedNoteUrl(file, { width: 400 }),
   };
 }
 
@@ -338,6 +334,9 @@ export async function saveNoteFiles(
   }
 
   for (const upload of uploads) {
+    if (typeof upload?.format === "string" && /^\.?pdf$/i.test(upload.format.trim())) {
+      return { error: "PDFs cannot be uploaded. Share the PDF from Google Drive in the link field." };
+    }
     if (
       typeof upload?.publicId !== "string" ||
       !isInNoteFolder(upload.publicId, noteId) ||
@@ -368,7 +367,7 @@ export async function saveNoteFiles(
         publicId: upload.publicId,
         version: upload.version,
         format: upload.format.toLowerCase().replace(/^\./, ""),
-        resourceType: resourceTypeFor(upload.format),
+        resourceType: "image",
         originalName: cleanFileName(upload.originalName),
         bytes: toInt(upload.bytes),
         width: toInt(upload.width),
