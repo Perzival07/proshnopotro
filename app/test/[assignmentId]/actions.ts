@@ -745,3 +745,48 @@ export async function closeAnswerUpload(
   revalidatePath("/admin/roster");
   return { success: true };
 }
+
+/** The most one report can add to one question: an idle tab should not count. */
+const MAX_TIME_REPORT_MS = 10 * 60_000;
+
+/**
+ * Adds time the student spent on questions (the page reports it every few
+ * seconds and before submitting). Only while the attempt is open, only for
+ * this paper's questions, and never more than MAX_TIME_REPORT_MS at once.
+ */
+export async function recordQuestionTime(
+  assignmentId: string,
+  entries: Record<string, number>
+): Promise<{ success?: true; error?: string }> {
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) return { error: "Signed out." };
+  const ids = Object.keys(entries).slice(0, 300);
+  if (ids.length === 0) return { success: true };
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: { test: { select: { id: true, durationMinutes: true } }, result: true },
+  });
+  if (!assignment || assignment.studentEmail.toLowerCase() !== sessionUser.email.trim().toLowerCase()) {
+    return { error: "Unauthorized." };
+  }
+  if (!assignment.startedAt || isAssignmentSubmitted(assignment)) return { success: true };
+  if (isTimeUp(assignment, new Date(Date.now() - LATE_SAVE_GRACE_MS))) return { success: true };
+
+  const questions = await prisma.question.findMany({
+    where: { id: { in: ids }, section: { testId: assignment.test.id } },
+    select: { id: true },
+  });
+  const ops = questions
+    .map((q) => ({ id: q.id, ms: Math.round(Number(entries[q.id])) }))
+    .filter((e) => Number.isFinite(e.ms) && e.ms > 0)
+    .map((e) =>
+      prisma.questionResponse.upsert({
+        where: { assignmentId_questionId: { assignmentId, questionId: e.id } },
+        create: { assignmentId, questionId: e.id, value: Prisma.JsonNull, timeSpentMs: Math.min(e.ms, MAX_TIME_REPORT_MS) },
+        update: { timeSpentMs: { increment: Math.min(e.ms, MAX_TIME_REPORT_MS) } },
+      })
+    );
+  if (ops.length) await prisma.$transaction(ops);
+  return { success: true };
+}

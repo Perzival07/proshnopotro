@@ -73,6 +73,8 @@ export interface ImportedQuestion {
   /** "Chapter: ..." and "Topic: ..." as written; the chapter is looked up later. */
   chapter: string | null;
   topic: string | null;
+  /** "Video: https://..." -- an explanation shown with the solution. */
+  videoUrl: string | null;
 }
 
 export interface ImportedSection {
@@ -106,6 +108,7 @@ const MARKS_EACH_RE = /\|\s*(\d+(?:\.\d+)?)\s*marks?(?:\s+each)?\s*$/i;
 const OR_RE = /^\(?\s*(?:OR|अथवा)\s*\)?$/i;
 const CHAPTER_RE = /^(?:Chapter|अध्याय)\s*[:.-]\s*(.+)$/i;
 const TOPIC_RE = /^(?:Topic|विषय)\s*[:.-]\s*(.+)$/i;
+const VIDEO_RE = /^(?:Video|वीडियो)\s*[:.-]\s*(https:\/\/\S+)\s*$/i;
 const SAME_NUMBER_RE = /^(?:Q(?:uestion)?|प्रश्न)?\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
 const COLUMN_OPTION_RE = /^\(?([P-Tp-t])[.)]\s+(.*)$/;
 const COLUMN_HEADER_RE = /^(?:Column|List)[\s-]*(I{1,2}|1|2)\b\s*[:.-]?\s*$/i;
@@ -191,6 +194,7 @@ interface Draft {
   choiceGroup: string | null;
   chapter: string | null;
   topic: string | null;
+  videoUrl: string | null;
 }
 
 function tagToType(tag: string): QuestionType {
@@ -377,6 +381,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         choiceGroup: d.choiceGroup,
         chapter: d.chapter,
         topic: d.topic,
+        videoUrl: d.videoUrl,
       });
       return;
     }
@@ -399,6 +404,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         choiceGroup: d.choiceGroup,
         chapter: d.chapter,
         topic: d.topic,
+        videoUrl: d.videoUrl,
       });
       return;
     }
@@ -516,6 +522,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       choiceGroup: d.choiceGroup,
       chapter: d.chapter,
       topic: d.topic,
+      videoUrl: d.videoUrl,
     });
   };
 
@@ -623,6 +630,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         // An alternative is usually on the same chapter; it can say otherwise.
         chapter: before.chapter,
         topic: before.topic,
+        videoUrl: null,
       };
       field = "stem";
       return;
@@ -675,6 +683,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         choiceGroup: null,
         chapter: null,
         topic: null,
+        videoUrl: null,
       };
       field = "stem";
       return;
@@ -709,6 +718,12 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
     const chapter = line.match(CHAPTER_RE);
     if (chapter) {
       d.chapter = chapter[1].trim();
+      field = null;
+      return;
+    }
+    const video = line.match(VIDEO_RE);
+    if (video) {
+      d.videoUrl = video[1];
       field = null;
       return;
     }
@@ -813,6 +828,7 @@ function keyToAnswer(key: AnswerKey): string {
 export function questionToText(
   question: Pick<ImportedQuestion, "type" | "stem" | "options" | "key" | "solution" | "rule"> & {
     columns?: ImportedOption[];
+    videoUrl?: string | null;
   },
   number = 1
 ): string {
@@ -837,5 +853,6 @@ export function questionToText(
     lines.push(`Marks: +${formatNumber(correct)} ${wrong <= 0 ? "-" : "+"}${formatNumber(Math.abs(wrong))}`);
   }
   if (question.solution) lines.push(`Solution: ${question.solution}`);
+  if (question.videoUrl) lines.push(`Video: ${question.videoUrl}`);
   return lines.join("\n");
 }

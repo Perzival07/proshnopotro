@@ -8,6 +8,9 @@ import { formatDate } from "@/lib/utils";
 import { parseTranslation } from "@/lib/translation";
 import { MarkedSheets } from "@/components/student/MarkedSheets";
 import { chapterBreakdown } from "@/lib/chapter-report";
+import { resultsVisible } from "@/lib/results-visibility";
+import { chapterVerdict, formatDuration, standing, summarizeAttempt } from "@/lib/analytics";
+import { videoEmbed } from "@/lib/video";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, PenLine, XCircle } from "lucide-react";
 
 const STATUS: Record<QuestionStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -37,11 +40,22 @@ function formatNumber(n: number) {
  * Marks are worked out afresh from the current key, the same way the stored
  * score is, so a corrected key shows here at once.
  */
+function Stat({ label, value, note }: { label: string; value: string; note: string }) {
+  return (
+    <div className="rounded-xl border border-brand-border bg-white p-3 shadow-card">
+      <p className="text-[10px] font-semibold uppercase tracking-wide text-brand-blue">{label}</p>
+      <p className="font-heading text-lg font-bold text-brand-navy">{value}</p>
+      <p className="text-[11px] text-brand-ink/60">{note}</p>
+    </div>
+  );
+}
+
 export async function PaperResult({ assignmentId }: { assignmentId: string }) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     select: {
       endedAt: true,
+      dueAt: true,
       autoSubmitted: true,
       feedback: true,
       returnedAt: true,
@@ -56,13 +70,13 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
           passages: { select: { id: true, content: true } },
         },
       },
-      responses: { select: { questionId: true, value: true, manualMarks: true, feedback: true } },
+      responses: { select: { questionId: true, value: true, manualMarks: true, feedback: true, timeSpentMs: true } },
     },
   });
   if (!assignment) return null;
 
   const { test } = assignment;
-  const visible = test.resultRelease === "INSTANT" || test.resultsReleasedAt !== null;
+  const visible = resultsVisible(test, assignment);
 
   if (!visible) {
     return (
@@ -71,7 +85,9 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
         <p className="font-heading text-base font-semibold text-brand-navy">Your answers are submitted</p>
         <p className="text-xs text-brand-ink/70">
           {assignment.endedAt ? `Submitted ${formatDate(assignment.endedAt)}. ` : ""}
-          Your tutor will release the results; your score and the solutions will appear here.
+          {test.resultRelease === "AFTER_DEADLINE"
+            ? `Your score, the solutions and any video explanations appear here after the deadline, ${formatDate(assignment.dueAt)}.`
+            : "Your tutor will release the results; your score and the solutions will appear here."}
         </p>
       </div>
     );
@@ -106,6 +122,32 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
     : new Map<string, { name: string; position: number }>();
   byChapter.sort(
     (a, b) => (a.chapterId ? chapterNames.get(a.chapterId)?.position ?? 999 : 1000) - (b.chapterId ? chapterNames.get(b.chapterId)?.position ?? 999 : 1000)
+  );
+
+  const summary = summarizeAttempt(marked);
+  const myTime = new Map(assignment.responses.map((r) => [r.questionId, r.timeSpentMs]));
+  const totalTime = assignment.responses.reduce((n, r) => n + r.timeSpentMs, 0);
+
+  // Rank among everyone who sat this paper. With written answers it waits
+  // until every copy has been returned, so an early rank cannot mislead.
+  const hasWritten = test.sections.some((s) => s.questions.some((q) => q.type === "SUBJECTIVE"));
+  const classmates = await prisma.assignment.findMany({
+    where: { testId: test.id, status: "SUBMITTED" },
+    select: { returnedAt: true, result: { select: { score: true } } },
+  });
+  const allReturned = classmates.every((c) => c.returnedAt !== null);
+  const scores = classmates.map((c) => c.result?.score).filter((s): s is number => typeof s === "number");
+  const place = (!hasWritten || allReturned) && scores.length > 1 ? standing(scores, marked.score) : null;
+
+  // The class's average time on each question, to set the student's beside.
+  const classTime = new Map(
+    (
+      await prisma.questionResponse.groupBy({
+        by: ["questionId"],
+        where: { assignment: { testId: test.id, status: "SUBMITTED" }, timeSpentMs: { gt: 0 } },
+        _avg: { timeSpentMs: true },
+      })
+    ).map((g) => [g.questionId, g._avg.timeSpentMs ?? 0])
   );
 
   const tally = { CORRECT: 0, PARTIAL: 0, WRONG: 0, UNATTEMPTED: 0, NOT_COUNTED: 0, PENDING: 0, MARKED: 0 } as Record<QuestionStatus, number>;
@@ -162,9 +204,36 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
         )}
       </div>
 
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {place && (
+          <Stat label="Rank" value={`${place.rank} of ${place.of}`} note={`${place.percentile} percentile`} />
+        )}
+        <Stat
+          label="Accuracy"
+          value={summary.accuracy === null ? "\u2014" : `${Math.round(summary.accuracy * 100)}%`}
+          note={`${summary.correct} right of ${summary.attempted} answered`}
+        />
+        {totalTime > 0 && <Stat label="Time spent" value={formatDuration(totalTime)} note="on the questions" />}
+        <Stat
+          label="Negative marking"
+          value={summary.negativeLost > 0 ? `\u2212${formatNumber(summary.negativeLost)}` : "0"}
+          note={summary.negativeLost > 0 ? `marks lost to ${summary.wrong} wrong ${summary.wrong === 1 ? "answer" : "answers"}` : "no marks lost"}
+        />
+      </div>
+
       {byChapter.length > 0 && (
         <div className="rounded-xl border border-brand-border bg-white p-5 shadow-card">
-          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-blue">By chapter</p>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-blue">Strengths and weaknesses, by chapter</p>
+          {(() => {
+            const weak = byChapter.filter((l) => l.chapterId && chapterVerdict(l.scored, l.max) === "weak");
+            return weak.length ? (
+              <p className="mb-3 text-xs text-brand-ink/70">
+                Work on: {weak.map((l) => chapterNames.get(l.chapterId!)?.name).filter(Boolean).join(", ")}.
+              </p>
+            ) : (
+              <p className="mb-3 text-xs text-brand-ink/70">No weak chapters on this paper.</p>
+            );
+          })()}
           <table className="w-full text-xs">
             <tbody>
               {byChapter.map((line) => {
@@ -184,6 +253,16 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                     </td>
                     <td className="w-20 py-1.5 text-right font-mono">
                       {formatNumber(line.scored)} / {formatNumber(line.max)}
+                    </td>
+                    <td className="w-20 py-1.5 pl-2 text-right text-[10px] font-semibold">
+                      {(() => {
+                        const v = chapterVerdict(line.scored, line.max);
+                        return v === "strong" ? (
+                          <span className="text-emerald-700">Strong</span>
+                        ) : v === "weak" ? (
+                          <span className="text-red-700">Needs work</span>
+                        ) : null;
+                      })()}
                     </td>
                   </tr>
                 );
@@ -241,6 +320,12 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                       {status.label}
                     </span>
                     <span className="font-mono text-xs font-semibold text-brand-ink/70">{signed(mark.marks)}</span>
+                    {(myTime.get(q.id) ?? 0) > 0 && (
+                      <span className="ml-auto text-[11px] text-brand-ink/60">
+                        {formatDuration(myTime.get(q.id)!)}
+                        {classTime.get(q.id) ? ` \u00b7 class average ${formatDuration(classTime.get(q.id)!)}` : ""}
+                      </span>
+                    )}
                     {q.bonus && <span className="text-[11px] font-semibold text-amber-700">Bonus question</span>}
                   </div>
 
@@ -368,8 +453,32 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
 
                   {q.solution && (
                     <details className="rounded-md border border-brand-border bg-brand-page px-3 py-2 text-sm">
-                      <summary className="cursor-pointer text-xs font-semibold text-brand-navy">Solution</summary>
+                      <summary className="cursor-pointer text-xs font-semibold text-brand-navy">
+                        {q.type === "SUBJECTIVE" ? "Model answer" : "Solution"}
+                      </summary>
                       <RichText text={q.solution} className="mt-2" />
+                    </details>
+                  )}
+                  {q.videoUrl && videoEmbed(q.videoUrl) && (
+                    <details className="rounded-md border border-brand-border bg-brand-page px-3 py-2 text-sm">
+                      <summary className="cursor-pointer text-xs font-semibold text-brand-navy">Video explanation</summary>
+                      {videoEmbed(q.videoUrl)!.embed ? (
+                        <div className="mt-2 aspect-video overflow-hidden rounded-md bg-black">
+                          <iframe
+                            src={videoEmbed(q.videoUrl)!.embed!}
+                            title={`Video explanation for question ${number}`}
+                            className="h-full w-full border-0"
+                            loading="lazy"
+                            allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen"
+                            allowFullScreen
+                            referrerPolicy="strict-origin-when-cross-origin"
+                          />
+                        </div>
+                      ) : (
+                        <a href={videoEmbed(q.videoUrl)!.href} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block text-xs font-semibold text-brand-blue underline">
+                          Watch the explanation
+                        </a>
+                      )}
                     </details>
                   )}
                 </div>

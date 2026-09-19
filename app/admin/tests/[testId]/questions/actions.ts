@@ -155,6 +155,7 @@ async function writePaper(
         choiceGroup: q.choiceGroup ? `${importToken}-${q.choiceGroup}` : null,
         chapterId: chapterIds.get(q) ?? null,
         topic: q.topic,
+        videoUrl: q.videoUrl,
       })),
     });
   }
@@ -264,6 +265,7 @@ export async function updateQuestion(questionId: string, text: string): Promise<
       // the tag set from the menu stays as it is.
       ...(q.chapter ? { chapterId: tagged.ids.get(q) ?? null } : {}),
       ...(q.topic ? { topic: q.topic } : {}),
+      videoUrl: q.videoUrl,
     },
   });
 

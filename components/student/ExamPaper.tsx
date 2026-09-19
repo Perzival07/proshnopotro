@@ -14,6 +14,7 @@ import { MatrixColumns } from "@/components/MatrixColumns";
 import { Calculator } from "@/components/student/Calculator";
 import { Button } from "@/components/ui/button";
 import {
+  recordQuestionTime,
   saveQuestionResponse,
   type StudentPaper,
 } from "@/app/test/[assignmentId]/actions";
@@ -202,10 +203,54 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
     [pump]
   );
 
+  // ── Time on each question ─────────────────────────────────
+  // Counted while the question is on screen and the page is visible, and
+  // sent every few seconds and before submitting, so a closed laptop loses
+  // at most the last few seconds.
+  const unsentTime = useRef<Record<string, number>>({});
+  const shownSince = useRef<{ id: string; at: number } | null>(null);
+  const noteTime = useCallback(() => {
+    const shown = shownSince.current;
+    if (!shown) return;
+    const now = Date.now();
+    unsentTime.current[shown.id] = (unsentTime.current[shown.id] ?? 0) + (now - shown.at);
+    shown.at = now;
+  }, []);
+  const sendTime = useCallback(async () => {
+    noteTime();
+    const batch = unsentTime.current;
+    if (Object.keys(batch).length === 0 || endedRef.current) return;
+    unsentTime.current = {};
+    try {
+      await recordQuestionTime(assignmentId, batch);
+    } catch {
+      // Put it back for the next try.
+      for (const [id, ms] of Object.entries(batch)) unsentTime.current[id] = (unsentTime.current[id] ?? 0) + ms;
+    }
+  }, [assignmentId, noteTime]);
+  const currentId = flat[current]?.question.id;
+  useEffect(() => {
+    noteTime();
+    shownSince.current = currentId && document.visibilityState === "visible" ? { id: currentId, at: Date.now() } : null;
+  }, [currentId, noteTime]);
+  useEffect(() => {
+    const onVisibility = () => {
+      noteTime();
+      shownSince.current = document.visibilityState === "visible" && currentId ? { id: currentId, at: Date.now() } : null;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const timer = window.setInterval(() => void sendTime(), 20_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(timer);
+    };
+  }, [currentId, noteTime, sendTime]);
+
   useImperativeHandle(
     ref,
     () => ({
       async flush() {
+        await sendTime();
         for (const [id, timer] of Array.from(typingTimers.current.entries())) {
           window.clearTimeout(timer);
           typingTimers.current.delete(id);
@@ -218,7 +263,7 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
         }
       },
     }),
-    [pump]
+    [pump, sendTime]
   );
 
   useEffect(

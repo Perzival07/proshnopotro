@@ -9,6 +9,7 @@ import { deriveCardStatus } from "@/lib/assignment-status";
 import { closeExpiredAttempts } from "@/lib/close-expired";
 import { attemptDeadline } from "@/lib/exam-timer";
 import { uploadState } from "@/lib/answer-upload";
+import { resultsVisible } from "@/lib/results-visibility";
 import { countVisibleNotes, getStudentClassrooms } from "@/lib/note-access";
 import { BookOpen, NotebookText, Users } from "lucide-react";
 import Link from "next/link";
@@ -59,7 +60,7 @@ export default async function StudentDashboardPage() {
     .map((a) => {
       const hidden =
         a.test.format === "QUESTIONS" &&
-        ((a.test.resultRelease === "ON_RELEASE" && !a.test.resultsReleasedAt) ||
+        (!resultsVisible(a.test, a) ||
           // A paper with written answers scores only once the copy is back.
           (a.test.sections.some((s) => s.questions.length > 0) && !a.returnedAt));
       return hidden ? { ...a, result: null } : a;

@@ -47,7 +47,7 @@ interface TestModalProps {
     durationMinutes: number | null;
     proctored: boolean;
     active: boolean;
-    resultRelease?: "INSTANT" | "ON_RELEASE";
+    resultRelease?: "INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE";
     answerSheets?: boolean;
     calculator?: boolean;
     board?: string | null;
@@ -63,7 +63,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const router = useRouter();
   const [mode, setMode] = useState<Mode>("LINK");
   const [schemePreset, setSchemePreset] = useState<SchemePreset>("JEE_MAIN");
-  const [resultRelease, setResultRelease] = useState<"INSTANT" | "ON_RELEASE">("ON_RELEASE");
+  const [resultRelease, setResultRelease] = useState<"INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE">("ON_RELEASE");
   const [answerSheets, setAnswerSheets] = useState(false);
   const [calculator, setCalculator] = useState(false);
   const [board, setBoard] = useState<string>("");
@@ -357,10 +357,11 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
 
               <div>
                 <Label className="text-xs font-semibold text-brand-navy">Show Students Their Results</Label>
-                <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   {(
                     [
                       { value: "ON_RELEASE" as const, title: "When I release them", hint: "Nobody sees answers while others are still writing" },
+                      { value: "AFTER_DEADLINE" as const, title: "After the deadline", hint: "Solutions and videos open when the test closes" },
                       { value: "INSTANT" as const, title: "Right after submitting", hint: "Score and solutions at once" },
                     ]
                   ).map((opt) => (

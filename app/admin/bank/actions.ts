@@ -135,6 +135,7 @@ async function copyQuestions<Q extends SourceQuestion>(
         choiceGroup,
         chapterId: q.chapterId,
         topic: q.topic,
+        videoUrl: q.videoUrl,
       },
     });
   }

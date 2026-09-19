@@ -50,7 +50,7 @@ interface TestItem {
   durationMinutes: number | null;
   proctored: boolean;
   active: boolean;
-  resultRelease: "INSTANT" | "ON_RELEASE";
+  resultRelease: "INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE";
   answerSheets: boolean;
   calculator: boolean;
   board: string | null;

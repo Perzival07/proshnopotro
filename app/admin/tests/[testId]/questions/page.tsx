@@ -71,6 +71,7 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       choiceGroup: q.choiceGroup,
       chapterId: q.chapterId,
       topic: q.topic,
+      videoUrl: q.videoUrl,
     })),
   }));
 

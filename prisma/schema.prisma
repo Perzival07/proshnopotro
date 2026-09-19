@@ -49,6 +49,8 @@ enum ResultRelease {
   INSTANT
   /// Once the tutor releases results for the whole test.
   ON_RELEASE
+  /// Once the student's deadline has passed, so nobody still writing sees them.
+  AFTER_DEADLINE
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -300,6 +302,8 @@ model Question {
   /// The syllabus chapter it tests, and a finer topic within it.
   chapterId   String?
   topic       String?
+  /// A video explanation (YouTube or Drive), shown with the solution.
+  videoUrl    String?
   /// The question in the test's second language: { stem, options, columns,
   /// solution }, as lib/translation.ts QuestionTranslation. Marked with the
   /// same key.
@@ -346,6 +350,8 @@ model QuestionResponse {
   /// Written answers: the marks the tutor gave, and a note for the student.
   manualMarks     Float?
   feedback        String?  @db.Text
+  /// How long the student had this question on screen, in milliseconds.
+  timeSpentMs     Int      @default(0)
   updatedAt       DateTime @updatedAt
 
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)

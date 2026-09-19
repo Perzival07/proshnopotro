@@ -24,7 +24,7 @@ export interface TestInput {
   /** QUESTIONS only: the marking scheme to start from when the test is created. */
   schemePreset?: SchemePreset;
   /** QUESTIONS only. */
-  resultRelease?: "INSTANT" | "ON_RELEASE";
+  resultRelease?: "INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE";
   /** Whether students upload photos of answer sheets after the paper. */
   answerSheets?: boolean;
   /** QUESTIONS only: show an on-screen calculator during the paper. */
@@ -96,7 +96,10 @@ function questionSettings(data: TestInput, format: TestFormat, creating: boolean
   if (format !== "QUESTIONS") return { answerSheets: data.answerSheets ?? true, ...upload };
   const preset = data.schemePreset && SCHEME_PRESETS[data.schemePreset] ? data.schemePreset : "JEE_MAIN";
   return {
-    resultRelease: data.resultRelease === "INSTANT" ? ("INSTANT" as const) : ("ON_RELEASE" as const),
+    resultRelease:
+      data.resultRelease === "INSTANT" || data.resultRelease === "AFTER_DEADLINE"
+        ? data.resultRelease
+        : ("ON_RELEASE" as const),
     answerSheets: data.answerSheets ?? false,
     calculator: data.calculator ?? false,
     board: data.board && (BOARDS as readonly string[]).includes(data.board) ? data.board : null,

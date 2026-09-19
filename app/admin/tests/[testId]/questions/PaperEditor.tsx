@@ -70,6 +70,7 @@ export interface EditorQuestion {
   choiceGroup: string | null;
   chapterId: string | null;
   topic: string | null;
+  videoUrl: string | null;
 }
 
 export interface EditorSection {
@@ -88,7 +89,7 @@ interface PaperEditorProps {
     id: string;
     title: string;
     subject: string;
-    resultRelease: "INSTANT" | "ON_RELEASE";
+    resultRelease: "INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE";
     released: boolean;
     assigned: number;
     started: number;
@@ -486,6 +487,7 @@ function ImportPanel({
             <li>No options means a typed answer: <code>Answer: 7</code> (integer), <code>Answer: 2.45 to 2.55</code> or <code>Answer: 2.5 ± 0.05</code> (decimal).</li>
             <li><code>Solution:</code> is optional. <code>Marks: +3 -1</code> gives one question its own marks.</li>
             <li>Instead of <code>Answer:</code> lines, end with <code>Answer key</code> and <code>1. B 2. A, C 3. 7</code>.</li>
+            <li><code>Video: https://youtu.be/...</code> adds a video explanation, shown with the solution (YouTube or Google Drive).</li>
             <li><code>Chapter: Laws of Motion</code> (or its number, <code>Chapter: 4</code>) and <code>Topic: Friction</code> tag a question, once the test has a board and class.</li>
             <li>A table is rows like <code>| (P) Force | (1) N |</code>.</li>
             <li><code>Paragraph:</code> starts a passage for the questions after it, until <code>End paragraph</code>.</li>
@@ -668,6 +670,7 @@ function QuestionCard({
               stem: question.stem,
               options: question.options,
               columns: question.columns,
+              videoUrl: question.videoUrl,
               key: question.key,
               solution: question.solution,
               rule:
@@ -777,6 +780,14 @@ function QuestionCard({
         marks={marksFor(scheme, question)}
         bonus={question.bonus}
       />
+      {question.videoUrl && (
+        <p className="mt-2 text-[11px]">
+          <span className="font-semibold text-brand-navy">Video explanation: </span>
+          <a href={question.videoUrl} target="_blank" rel="noopener noreferrer" className="break-all text-brand-blue underline">
+            {question.videoUrl}
+          </a>
+        </p>
+      )}
       {question.translation && language && (
         <div className="mt-3 space-y-2 rounded-md border border-dashed border-brand-blue/30 bg-brand-tint/30 p-2.5 text-sm">
           <p className="text-[11px] font-semibold text-brand-navy">{language}</p>
@@ -1298,6 +1309,22 @@ function ResultsCard({ test }: { test: PaperEditorProps["test"] }) {
       </p>
       {test.resultRelease === "INSTANT" ? (
         <p className="text-brand-ink/70">Students see their score and the solutions right after they submit.</p>
+      ) : test.resultRelease === "AFTER_DEADLINE" && !test.released ? (
+        <div className="space-y-2">
+          <p className="text-brand-ink/70">
+            Each student sees their score, the solutions and videos once their deadline has passed.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={busy}
+            className="h-8 text-xs"
+            onClick={() => void act(() => setResultsReleased(test.id, true), "Results released to everyone now.")}
+          >
+            Release to everyone now
+          </Button>
+        </div>
       ) : test.released ? (
         <div className="space-y-2">
           <p className="flex items-center gap-1.5 font-semibold text-emerald-700">
