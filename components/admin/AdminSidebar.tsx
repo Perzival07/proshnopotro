@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Library,
   ListTree,
+  Layers,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
@@ -25,6 +26,12 @@ export const NAV_ITEMS = [
     href: "/admin/tests",
     icon: FileText,
     description: "Create, edit & configure tests",
+  },
+  {
+    name: "Test Series",
+    href: "/admin/series",
+    icon: Layers,
+    description: "Group tests to track progress",
   },
   {
     name: "Question Bank",

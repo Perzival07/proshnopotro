@@ -67,6 +67,9 @@ model User {
   phone           String?
   className       String? // e.g. "Class 10", "Class 12"
   profileComplete Boolean   @default(false)
+  /// The secret in a student's read-only progress link for a parent. null =
+  /// no link; changing it cuts off the old link.
+  parentToken     String?   @unique
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
 
@@ -164,6 +167,10 @@ model Test {
   /// Bank papers: the year sat, and the exam's own name ("Board exam, Set 1").
   year              Int?
   examName          String?
+  /// The series this test belongs to (weekly tests, a test series), for
+  /// students' progress across it.
+  seriesId          String?
+  series            TestSeries?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
   /// Set when the tutor releases results. Only read for ON_RELEASE tests.
   resultsReleasedAt DateTime?
   createdAt       DateTime   @default(now())
@@ -174,6 +181,7 @@ model Test {
   passages    Passage[]
 
   @@index([bank])
+  @@index([seriesId])
 
   @@index([active])
 }
@@ -317,6 +325,17 @@ model Question {
 
   @@index([sectionId])
   @@index([chapterId])
+}
+
+/// A run of tests taken over time -- weekly tests, an all-India-style test
+/// series -- whose results students follow as one line of progress.
+model TestSeries {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  tests Test[]
 }
 
 /// One chapter of a board's syllabus for a class and subject, in book order.
