@@ -7,18 +7,22 @@
  *   PDF         - a written paper shared as a PDF on Google Drive. PDFs are
  *                 linked, never uploaded: the portal stores no copy.
  *
+ * A fourth kind of test, QUESTIONS, has no link at all: its questions are
+ * written in the portal (see lib/paper.ts).
+ *
  * Google serves different URLs for viewing and for embedding, and the viewing
  * URL refuses to render in an iframe. The conversions below are what make an
  * in-page preview possible at all.
  */
 
-export type TestFormat = "GOOGLE_FORM" | "GOOGLE_DOC" | "PDF";
+export type TestFormat = "GOOGLE_FORM" | "GOOGLE_DOC" | "PDF" | "QUESTIONS";
 
-export const TEST_FORMATS: readonly TestFormat[] = ["GOOGLE_FORM", "GOOGLE_DOC", "PDF"];
+/** The kinds of test delivered through a link. */
+export type LinkFormat = Exclude<TestFormat, "QUESTIONS">;
 
 /** A paper the student reads and answers on paper, rather than online. */
 export function isWrittenPaper(format: TestFormat): boolean {
-  return format !== "GOOGLE_FORM";
+  return format === "GOOGLE_DOC" || format === "PDF";
 }
 
 /** Accepts the URL shapes Google actually hands out for forms. */
@@ -79,14 +83,14 @@ export function isDriveFileUrl(url: string): boolean {
  * The tutor pastes one link and never picks a type: the link itself says
  * which it is, so the two can never disagree.
  */
-export function detectTestFormat(url: string): TestFormat | null {
+export function detectTestFormat(url: string): LinkFormat | null {
   if (isGoogleFormUrl(url)) return "GOOGLE_FORM";
   if (isGoogleDocUrl(url)) return "GOOGLE_DOC";
   if (isDriveFileUrl(url)) return "PDF";
   return null;
 }
 
-export function isValidResourceUrl(url: string, format: TestFormat): boolean {
+export function isValidResourceUrl(url: string, format: LinkFormat): boolean {
   if (format === "PDF") return isDriveFileUrl(url);
   return format === "GOOGLE_FORM" ? isGoogleFormUrl(url) : isGoogleDocUrl(url);
 }
@@ -96,6 +100,7 @@ export function isValidResourceUrl(url: string, format: TestFormat): boolean {
  * (a forms.gle shortlink, for instance), so callers can fall back to a button.
  */
 export function toEmbedUrl(url: string, format: TestFormat): string | null {
+  if (format === "QUESTIONS") return null;
   if (format === "PDF") {
     // Drive's own viewer, which renders the PDF on phones too.
     const id = driveFileId(url);
@@ -131,4 +136,5 @@ export const FORMAT_LABELS: Record<TestFormat, string> = {
   GOOGLE_FORM: "Google Form (answered online)",
   GOOGLE_DOC: "Google Doc (written paper)",
   PDF: "PDF link (written paper)",
+  QUESTIONS: "Questions in the portal (marked automatically)",
 };

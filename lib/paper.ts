@@ -1,0 +1,236 @@
+/**
+ * The bridge between stored questions and the marker, and between stored
+ * questions and what a student is allowed to see.
+ *
+ * Pure functions only: the database hands rows in, and nothing here reads or
+ * writes anything, so each rule can be tested on its own.
+ */
+
+import {
+  isAttempted,
+  QUESTION_TYPES,
+  SCHEME_PRESETS,
+  type AnswerKey,
+  type MarkableSection,
+  type MarkingScheme,
+  type MarkRule,
+  type QuestionType,
+  type ResponseValue,
+} from "./marking";
+
+export interface OptionRow {
+  id: string;
+  text: string;
+}
+
+/** A question row as stored, with the Json columns still untyped. */
+export interface QuestionRow {
+  id: string;
+  position: number;
+  type: QuestionType;
+  stem: string;
+  options: unknown;
+  answerKey: unknown;
+  solution: string | null;
+  marksCorrect: number | null;
+  marksWrong: number | null;
+  bonus: boolean;
+  passageId: string | null;
+}
+
+export interface SectionRow {
+  id: string;
+  title: string;
+  position: number;
+  instructions: string | null;
+  attemptLimit: number | null;
+  durationMinutes: number | null;
+  markingScheme: unknown;
+  questions: QuestionRow[];
+}
+
+const isNum = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v);
+
+function readRule(raw: unknown, fallback: MarkRule): MarkRule {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    correct: isNum(r.correct) ? r.correct : fallback.correct,
+    wrong: isNum(r.wrong) ? r.wrong : fallback.wrong,
+  };
+}
+
+/**
+ * A stored scheme, with anything missing or malformed filled in from the
+ * JEE Main preset rather than failing the whole paper.
+ */
+export function normalizeScheme(raw: unknown): MarkingScheme {
+  const base = SCHEME_PRESETS.JEE_MAIN.scheme;
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const multi = (r.MULTIPLE ?? {}) as Record<string, unknown>;
+  return {
+    SINGLE: readRule(r.SINGLE, base.SINGLE),
+    MULTIPLE: {
+      ...readRule(r.MULTIPLE, base.MULTIPLE),
+      partial: multi.partial === "PER_OPTION" ? "PER_OPTION" : "NONE",
+      partialPerOption: isNum(multi.partialPerOption) ? multi.partialPerOption : 0,
+    },
+    INTEGER: readRule(r.INTEGER, base.INTEGER),
+    DECIMAL: readRule(r.DECIMAL, base.DECIMAL),
+  };
+}
+
+/** A stored answer key, or null when it is not one this type can use. */
+export function parseAnswerKey(type: QuestionType, raw: unknown): AnswerKey | null {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  if (r.type !== type) return null;
+  switch (type) {
+    case "SINGLE":
+    case "MULTIPLE":
+      return Array.isArray(r.options) && r.options.length > 0 && r.options.every((o) => typeof o === "string")
+        ? { type, options: r.options as string[] }
+        : null;
+    case "INTEGER":
+      return Array.isArray(r.values) && r.values.length > 0 && r.values.every((v) => isNum(v) && Number.isInteger(v))
+        ? { type, values: r.values as number[] }
+        : null;
+    case "DECIMAL":
+      return isNum(r.min) && isNum(r.max) && r.min <= r.max ? { type, min: r.min, max: r.max } : null;
+  }
+}
+
+export function parseOptions(raw: unknown): OptionRow[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(
+    (o): o is OptionRow =>
+      !!o && typeof (o as OptionRow).id === "string" && typeof (o as OptionRow).text === "string"
+  );
+}
+
+const byPosition = <T extends { position: number }>(a: T, b: T) => a.position - b.position;
+
+/**
+ * The paper in the marker's shape. A question whose stored key cannot be read
+ * is marked as a bonus rather than wrongly: a broken key must never cost a
+ * student marks.
+ */
+export function toMarkableSections(
+  sections: SectionRow[],
+  testScheme: MarkingScheme
+): MarkableSection[] {
+  return [...sections].sort(byPosition).map((section) => ({
+    id: section.id,
+    attemptLimit: section.attemptLimit,
+    scheme: section.markingScheme ? normalizeScheme(section.markingScheme) : testScheme,
+    questions: [...section.questions].sort(byPosition).map((q) => {
+      const key = parseAnswerKey(q.type, q.answerKey);
+      return {
+        id: q.id,
+        key: key ?? { type: "SINGLE", options: [] },
+        rule:
+          q.marksCorrect !== null || q.marksWrong !== null
+            ? { correct: q.marksCorrect ?? undefined, wrong: q.marksWrong ?? undefined }
+            : null,
+        bonus: q.bonus || key === null,
+      };
+    }),
+  }));
+}
+
+export interface StudentQuestion {
+  id: string;
+  number: number;
+  type: QuestionType;
+  stem: string;
+  options: OptionRow[];
+  passageId: string | null;
+  marks: { correct: number; wrong: number };
+}
+
+export interface StudentSection {
+  id: string;
+  title: string;
+  instructions: string | null;
+  attemptLimit: number | null;
+  questions: StudentQuestion[];
+}
+
+/**
+ * The paper as a student may see it while writing: no answer keys, no
+ * solutions, nothing that would give an answer away. Questions are numbered
+ * straight through the paper, as on the real exam.
+ */
+export function toStudentPaper(sections: SectionRow[], testScheme: MarkingScheme): StudentSection[] {
+  let number = 0;
+  return [...sections].sort(byPosition).map((section) => {
+    const scheme = section.markingScheme ? normalizeScheme(section.markingScheme) : testScheme;
+    return {
+      id: section.id,
+      title: section.title,
+      instructions: section.instructions,
+      attemptLimit: section.attemptLimit,
+      questions: [...section.questions].sort(byPosition).map((q) => ({
+        id: q.id,
+        number: ++number,
+        type: q.type,
+        stem: q.stem,
+        options: parseOptions(q.options),
+        passageId: q.passageId,
+        marks: {
+          correct: q.marksCorrect ?? scheme[q.type].correct,
+          wrong: q.marksWrong ?? scheme[q.type].wrong,
+        },
+      })),
+    };
+  });
+}
+
+export type ResponseCheck = { ok: true; value: ResponseValue } | { ok: false; error: string };
+
+/**
+ * Checks what the browser sent for one question before it is saved. Only the
+ * shape is checked here -- whether it is right is the marker's business, and
+ * only after the paper closes.
+ */
+export function checkResponse(
+  type: QuestionType,
+  optionIds: string[],
+  raw: unknown
+): ResponseCheck {
+  if (raw === null || raw === undefined || raw === "") return { ok: true, value: null };
+  if (!QUESTION_TYPES.includes(type)) return { ok: false, error: "Unknown question type." };
+
+  if (type === "SINGLE") {
+    return typeof raw === "string" && optionIds.includes(raw)
+      ? { ok: true, value: raw }
+      : { ok: false, error: "Choose one of the options." };
+  }
+  if (type === "MULTIPLE") {
+    if (!Array.isArray(raw) || !raw.every((o) => typeof o === "string" && optionIds.includes(o))) {
+      return { ok: false, error: "Choose from the options given." };
+    }
+    const chosen = Array.from(new Set(raw as string[])).sort();
+    return { ok: true, value: chosen.length > 0 ? chosen : null };
+  }
+  // INTEGER / DECIMAL: kept as typed; the marker reads the number.
+  if (typeof raw !== "string" || raw.length > 20 || !/^[\d.\-\s]*$/.test(raw)) {
+    return { ok: false, error: "Enter a number." };
+  }
+  const trimmed = raw.trim();
+  return { ok: true, value: trimmed === "" ? null : trimmed };
+}
+
+/**
+ * Whether a student may put an answer to this question in a section with an
+ * "attempt any N" limit. Changing an answer they already gave is always fine;
+ * a new one is refused once N are answered.
+ */
+export function withinAttemptLimit(
+  attemptLimit: number | null,
+  answeredInSection: number,
+  alreadyAnswered: boolean
+): boolean {
+  if (!attemptLimit || attemptLimit <= 0 || alreadyAnswered) return true;
+  return answeredInSection < attemptLimit;
+}
+
+export { isAttempted };

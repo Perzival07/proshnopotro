@@ -4,6 +4,8 @@ import type { UploadSignature } from "./cloudinary";
 export interface CloudinaryUploadResult {
   public_id: string;
   version: number;
+  /** The public https address, for files uploaded with type "upload". */
+  secure_url?: string;
   bytes?: number;
   width?: number;
   height?: number;

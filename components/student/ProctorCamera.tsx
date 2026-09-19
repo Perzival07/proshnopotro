@@ -120,7 +120,7 @@ export function ProctorCameraBadge({
   const live = status === "on";
 
   return (
-    <div className="fixed bottom-3 right-3 z-[55] w-40 overflow-hidden rounded-xl border border-brand-border bg-white shadow-lg sm:w-44">
+    <div className="fixed bottom-3 right-3 z-[55] w-28 overflow-hidden rounded-xl border border-brand-border bg-white shadow-lg sm:w-44">
       <div className="relative aspect-[4/3] bg-brand-navy">
         {live ? (
           <video

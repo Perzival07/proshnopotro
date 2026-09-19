@@ -4,6 +4,7 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
+import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
 import { parseDurationMinutes } from "@/lib/exam-timer";
 import { destroyNoteFile } from "@/lib/cloudinary";
 import { NO_PAPER, paperFile } from "@/lib/question-paper";
@@ -13,8 +14,16 @@ export interface TestInput {
   subject: string;
   description?: string;
   iconName: string;
-  /** The question paper link. Its type is worked out from the link itself. */
+  /** A paper behind a link, or questions written in the portal. */
+  mode?: "LINK" | "QUESTIONS";
+  /** LINK only: the question paper link. Its type is worked out from the link itself. */
   formUrl: string;
+  /** QUESTIONS only: the marking scheme to start from when the test is created. */
+  schemePreset?: SchemePreset;
+  /** QUESTIONS only. */
+  resultRelease?: "INSTANT" | "ON_RELEASE";
+  /** Whether students upload photos of answer sheets after the paper. */
+  answerSheets?: boolean;
   /** Minutes the student gets once they open the paper. Blank/null = untimed. */
   durationMinutes?: number | string | null;
   proctored?: boolean;
@@ -31,6 +40,9 @@ function validateTestInput(data: TestInput): { error: string } | { format: TestF
   }
   const duration = parseDurationMinutes(data.durationMinutes);
   if (duration.error) return { error: duration.error };
+
+  // A paper written in the portal has no link to check.
+  if (data.mode === "QUESTIONS") return { format: "QUESTIONS" };
 
   if (!data.formUrl.trim()) {
     return { error: "The question paper link is required." };
@@ -53,6 +65,21 @@ function validateTestInput(data: TestInput): { error: string } | { format: TestF
     };
   }
   return { format };
+}
+
+/**
+ * The settings that only mean something for questions written in the portal.
+ * The marking scheme is only seeded on create; after that it is edited on the
+ * paper's own page, where changing it re-marks attempts.
+ */
+function questionSettings(data: TestInput, format: TestFormat, creating: boolean) {
+  if (format !== "QUESTIONS") return { answerSheets: data.answerSheets ?? true };
+  const preset = data.schemePreset && SCHEME_PRESETS[data.schemePreset] ? data.schemePreset : "JEE_MAIN";
+  return {
+    resultRelease: data.resultRelease === "INSTANT" ? ("INSTANT" as const) : ("ON_RELEASE" as const),
+    answerSheets: data.answerSheets ?? false,
+    ...(creating ? { markingScheme: JSON.parse(JSON.stringify(SCHEME_PRESETS[preset].scheme)) } : {}),
+  };
 }
 
 /**
@@ -79,17 +106,18 @@ export async function createTest(data: TestInput) {
         description: data.description?.trim() || null,
         iconName: data.iconName || "BookOpen",
         format: checked.format,
-        formUrl: data.formUrl.trim(),
+        formUrl: checked.format === "QUESTIONS" ? "" : data.formUrl.trim(),
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         proctored: data.proctored ?? true,
         active: data.active ?? true,
+        ...questionSettings(data, checked.format, true),
       },
     });
 
     revalidatePath("/admin/tests");
     revalidatePath("/admin/assign");
     revalidatePath("/");
-    return { success: true, testId: test.id };
+    return { success: true, testId: test.id, format: checked.format };
   } catch (error) {
     console.error("Error creating test:", error);
     return { error: "Failed to create test in database." };
@@ -105,8 +133,20 @@ export async function updateTest(id: string, data: TestInput) {
   try {
     const previous = await prisma.test.findUnique({
       where: { id },
-      select: { paperPublicId: true, paperVersion: true },
+      select: { paperPublicId: true, paperVersion: true, format: true },
     });
+    if (!previous) return { error: "Test not found." };
+
+    // Switching between a link and portal questions would strand either the
+    // students' saved answers or the link; a test keeps the kind it began as.
+    if ((previous.format === "QUESTIONS") !== (checked.format === "QUESTIONS")) {
+      return {
+        error:
+          previous.format === "QUESTIONS"
+            ? "This test's questions are written in the portal. Create a new test to use a link instead."
+            : "This test uses a link. Create a new test to write questions in the portal.",
+      };
+    }
 
     await prisma.test.update({
       where: { id },
@@ -116,16 +156,17 @@ export async function updateTest(id: string, data: TestInput) {
         description: data.description?.trim() || null,
         iconName: data.iconName || "BookOpen",
         format: checked.format,
-        formUrl: data.formUrl.trim(),
+        formUrl: checked.format === "QUESTIONS" ? "" : data.formUrl.trim(),
         // Papers are links now; an older uploaded file is dropped.
         ...NO_PAPER,
         durationMinutes: parseDurationMinutes(data.durationMinutes).minutes,
         proctored: data.proctored ?? true,
         active: data.active ?? true,
+        ...questionSettings(data, checked.format, false),
       },
     });
 
-    if (previous?.paperPublicId) await discardPaper(previous);
+    if (previous.paperPublicId) await discardPaper(previous);
 
     revalidatePath("/admin/tests");
     revalidatePath("/admin/assign");

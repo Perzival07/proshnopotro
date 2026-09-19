@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import {
   Dialog,
   DialogContent,
@@ -23,9 +24,11 @@ import {
   FileText,
   FileType2,
   ClipboardList,
+  ListChecks,
   Timer,
 } from "lucide-react";
-import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
+import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
+import { detectTestFormat, toEmbedUrl, type LinkFormat, type TestFormat } from "@/lib/test-resource";
 import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
 
 interface TestModalProps {
@@ -42,11 +45,20 @@ interface TestModalProps {
     durationMinutes: number | null;
     proctored: boolean;
     active: boolean;
+    resultRelease?: "INSTANT" | "ON_RELEASE";
+    answerSheets?: boolean;
   } | null;
 }
 
+type Mode = "LINK" | "QUESTIONS";
+
 export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const isEditing = Boolean(testToEdit);
+  const router = useRouter();
+  const [mode, setMode] = useState<Mode>("LINK");
+  const [schemePreset, setSchemePreset] = useState<SchemePreset>("JEE_MAIN");
+  const [resultRelease, setResultRelease] = useState<"INSTANT" | "ON_RELEASE">("ON_RELEASE");
+  const [answerSheets, setAnswerSheets] = useState(false);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("Physics");
   const [description, setDescription] = useState("");
@@ -72,6 +84,9 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       );
       setProctored(testToEdit.proctored);
       setActive(testToEdit.active);
+      setMode(testToEdit.format === "QUESTIONS" ? "QUESTIONS" : "LINK");
+      setResultRelease(testToEdit.resultRelease ?? "ON_RELEASE");
+      setAnswerSheets(testToEdit.answerSheets ?? false);
     } else {
       setTitle("");
       setSubject("Physics");
@@ -81,6 +96,10 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setDurationMinutes("");
       setProctored(true);
       setActive(true);
+      setMode("LINK");
+      setSchemePreset("JEE_MAIN");
+      setResultRelease("ON_RELEASE");
+      setAnswerSheets(false);
     }
     setError(null);
   }, [testToEdit, isOpen]);
@@ -96,7 +115,11 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       subject,
       description,
       iconName,
+      mode,
       formUrl,
+      schemePreset,
+      resultRelease,
+      answerSheets: mode === "QUESTIONS" ? answerSheets : undefined,
       durationMinutes,
       proctored,
       active,
@@ -112,6 +135,11 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
     } else {
       setLoading(false);
       onClose();
+      // A new portal paper has no questions yet; take the tutor straight to
+      // where they are written.
+      if (!isEditing && "testId" in res && res.testId && mode === "QUESTIONS") {
+        router.push(`/admin/tests/${res.testId}/questions`);
+      }
     }
   };
 
@@ -123,7 +151,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             {isEditing ? "Edit Assessment Test" : "Create New Assessment Test"}
           </DialogTitle>
           <DialogDescription>
-            Configure the test record, then paste the link to a Google Form, a Google Doc, or a PDF on Google Drive.
+            Link a Google Form, Google Doc or Drive PDF, or write the questions in the portal so they are marked automatically.
           </DialogDescription>
         </DialogHeader>
 
@@ -210,6 +238,55 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
           </div>
 
           <div>
+            <Label className="text-xs font-semibold text-brand-navy">
+              Question Paper <span className="text-red-500">*</span>
+            </Label>
+            <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    value: "LINK" as const,
+                    icon: LinkIcon,
+                    title: "Link to a paper",
+                    hint: "Google Form, Google Doc or a PDF on Drive",
+                  },
+                  {
+                    value: "QUESTIONS" as const,
+                    icon: ListChecks,
+                    title: "Write questions here",
+                    hint: "MCQ and numerical, marked automatically",
+                  },
+                ]
+              ).map((opt) => {
+                const Icon = opt.icon;
+                const selected = mode === opt.value;
+                // A test keeps the kind it was created as.
+                const locked = isEditing && !selected;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    disabled={locked}
+                    onClick={() => setMode(opt.value)}
+                    className={`flex flex-col items-start gap-0.5 rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      selected
+                        ? "border-brand-blue bg-brand-tint text-brand-navy shadow-xs"
+                        : "border-brand-border bg-white text-brand-ink/70 hover:border-brand-blue/50"
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 text-xs font-semibold">
+                      <Icon className="h-3.5 w-3.5 text-brand-blue" />
+                      {opt.title}
+                    </span>
+                    <span className="text-[10px] leading-snug text-brand-ink/60">{opt.hint}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {mode === "LINK" ? (
+          <div>
             <div className="flex items-center justify-between">
               <Label htmlFor="form-url" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
                 <LinkIcon className="h-3.5 w-3.5 text-brand-blue" />
@@ -232,6 +309,77 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             />
             <LinkTypeHint url={formUrl} />
           </div>
+          ) : (
+            <div className="space-y-4 rounded-lg border border-brand-border bg-brand-page p-3">
+              {!isEditing && (
+                <div>
+                  <Label htmlFor="test-scheme" className="text-xs font-semibold text-brand-navy">
+                    Marking Scheme
+                  </Label>
+                  <Select value={schemePreset} onValueChange={(v) => setSchemePreset(v as SchemePreset)}>
+                    <SelectTrigger id="test-scheme" className="mt-1 bg-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(SCHEME_PRESETS) as SchemePreset[]).map((key) => (
+                        <SelectItem key={key} value={key}>
+                          {SCHEME_PRESETS[key].label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="mt-1 text-[11px] text-brand-ink/55">
+                    A starting point. You can change the marks for each question type, section
+                    or question on the paper&apos;s page.
+                  </p>
+                </div>
+              )}
+
+              <div>
+                <Label className="text-xs font-semibold text-brand-navy">Show Students Their Results</Label>
+                <div className="mt-1.5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  {(
+                    [
+                      { value: "ON_RELEASE" as const, title: "When I release them", hint: "Nobody sees answers while others are still writing" },
+                      { value: "INSTANT" as const, title: "Right after submitting", hint: "Score and solutions at once" },
+                    ]
+                  ).map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setResultRelease(opt.value)}
+                      className={`flex flex-col items-start gap-0.5 rounded-lg border p-2.5 text-left transition-colors ${
+                        resultRelease === opt.value
+                          ? "border-brand-blue bg-white text-brand-navy shadow-xs"
+                          : "border-brand-border bg-white/60 text-brand-ink/70 hover:border-brand-blue/50"
+                      }`}
+                    >
+                      <span className="text-xs font-semibold">{opt.title}</span>
+                      <span className="text-[10px] leading-snug text-brand-ink/60">{opt.hint}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="answer-sheets"
+                  checked={answerSheets}
+                  onCheckedChange={(checked) => setAnswerSheets(Boolean(checked))}
+                  className="mt-0.5"
+                />
+                <label htmlFor="answer-sheets" className="cursor-pointer leading-tight">
+                  <span className="text-xs font-medium text-brand-ink">
+                    Also collect photos of written answers
+                  </span>
+                  <span className="block text-[11px] text-brand-ink/55">
+                    For papers with a subjective part, like ISI or CMI proofs. Students
+                    photograph their sheets after the objective questions.
+                  </span>
+                </label>
+              </div>
+            </div>
+          )}
 
           <div>
             <Label
@@ -303,7 +451,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             </Button>
             <Button
               type="submit"
-              disabled={loading || !title.trim() || !formUrl.trim()}
+              disabled={loading || !title.trim() || (mode === "LINK" && !formUrl.trim())}
               className="bg-brand-navy hover:bg-brand-navy/90 text-white"
             >
               {loading ? (
@@ -313,6 +461,8 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                 </div>
               ) : isEditing ? (
                 "Save Changes"
+              ) : mode === "QUESTIONS" ? (
+                "Create & Add Questions"
               ) : (
                 "Create Test Record"
               )}
@@ -325,7 +475,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
 }
 
 const LINK_TYPES: Record<
-  TestFormat,
+  LinkFormat,
   { icon: React.ElementType; title: string; hint: string; share: string }
 > = {
   GOOGLE_FORM: {

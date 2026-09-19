@@ -43,11 +43,21 @@ export default async function StudentDashboardPage() {
   // Any timed attempt whose window ran out while the student was away is
   // closed here, so the dashboard they land on is already truthful.
   const autoClosed = await closeExpiredAttempts(assignments);
-  const cards = assignments.map((a) =>
-    autoClosed.has(a.id)
-      ? { ...a, status: "SUBMITTED" as const, endedAt: attemptDeadline(a) }
-      : a
-  );
+  const cards = assignments
+    .map((a) =>
+      autoClosed.has(a.id)
+        ? { ...a, status: "SUBMITTED" as const, endedAt: attemptDeadline(a) }
+        : a
+    )
+    // A score the tutor has not released yet is not shown -- it is marked,
+    // but students still writing must not learn it from a classmate's card.
+    .map((a) =>
+      a.test.format === "QUESTIONS" &&
+      a.test.resultRelease === "ON_RELEASE" &&
+      !a.test.resultsReleasedAt
+        ? { ...a, result: null }
+        : a
+    );
 
   const availableCount = cards.filter(
     (a) => deriveCardStatus(a) === "AVAILABLE"

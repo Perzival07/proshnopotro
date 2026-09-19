@@ -17,6 +17,18 @@ import {
   type UploadState,
 } from "@/lib/answer-upload";
 import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
+import { gradeAssignment } from "@/lib/grade-attempt";
+import {
+  checkResponse,
+  isAttempted,
+  normalizeScheme,
+  parseOptions,
+  toStudentPaper,
+  withinAttemptLimit,
+  type StudentSection,
+} from "@/lib/paper";
+import type { ResponseValue } from "@/lib/marking";
+import { Prisma } from "@prisma/client";
 
 export interface FormResolutionResult {
   /**
@@ -35,7 +47,21 @@ export interface FormResolutionResult {
   serverNow?: string;
   /** The attempt is over, so the page should move on to the answer upload. */
   ended?: boolean;
+  /** QUESTIONS tests: the paper itself, without answers, and what is saved so far. */
+  paper?: StudentPaper;
   error?: string;
+}
+
+export interface SavedResponse {
+  questionId: string;
+  value: ResponseValue;
+  markedForReview: boolean;
+}
+
+export interface StudentPaper {
+  sections: StudentSection[];
+  passages: { id: string; content: string }[];
+  responses: SavedResponse[];
 }
 
 /**
@@ -98,6 +124,22 @@ export async function resolveSecureFormUrl(
 
   const format = assignment.test.format as TestFormat;
 
+  if (format === "QUESTIONS") {
+    const paper = await loadStudentPaper(assignment.id, assignment.test.id, assignment.test.markingScheme);
+    if (paper.sections.every((s) => s.questions.length === 0)) {
+      return { error: "This paper has no questions yet. Please tell your tutor." };
+    }
+    const startedAt = await ensureStarted(assignment);
+    if (!isTimed(assignment)) return { format, paper };
+    const deadline = attemptDeadline({ ...assignment, startedAt });
+    return {
+      format,
+      paper,
+      endsAt: deadline.toISOString(),
+      serverNow: new Date().toISOString(),
+    };
+  }
+
   if (!assignment.test.formUrl) {
     return { error: "The question paper link is not configured. Please contact your tutor." };
   }
@@ -126,6 +168,121 @@ export async function resolveSecureFormUrl(
     endsAt: deadline.toISOString(),
     serverNow: new Date().toISOString(),
   };
+}
+
+/**
+ * The paper as this student may see it, with the answers they have saved so
+ * far so a reload or a second device carries on where they were.
+ */
+async function loadStudentPaper(
+  assignmentId: string,
+  testId: string,
+  markingScheme: Prisma.JsonValue
+): Promise<StudentPaper> {
+  const [sections, passages, responses] = await Promise.all([
+    prisma.testSection.findMany({ where: { testId }, include: { questions: true } }),
+    prisma.passage.findMany({ where: { testId }, select: { id: true, content: true } }),
+    prisma.questionResponse.findMany({
+      where: { assignmentId },
+      select: { questionId: true, value: true, markedForReview: true },
+    }),
+  ]);
+  const paper = toStudentPaper(sections, normalizeScheme(markingScheme));
+  // Only passages the paper actually uses are sent.
+  const used = new Set(paper.flatMap((s) => s.questions.map((q) => q.passageId)).filter(Boolean));
+  return {
+    sections: paper,
+    passages: passages.filter((p) => used.has(p.id)),
+    responses: responses.map((r) => ({
+      questionId: r.questionId,
+      value: (r.value ?? null) as ResponseValue,
+      markedForReview: r.markedForReview,
+    })),
+  };
+}
+
+/**
+ * How long after the deadline an answer sent in the last moments is still
+ * accepted. The page saves everything outstanding before it submits, and a
+ * save that left the browser at 00:00 must not be lost to the network.
+ */
+const LATE_SAVE_GRACE_MS = 15_000;
+
+/**
+ * Saves one answer while the paper is open. Checked against the attempt, the
+ * question and the section's "attempt any N" limit; whether it is right is
+ * only worked out once the paper closes.
+ */
+export async function saveQuestionResponse(
+  assignmentId: string,
+  questionId: string,
+  value: unknown,
+  markedForReview: boolean
+): Promise<{ success?: true; ended?: boolean; error?: string }> {
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) return { error: "You are signed out. Sign in again to keep answering." };
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: { test: { select: { id: true, format: true, durationMinutes: true } }, result: true },
+  });
+  if (!assignment) return { error: "Assignment not found." };
+  if (assignment.studentEmail.toLowerCase() !== sessionUser.email.trim().toLowerCase()) {
+    return { error: "Unauthorized." };
+  }
+  if (assignment.test.format !== "QUESTIONS") return { error: "This test has no questions to answer here." };
+  if (isAssignmentSubmitted(assignment)) return { ended: true, error: "This test has already been submitted." };
+  if (!assignment.startedAt) return { error: "Open the paper before answering." };
+  if (isTimeUp(assignment, new Date(Date.now() - LATE_SAVE_GRACE_MS))) {
+    return { ended: true, error: "Time is up. This answer was not saved." };
+  }
+
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    select: {
+      id: true,
+      type: true,
+      options: true,
+      sectionId: true,
+      section: { select: { testId: true, attemptLimit: true } },
+    },
+  });
+  if (!question || question.section.testId !== assignment.test.id) {
+    return { error: "That question is not in this paper." };
+  }
+
+  const checked = checkResponse(
+    question.type,
+    parseOptions(question.options).map((o) => o.id),
+    value
+  );
+  if (!checked.ok) return { error: checked.error };
+
+  if (question.section.attemptLimit && isAttempted(checked.value)) {
+    const inSection = await prisma.questionResponse.findMany({
+      where: { assignmentId, question: { sectionId: question.sectionId } },
+      select: { questionId: true, value: true },
+    });
+    const answered = inSection.filter(
+      (r) => r.questionId !== questionId && isAttempted(r.value as ResponseValue)
+    ).length;
+    const already = inSection.some(
+      (r) => r.questionId === questionId && isAttempted(r.value as ResponseValue)
+    );
+    if (!withinAttemptLimit(question.section.attemptLimit, answered, already)) {
+      return {
+        error: `You can answer only ${question.section.attemptLimit} questions in this section. Clear another answer first.`,
+      };
+    }
+  }
+
+  const stored = checked.value === null ? Prisma.JsonNull : (checked.value as Prisma.InputJsonValue);
+  await prisma.questionResponse.upsert({
+    where: { assignmentId_questionId: { assignmentId, questionId } },
+    create: { assignmentId, questionId, value: stored, markedForReview },
+    update: { value: stored, markedForReview },
+  });
+  return { success: true };
 }
 
 /**
@@ -176,6 +333,14 @@ async function closeOutAssignment(
     where: { id: assignmentId, status: "ASSIGNED" },
     data: { status: "SUBMITTED", autoSubmitted: auto, endedAt },
   });
+
+  // A paper written in the portal is marked the moment it closes. A failure
+  // here must not undo the close: the tutor can re-mark from the paper page.
+  try {
+    await gradeAssignment(assignmentId);
+  } catch (err) {
+    console.error("Failed to mark attempt", assignmentId, err);
+  }
 
   revalidatePath(`/test/${assignmentId}`);
   revalidatePath("/");

@@ -6,6 +6,7 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { StartTestButton } from "./StartTestButton";
+import { PaperResult } from "@/components/student/PaperResult";
 import { formatDate } from "@/lib/utils";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { attemptDeadline, formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
@@ -45,6 +46,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           format: true,
           durationMinutes: true,
           proctored: true,
+          answerSheets: true,
           // formUrl is explicitly OMITTED to prevent leakage into HTML
         },
       },
@@ -84,6 +86,29 @@ export default async function TestConfirmationPage({ params }: PageProps) {
   // A finished attempt whose answers are not uploaded yet comes back here for
   // the upload, and only that -- the paper itself stays closed.
   const awaitingUpload = isSubmitted && uploadState(current) === "OPEN";
+
+  // A submitted paper written in the portal opens onto its result -- or, until
+  // the tutor releases results, onto a note that it was received.
+  if (current.test.format === "QUESTIONS" && isSubmitted && !awaitingUpload) {
+    return (
+      <div className="min-h-screen flex flex-col justify-between bg-brand-page">
+        <Navbar user={user} />
+        <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <Link
+            href="/"
+            className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:text-brand-blue mb-6 transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to All Assessments</span>
+          </Link>
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-blue">{assignment.test.subject}</p>
+          <h1 className="mb-6 font-heading text-xl sm:text-2xl font-bold text-brand-navy">{assignment.test.title}</h1>
+          <PaperResult assignmentId={assignment.id} />
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   // Otherwise, if closed or already submitted, redirect to dashboard
   if (!awaitingUpload && (isSubmitted || outOfTime || isInactive)) {
@@ -200,6 +225,13 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                     </p>
                   </>
                 )}
+                {assignment.test.format === "QUESTIONS" && (
+                  <p className="text-xs leading-relaxed font-medium">
+                    Answer on screen. Every answer is saved as you give it, so a dropped
+                    connection loses nothing already answered.
+                  </p>
+                )}
+                {(assignment.test.format !== "QUESTIONS" || assignment.test.answerSheets) && (
                 <p className="text-xs leading-relaxed font-medium">
                   When you finish or the time runs out, the paper closes. You then
                   have {UPLOAD_WINDOW_MINUTES} minutes to photograph your answers
@@ -207,6 +239,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                   uploading. Leaving the page closes the upload. After uploading, send
                   &ldquo;Work done&rdquo; to your tutor on WhatsApp.
                 </p>
+                )}
                 <p className="text-[11px] opacity-80 leading-normal">
                   Make sure your internet connection is stable before opening the test.
                 </p>
@@ -223,6 +256,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 initialEndsAt={endsAt?.toISOString() ?? null}
                 initialServerNow={endsAt ? new Date().toISOString() : null}
                 proctored={assignment.test.proctored}
+                answerSheets={assignment.test.answerSheets}
                 initialPhase={awaitingUpload ? "upload" : "exam"}
               />
             </div>

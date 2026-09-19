@@ -146,7 +146,9 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
             </p>
           ) : (
             <p className="text-xs text-brand-ink/50 mt-1.5 italic">
-              {test.format && isWrittenPaper(test.format)
+              {test.format === "QUESTIONS"
+                ? "Answered on screen \u2014 marked automatically"
+                : test.format && isWrittenPaper(test.format)
                 ? "Written paper \u2014 answers uploaded as photos"
                 : "Google Form online test"}
             </p>
@@ -191,6 +193,13 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
               >
                 <span>{test.format && isWrittenPaper(test.format) ? "Open Question Paper" : "Take Assessment"}</span>
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+              </Link>
+            </Button>
+          ) : cardStatus === "SUBMITTED" && test.format === "QUESTIONS" ? (
+            <Button asChild variant="outline" className="w-full font-medium">
+              <Link href={`/test/${assignment.id}`} className="flex items-center justify-center gap-2">
+                <span>{result ? "View Your Result" : "View Submission"}</span>
+                <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>
           ) : (

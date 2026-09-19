@@ -36,6 +36,8 @@ export default async function AdminTestsPage() {
       durationMinutes: t.durationMinutes,
       proctored: t.proctored,
       active: t.active,
+      resultRelease: t.resultRelease,
+      answerSheets: t.answerSheets,
       createdAt: t.createdAt,
       _count: t._count,
       submittedCount,

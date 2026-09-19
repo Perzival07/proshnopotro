@@ -22,12 +22,31 @@ enum AssignmentStatus {
 /// GOOGLE_FORM: answered online in the form itself.
 /// GOOGLE_DOC:  a written paper the student reads and answers on paper.
 /// PDF:         a written paper shared as a PDF link on Google Drive.
-/// Whichever it is, once the attempt ends the student photographs their answer
-/// sheets and uploads them once (see AnswerImage).
+/// QUESTIONS:   questions written in the portal itself, answered and marked
+///              there (see TestSection and Question).
+/// Whichever it is, once the attempt ends the student may photograph their
+/// answer sheets and upload them once (see AnswerImage).
 enum TestFormat {
   GOOGLE_FORM
   GOOGLE_DOC
   PDF
+  QUESTIONS
+}
+
+/// The kinds of question the portal marks itself. See lib/marking.ts.
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+  INTEGER
+  DECIMAL
+}
+
+/// When a student sees their score and the answers for a QUESTIONS test.
+enum ResultRelease {
+  /// As soon as they submit.
+  INSTANT
+  /// Once the tutor releases results for the whole test.
+  ON_RELEASE
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -116,10 +135,20 @@ model Test {
   /// Warn the student when they leave the exam tab, and submit on the third.
   proctored       Boolean    @default(true)
   active          Boolean    @default(true)
+  /// QUESTIONS tests only: the marking scheme, as lib/marking.ts MarkingScheme.
+  markingScheme     Json?
+  resultRelease     ResultRelease @default(ON_RELEASE)
+  /// Whether students photograph and upload answer sheets after the paper.
+  /// Off for a purely objective paper; on for written and subjective ones.
+  answerSheets      Boolean       @default(true)
+  /// Set when the tutor releases results. Only read for ON_RELEASE tests.
+  resultsReleasedAt DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   assignments Assignment[]
+  sections    TestSection[]
+  passages    Passage[]
 
   @@index([active])
 }
@@ -150,6 +179,7 @@ model Assignment {
   test         Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
   result       Result?
   answerImages AnswerImage[]
+  responses    QuestionResponse[]
 
   @@unique([testId, studentEmail])
   @@index([studentEmail])
@@ -176,6 +206,87 @@ model AnswerImage {
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
 
   @@index([assignmentId])
+}
+
+/// A part of a QUESTIONS test: "Physics", "Chemistry", "Section B".
+model TestSection {
+  id           String  @id @default(cuid())
+  testId       String
+  title        String
+  /// Order within the test, from 0.
+  position     Int
+  instructions String? @db.Text
+  /// "Attempt any N": only the first N attempted questions are marked.
+  attemptLimit Int?
+  /// Minutes for this section on its own. null = shares the test's time.
+  durationMinutes Int?
+  /// Overrides the test's marking scheme for this section.
+  markingScheme Json?
+
+  test      Test       @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@index([testId])
+}
+
+/// A passage several questions share (paragraph / comprehension questions).
+model Passage {
+  id      String @id @default(cuid())
+  testId  String
+  content String @db.Text
+
+  test      Test       @relation(fields: [testId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@index([testId])
+}
+
+/// One question. Text is plain text with $...$ LaTeX and ![](url) images.
+model Question {
+  id          String       @id @default(cuid())
+  sectionId   String
+  /// Order within the section, from 0.
+  position    Int
+  type        QuestionType
+  stem        String       @db.Text
+  /// [{ id: "A", text: "..." }, ...]; empty for numeric questions.
+  options     Json
+  /// The answer key, as lib/marking.ts AnswerKey. Never sent to a student
+  /// before their results are released.
+  answerKey   Json
+  solution    String?      @db.Text
+  /// This question's own marks, overriding the scheme when set.
+  marksCorrect Float?
+  marksWrong   Float?
+  /// Dropped from the paper: full marks to everyone who attempted it.
+  bonus       Boolean      @default(false)
+  passageId   String?
+
+  section   TestSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  passage   Passage?           @relation(fields: [passageId], references: [id], onDelete: SetNull)
+  responses QuestionResponse[]
+
+  @@index([sectionId])
+}
+
+/// A student's answer to one question, saved as they go.
+model QuestionResponse {
+  id              String   @id @default(cuid())
+  assignmentId    String
+  questionId      String
+  /// An option id, a list of them, or the typed number; null when cleared.
+  value           Json?
+  markedForReview Boolean  @default(false)
+  /// Filled in when the attempt is marked.
+  marks           Float?
+  status          String?
+  updatedAt       DateTime @updatedAt
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  question   Question   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@unique([assignmentId, questionId])
+  @@index([questionId])
 }
 
 model Result {

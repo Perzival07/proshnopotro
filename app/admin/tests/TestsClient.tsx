@@ -33,6 +33,7 @@ import {
   XCircle,
   Timer,
   Eye,
+  ListChecks,
 } from "lucide-react";
 
 interface TestItem {
@@ -46,6 +47,8 @@ interface TestItem {
   durationMinutes: number | null;
   proctored: boolean;
   active: boolean;
+  resultRelease: "INSTANT" | "ON_RELEASE";
+  answerSheets: boolean;
   createdAt: Date;
   _count: {
     assignments: number;
@@ -298,6 +301,15 @@ export function TestsClient({ tests }: TestsClientProps) {
                 {/* h-9 w-9 targets: comfortably tappable, unlike the 14px
                     desktop icon buttons. */}
                 <div className="flex items-center gap-1">
+                  {test.format === "QUESTIONS" && (
+                    <Link
+                      href={`/admin/tests/${test.id}/questions`}
+                      aria-label="Edit questions"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-brand-blue transition-colors hover:bg-brand-tint"
+                    >
+                      <ListChecks className="h-4 w-4" />
+                    </Link>
+                  )}
                   <Link
                     href={`/admin/roster?testId=${test.id}`}
                     aria-label="View roster"
@@ -465,6 +477,15 @@ export function TestsClient({ tests }: TestsClientProps) {
 
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      {test.format === "QUESTIONS" && (
+                        <Link
+                          href={`/admin/tests/${test.id}/questions`}
+                          title="Edit Questions"
+                          className="p-1.5 rounded-md text-brand-blue hover:bg-brand-tint transition-colors"
+                        >
+                          <ListChecks className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
                       <Link
                         href={`/admin/roster?testId=${test.id}`}
                         title="View Roster"
@@ -558,6 +579,14 @@ export function TestsClient({ tests }: TestsClientProps) {
 
 /** How the question paper is delivered, in a word, for the list rows. */
 function FormatLabel({ format }: { format: TestFormat }) {
+  if (format === "QUESTIONS") {
+    return (
+      <>
+        <ListChecks className="h-3 w-3" />
+        Questions
+      </>
+    );
+  }
   if (format === "PDF") {
     return (
       <>

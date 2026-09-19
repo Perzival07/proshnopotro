@@ -2,7 +2,8 @@
 
 import React, { useState, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { resolveSecureFormUrl, markStudentSubmission } from "./actions";
+import { resolveSecureFormUrl, markStudentSubmission, type StudentPaper } from "./actions";
+import { ExamPaper, type ExamPaperHandle } from "@/components/student/ExamPaper";
 import { exitFullscreen } from "@/lib/fullscreen";
 import { isWrittenPaper, type TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
@@ -36,6 +37,8 @@ interface StartTestButtonProps {
   initialServerNow?: string | null;
   /** Whether leaving the tab is warned about and, on the second time, ends it. */
   proctored?: boolean;
+  /** Whether answer sheets are photographed after the paper. */
+  answerSheets?: boolean;
   /**
    * "upload" when the attempt already ended but the answers are not uploaded
    * yet -- a reload, or a student coming back -- so the page opens straight
@@ -65,6 +68,7 @@ export function StartTestButton({
   initialEndsAt,
   initialServerNow,
   proctored = false,
+  answerSheets = true,
   initialPhase = "exam",
 }: StartTestButtonProps) {
   const [loading, setLoading] = useState(false);
@@ -74,6 +78,11 @@ export function StartTestButton({
   // Resolved only after the server has authorised this student, so the link
   // still never appears in the page's initial HTML.
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
+  // A paper written in the portal, in place of a link.
+  const [paper, setPaper] = useState<StudentPaper | null>(null);
+  const [progress, setProgress] = useState({ answered: 0, total: 0 });
+  const examRef = useRef<ExamPaperHandle>(null);
+  const onProgress = useCallback((answered: number, total: number) => setProgress({ answered, total }), []);
   const fullscreen = useFullscreen();
   const { expanded, collapse } = fullscreen;
 
@@ -121,7 +130,8 @@ export function StartTestButton({
 
   // A Google Doc or a Drive PDF: read on screen, answered on paper.
   const isDoc = isWrittenPaper(testFormat);
-  const paperNoun = isDoc ? "Question Paper" : "Google Form";
+  const isQuestions = testFormat === "QUESTIONS";
+  const paperNoun = isDoc || isQuestions ? "Question Paper" : "Google Form";
 
   const handleOpenClick = () => {
     if (proctored) {
@@ -157,13 +167,14 @@ export function StartTestButton({
       setTimeUp(true);
       return;
     }
-    if (res.error || !res.embedUrl) {
+    if (res.error || (!res.embedUrl && !res.paper)) {
       camera.stop();
       setError(res.error || "Could not load the question paper.");
       return;
     }
 
-    setEmbedUrl(res.embedUrl);
+    setEmbedUrl(res.embedUrl ?? null);
+    setPaper(res.paper ?? null);
     setOpened(true);
     if (res.endsAt && res.serverNow) {
       const fresh = toClientDeadline(res.endsAt, res.serverNow);
@@ -184,9 +195,12 @@ export function StartTestButton({
     if (expiringRef.current) return;
     expiringRef.current = true;
 
-    setTimeUp(true);
     collapse();
     setSubmitting(true);
+    // Answers given in the last seconds are still on their way; they go
+    // first, while the paper is still on screen, then the attempt closes.
+    await examRef.current?.flush();
+    setTimeUp(true);
     try {
       const res = await markStudentSubmission(assignmentId, "TIMER");
       if (res.error) {
@@ -224,6 +238,7 @@ export function StartTestButton({
     setSubmitting(true);
     setError(null);
     try {
+      await examRef.current?.flush();
       const res = await markStudentSubmission(assignmentId, "STUDENT");
       if (res.error) {
         setError(res.error);
@@ -319,15 +334,25 @@ export function StartTestButton({
               <p className="leading-relaxed">
                 {submitting
                   ? "Submitting your assessment\u2026"
-                  : "The question paper is closed. Upload photos of your answers, or finish without uploading."}
+                  : isQuestions && !answerSheets
+                    ? "The question paper is closed and your answers are submitted."
+                    : "The question paper is closed. Upload photos of your answers, or finish without uploading."}
               </p>
             </div>
           </div>
 
           {/* The paper is gone; the upload pop-up is the only way forward.
               Held back until the close-out has landed, so the server is
-              already treating the attempt as ended when it is asked. */}
-          {!submitting && (
+              already treating the attempt as ended when it is asked. An
+              objective paper has nothing to photograph: closing it reloads
+              this page onto the student's result instead. */}
+          {!submitting && isQuestions && !answerSheets && (
+            <div className="flex items-center gap-2 rounded-xl border border-brand-border bg-white p-4 text-xs text-brand-ink/80">
+              <AtomMark size={18} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+              <span>Your answers are submitted. Loading your result&hellip;</span>
+            </div>
+          )}
+          {!submitting && !(isQuestions && !answerSheets) && (
             <AnswerUploadPanel
               assignmentId={assignmentId}
               testTitle={testTitle}
@@ -375,6 +400,40 @@ export function StartTestButton({
               sight. */}
           {!expanded && countdown}
 
+          {paper && (
+            <FullscreenFrame
+              fullscreen={fullscreen}
+              title="Question paper"
+              label={`${testTitle} \u00b7 ${progress.answered}/${progress.total} answered`}
+              toolbar={
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">{countdown}</div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      collapse();
+                      setConfirmingFinish(true);
+                    }}
+                    className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                  >
+                    Submit
+                  </Button>
+                </div>
+              }
+              overlay={cameraBadge}
+            >
+              <ExamPaper
+                ref={examRef}
+                assignmentId={assignmentId}
+                paper={paper}
+                onProgress={onProgress}
+                onEnded={() => void handleExpire()}
+                cameraBadge={cameraActive}
+              />
+            </FullscreenFrame>
+          )}
+
           {/* In-page preview */}
           {embedUrl && (
             <FullscreenFrame
@@ -392,10 +451,14 @@ export function StartTestButton({
             <ShieldAlert className="h-5 w-5 shrink-0 text-brand-blue mt-0.5" />
             <div className="space-y-1 text-xs">
               <p className="font-semibold text-brand-navy">
-                {isDoc ? "Written paper" : "Assessment opened"}
+                {isQuestions ? "Your answers save as you go" : isDoc ? "Written paper" : "Assessment opened"}
               </p>
               <p className="text-brand-ink/80">
-                {isDoc
+                {isQuestions
+                  ? answerSheets
+                    ? "Answer the questions here, and write the rest on paper. When you submit, or when the time runs out, the paper closes and you upload photos of your written answers."
+                    : "Every answer is saved the moment you give it. Press Submit when you are done; when the time runs out, your answers are submitted automatically."
+                  : isDoc
                   ? "Write your answers on paper. When you finish, or when the time runs out, the paper closes and you upload photos of your answer sheets."
                   : "Answer every question and press Submit inside the form. When you finish, or when the time runs out, the paper closes and you upload photos of your answer sheets."}
               </p>
@@ -405,7 +468,9 @@ export function StartTestButton({
           {confirmingFinish ? (
             <div className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left">
               <p className="text-xs font-medium text-emerald-950">
-                {isDoc
+                {isQuestions
+                  ? `Submit now? You have answered ${progress.answered} of ${progress.total} questions. You cannot change your answers afterwards.`
+                  : isDoc
                   ? "Finish now? The question paper will close and you cannot open it again."
                   : "Have you pressed Submit inside the form? Finishing closes the paper and you cannot open it again."}
               </p>
@@ -418,7 +483,7 @@ export function StartTestButton({
                   onClick={handleFinish}
                   className="bg-emerald-600 font-semibold text-white hover:bg-emerald-700"
                 >
-                  Yes, finish
+                  {isQuestions ? "Yes, submit" : "Yes, finish"}
                 </Button>
               </div>
             </div>
@@ -437,7 +502,13 @@ export function StartTestButton({
               ) : (
                 <>
                   <CheckCircle2 className="h-5 w-5" />
-                  <span>I&apos;ve Finished &mdash; Upload My Answers</span>
+                  <span>
+                    {isQuestions
+                      ? answerSheets
+                        ? "Submit \u2014 Then Upload Written Answers"
+                        : "Submit Test"
+                      : "I\u2019ve Finished \u2014 Upload My Answers"}
+                  </span>
                 </>
               )}
             </Button>

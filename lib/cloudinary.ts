@@ -79,6 +79,21 @@ export function signAnswerUpload(folder: string): UploadSignature | null {
   };
 }
 
+/**
+ * Signs a direct browser upload of an image for a question, pinned to the
+ * test's folder. Unlike answer sheets these are public: they are shown inside
+ * the question paper, and the random name Cloudinary gives each one means
+ * nobody can find it before the paper opens.
+ */
+export function signQuestionImageUpload(folder: string): UploadSignature | null {
+  const c = getCloudinary();
+  if (!c) return null;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const params = { folder, timestamp, type: "upload" };
+  const signature = c.cloudinary.utils.api_sign_request(params, c.apiSecret);
+  return { cloudName: c.cloudName, apiKey: c.apiKey, timestamp, signature, folder, type: "upload" };
+}
+
 /** A signed link to one page, optionally resized for a thumbnail. */
 export function signedAnswerUrl(
   image: { publicId: string; version: number; format: string },

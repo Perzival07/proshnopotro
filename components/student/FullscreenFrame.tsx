@@ -59,7 +59,10 @@ export type FullscreenControls = ReturnType<typeof useFullscreen>;
 
 interface FullscreenFrameProps {
   fullscreen: FullscreenControls;
-  src: string;
+  /** The page to frame. Ignored when `children` are given instead. */
+  src?: string;
+  /** Content of our own, such as a paper written in the portal. */
+  children?: React.ReactNode;
   /** Accessible name of the iframe. */
   title: string;
   /** Shown in the bar above the frame. */
@@ -90,6 +93,7 @@ export function FullscreenFrame({
   overlay,
   sandbox,
   allow,
+  children,
 }: FullscreenFrameProps) {
   const { ref, expanded, expand, collapse } = fullscreen;
 
@@ -105,7 +109,7 @@ export function FullscreenFrame({
       <div className="flex items-center justify-between gap-2 border-b border-brand-border bg-brand-page px-3 py-2">
         <span className="truncate text-[11px] font-semibold text-brand-navy">
           {label}
-          {expanded && <span className="ml-2 font-normal text-brand-ink/60">Press Esc to exit</span>}
+          {expanded && <span className="ml-2 hidden font-normal text-brand-ink/60 sm:inline">Press Esc to exit</span>}
         </span>
 
         <div className="flex shrink-0 items-center gap-3">
@@ -144,15 +148,24 @@ export function FullscreenFrame({
         <div className="border-b border-brand-border bg-brand-page px-3 py-2">{toolbar}</div>
       )}
 
-      <iframe
-        src={src}
-        title={title}
-        className={expanded ? "w-full flex-1 border-0" : `w-full border-0 ${collapsedClassName}`}
-        loading="lazy"
-        referrerPolicy="no-referrer"
-        sandbox={sandbox}
-        allow={allow}
-      />
+      {children ? (
+        <div
+          aria-label={title}
+          className={expanded ? "flex-1 overflow-y-auto bg-brand-page p-3 sm:p-4" : "bg-brand-page p-3 sm:p-4"}
+        >
+          {children}
+        </div>
+      ) : (
+        <iframe
+          src={src}
+          title={title}
+          className={expanded ? "w-full flex-1 border-0" : `w-full border-0 ${collapsedClassName}`}
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          sandbox={sandbox}
+          allow={allow}
+        />
+      )}
 
       {expanded && overlay}
     </div>

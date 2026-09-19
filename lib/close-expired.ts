@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { attemptDeadline, isTimed, isTimeUp } from "@/lib/exam-timer";
+import { gradeAssignment } from "@/lib/grade-attempt";
 
 interface ClosableAssignment {
   id: string;
@@ -48,6 +49,15 @@ export async function closeExpiredAttempts(
       })
     )
   );
+
+  // Papers written in the portal are marked as they close, here as anywhere.
+  for (const a of expired) {
+    try {
+      await gradeAssignment(a.id);
+    } catch (err) {
+      console.error("Failed to mark attempt", a.id, err);
+    }
+  }
 
   return new Set(expired.map((a) => a.id));
 }
