@@ -23,6 +23,8 @@ import {
   isAttempted,
   normalizeScheme,
   parseOptions,
+  sectionOpen,
+  sectionWindows,
   toStudentPaper,
   withinAttemptLimit,
   type StudentSection,
@@ -62,6 +64,12 @@ export interface StudentPaper {
   sections: StudentSection[];
   passages: { id: string; content: string }[];
   responses: SavedResponse[];
+  /**
+   * For a paper timed per section: when each section opens and closes, on
+   * the server's clock. The page corrects them for its own clock using the
+   * serverNow sent alongside.
+   */
+  windows?: { id: string; opensAt: string; closesAt: string }[];
 }
 
 /**
@@ -130,6 +138,17 @@ export async function resolveSecureFormUrl(
       return { error: "This paper has no questions yet. Please tell your tutor." };
     }
     const startedAt = await ensureStarted(assignment);
+    const windows = sectionWindows(
+      paper.sections.map((s, position) => ({ id: s.id, position, durationMinutes: s.durationMinutes }))
+    );
+    if (windows && startedAt) {
+      const start = new Date(startedAt).getTime();
+      paper.windows = windows.map((w) => ({
+        id: w.id,
+        opensAt: new Date(start + w.opensAt).toISOString(),
+        closesAt: new Date(start + w.closesAt).toISOString(),
+      }));
+    }
     if (!isTimed(assignment)) return { format, paper };
     const deadline = attemptDeadline({ ...assignment, startedAt });
     return {
@@ -249,6 +268,24 @@ export async function saveQuestionResponse(
   });
   if (!question || question.section.testId !== assignment.test.id) {
     return { error: "That question is not in this paper." };
+  }
+
+  // A paper timed per section only takes answers for the section now open.
+  const windows = sectionWindows(
+    await prisma.testSection.findMany({
+      where: { testId: assignment.test.id },
+      select: { id: true, position: true, durationMinutes: true },
+    })
+  );
+  const elapsed = Date.now() - new Date(assignment.startedAt).getTime();
+  if (!sectionOpen(windows, question.sectionId, elapsed, LATE_SAVE_GRACE_MS)) {
+    const w = windows?.find((x) => x.id === question.sectionId);
+    return {
+      error:
+        w && elapsed < w.opensAt
+          ? "This section has not opened yet."
+          : "This section's time is over. That answer was not saved.",
+    };
   }
 
   const checked = checkResponse(

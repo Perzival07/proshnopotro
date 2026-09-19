@@ -5,7 +5,7 @@ import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { parseQuestionPaper, type ImportError, type ImportedPaper } from "@/lib/question-import";
-import { normalizeScheme, parseOptions } from "@/lib/paper";
+import { normalizeScheme, parseOptions, sectionalDuration } from "@/lib/paper";
 import type { MarkingScheme } from "@/lib/marking";
 import { regradeTest } from "@/lib/grade-attempt";
 import { signQuestionImageUpload, type UploadSignature } from "@/lib/cloudinary";
@@ -226,7 +226,15 @@ export async function deleteQuestion(questionId: string): Promise<Result> {
 
 export async function updateSection(
   sectionId: string,
-  data: { title: string; attemptLimit: number | null; instructions: string }
+  data: {
+    title: string;
+    attemptLimit: number | null;
+    instructions: string;
+    /** This section's own minutes; null for none. */
+    durationMinutes: number | null;
+    /** Marks for this section only; null to use the test's. */
+    markingScheme: MarkingScheme | null;
+  }
 ): Promise<Result> {
   await requireAdmin();
   const title = data.title.trim();
@@ -235,15 +243,63 @@ export async function updateSection(
   if (limit !== null && (!Number.isInteger(limit) || limit < 1)) {
     return { error: "\"Attempt any\" must be a whole number of at least 1, or blank." };
   }
+  const minutes = data.durationMinutes;
+  if (minutes !== null && (!Number.isInteger(minutes) || minutes < 1 || minutes > 600)) {
+    return { error: "A section's time must be a whole number of minutes, from 1 to 600, or blank." };
+  }
+  let scheme: MarkingScheme | null = null;
+  if (data.markingScheme) {
+    scheme = normalizeScheme(data.markingScheme);
+    const invalid = schemeProblem(scheme);
+    if (invalid) return { error: invalid };
+  }
 
-  const section = await prisma.testSection.update({
+  const current = await prisma.testSection.findUnique({
     where: { id: sectionId },
-    data: { title, attemptLimit: limit, instructions: data.instructions.trim() || null },
-    select: { testId: true },
+    select: { testId: true, durationMinutes: true },
   });
-  await regradeTest(section.testId);
-  refresh(section.testId);
+  if (!current) return { error: "Section not found." };
+  const started = await startedCount(current.testId);
+  if (started > 0 && current.durationMinutes !== minutes) {
+    return { error: `${started} ${started === 1 ? "student has" : "students have"} already started, so section times can no longer change.` };
+  }
+
+  await prisma.testSection.update({
+    where: { id: sectionId },
+    data: {
+      title,
+      attemptLimit: limit,
+      instructions: data.instructions.trim() || null,
+      durationMinutes: minutes,
+      markingScheme: scheme ? JSON.parse(JSON.stringify(scheme)) : Prisma.JsonNull,
+    },
+  });
+
+  // With a time on every section, the test's own time is their total, so the
+  // one countdown and the automatic submission cover the whole paper.
+  const sections = await prisma.testSection.findMany({
+    where: { testId: current.testId },
+    select: { id: true, position: true, durationMinutes: true },
+  });
+  const total = sectionalDuration(sections);
+  if (total !== null) {
+    await prisma.test.update({ where: { id: current.testId }, data: { durationMinutes: total } });
+  }
+
+  await regradeTest(current.testId);
+  refresh(current.testId);
   return { success: true };
+}
+
+function schemeProblem(scheme: MarkingScheme): string | null {
+  for (const rule of [scheme.SINGLE, scheme.MULTIPLE, scheme.INTEGER, scheme.DECIMAL]) {
+    if (rule.correct <= 0) return "Marks for a right answer must be more than zero.";
+    if (rule.wrong > 0) return "Marks for a wrong answer must be zero or negative.";
+  }
+  if (scheme.MULTIPLE.partial === "PER_OPTION" && scheme.MULTIPLE.partialPerOption <= 0) {
+    return "Partial marks per right option must be more than zero.";
+  }
+  return null;
 }
 
 /** Saves the test's marking scheme and re-marks every closed attempt. */
@@ -253,13 +309,8 @@ export async function updateMarkingScheme(testId: string, scheme: MarkingScheme)
   if ("error" in loaded) return { error: loaded.error };
 
   const clean = normalizeScheme(scheme);
-  for (const rule of [clean.SINGLE, clean.MULTIPLE, clean.INTEGER, clean.DECIMAL]) {
-    if (rule.correct <= 0) return { error: "Marks for a right answer must be more than zero." };
-    if (rule.wrong > 0) return { error: "Marks for a wrong answer must be zero or negative." };
-  }
-  if (clean.MULTIPLE.partial === "PER_OPTION" && clean.MULTIPLE.partialPerOption <= 0) {
-    return { error: "Partial marks per right option must be more than zero." };
-  }
+  const invalid = schemeProblem(clean);
+  if (invalid) return { error: invalid };
 
   await prisma.test.update({
     where: { id: testId },

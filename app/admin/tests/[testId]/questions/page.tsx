@@ -37,6 +37,8 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
     title: s.title,
     attemptLimit: s.attemptLimit,
     instructions: s.instructions,
+    durationMinutes: s.durationMinutes,
+    scheme: s.markingScheme ? normalizeScheme(s.markingScheme) : null,
     questions: s.questions.map((q) => ({
       id: q.id,
       type: q.type,

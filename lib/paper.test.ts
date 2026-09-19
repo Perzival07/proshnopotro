@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   checkResponse,
   normalizeScheme,
+  sectionalDuration,
+  sectionOpen,
+  sectionWindows,
   parseAnswerKey,
   toMarkableSections,
   toStudentPaper,
@@ -143,4 +146,38 @@ describe("withinAttemptLimit", () => {
   it("allows a new answer below the limit", () => expect(withinAttemptLimit(5, 4, false)).toBe(true));
   it("refuses a new answer at the limit", () => expect(withinAttemptLimit(5, 5, false)).toBe(false));
   it("always allows changing an existing answer", () => expect(withinAttemptLimit(5, 5, true)).toBe(true));
+});
+
+describe("section windows", () => {
+  const sections = [
+    { id: "chem", position: 1, durationMinutes: 40 },
+    { id: "phy", position: 0, durationMinutes: 60 },
+  ];
+  const min = 60_000;
+
+  it("runs sections back to back in paper order", () => {
+    expect(sectionWindows(sections)).toEqual([
+      { id: "phy", opensAt: 0, closesAt: 60 * min },
+      { id: "chem", opensAt: 60 * min, closesAt: 100 * min },
+    ]);
+    expect(sectionalDuration(sections)).toBe(100);
+  });
+
+  it("does not time sections unless every one has a time", () => {
+    expect(sectionWindows([...sections, { id: "bio", position: 2, durationMinutes: null }])).toBeNull();
+    expect(sectionWindows([])).toBeNull();
+  });
+
+  it("opens each section only in its own window", () => {
+    const w = sectionWindows(sections);
+    expect(sectionOpen(w, "phy", 10 * min)).toBe(true);
+    expect(sectionOpen(w, "chem", 10 * min)).toBe(false);
+    expect(sectionOpen(w, "phy", 61 * min)).toBe(false);
+    expect(sectionOpen(w, "chem", 61 * min)).toBe(true);
+  });
+
+  it("lets an answer sent at the last moment land", () =>
+    expect(sectionOpen(sectionWindows(sections), "phy", 60 * min + 5000, 15000)).toBe(true));
+
+  it("leaves an untimed paper open", () => expect(sectionOpen(null, "any", 0)).toBe(true));
 });

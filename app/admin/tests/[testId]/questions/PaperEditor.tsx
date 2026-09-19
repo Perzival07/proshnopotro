@@ -64,6 +64,9 @@ export interface EditorSection {
   title: string;
   attemptLimit: number | null;
   instructions: string | null;
+  durationMinutes: number | null;
+  /** This section's own marks, or null for the test's. */
+  scheme: MarkingScheme | null;
   questions: EditorQuestion[];
 }
 
@@ -705,11 +708,24 @@ function QuestionCard({
   );
 }
 
-function SectionHeader({ section, questionCount }: { section: EditorSection; questionCount: number }) {
+function SectionHeader({
+  section,
+  questionCount,
+  testScheme,
+  locked,
+}: {
+  section: EditorSection;
+  questionCount: number;
+  testScheme: MarkingScheme;
+  locked: boolean;
+}) {
   const [editing, setEditing] = useState(false);
   const [title, setTitle] = useState(section.title);
   const [limit, setLimit] = useState(section.attemptLimit ? String(section.attemptLimit) : "");
+  const [minutes, setMinutes] = useState(section.durationMinutes ? String(section.durationMinutes) : "");
   const [instructions, setInstructions] = useState(section.instructions ?? "");
+  const [ownMarks, setOwnMarks] = useState(section.scheme !== null);
+  const [scheme, setScheme] = useState<MarkingScheme>(section.scheme ?? testScheme);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -719,7 +735,9 @@ function SectionHeader({ section, questionCount }: { section: EditorSection; que
         <h2 className="font-heading text-base font-bold text-brand-navy">{section.title}</h2>
         <span className="text-xs text-brand-ink/60">
           {questionCount} {questionCount === 1 ? "question" : "questions"}
-          {section.attemptLimit ? ` · attempt any ${section.attemptLimit}` : ""}
+          {section.attemptLimit ? ` \u00b7 attempt any ${section.attemptLimit}` : ""}
+          {section.durationMinutes ? ` \u00b7 ${section.durationMinutes} min` : ""}
+          {section.scheme ? " \u00b7 its own marks" : ""}
         </span>
         <button
           type="button"
@@ -738,9 +756,14 @@ function SectionHeader({ section, questionCount }: { section: EditorSection; que
   const save = async () => {
     setBusy(true);
     setError(null);
-    const n = limit.trim() ? Number(limit) : null;
     try {
-      const res = await updateSection(section.id, { title, attemptLimit: n, instructions });
+      const res = await updateSection(section.id, {
+        title,
+        attemptLimit: limit.trim() ? Number(limit) : null,
+        instructions,
+        durationMinutes: minutes.trim() ? Number(minutes) : null,
+        markingScheme: ownMarks ? scheme : null,
+      });
       if (res.error) setError(res.error);
       else setEditing(false);
     } catch {
@@ -751,18 +774,34 @@ function SectionHeader({ section, questionCount }: { section: EditorSection; que
   };
 
   return (
-    <div className="space-y-2 rounded-lg border border-brand-border bg-white p-3">
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_140px]">
-        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Section name" />
-        <Input
-          value={limit}
-          onChange={(e) => setLimit(e.target.value)}
-          type="number"
-          min={1}
-          placeholder="Attempt any…"
-          title="Leave blank for all questions"
-        />
+    <div className="space-y-3 rounded-lg border border-brand-border bg-white p-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-[1fr_130px_130px]">
+        <label className="text-[11px] font-semibold text-brand-navy">
+          Name
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} className="mt-1" />
+        </label>
+        <label className="text-[11px] font-semibold text-brand-navy">
+          Attempt any
+          <Input value={limit} onChange={(e) => setLimit(e.target.value)} type="number" min={1} placeholder="All" className="mt-1" />
+        </label>
+        <label className="text-[11px] font-semibold text-brand-navy">
+          Time (minutes)
+          <Input
+            value={minutes}
+            onChange={(e) => setMinutes(e.target.value)}
+            type="number"
+            min={1}
+            placeholder="None"
+            disabled={locked}
+            className="mt-1"
+          />
+        </label>
       </div>
+      <p className="text-[11px] text-brand-ink/60">
+        Give every section a time to run the paper section by section: each opens when the one before closes, and
+        a closed section cannot be reopened. The test&apos;s time becomes their total.
+        {locked && " Times cannot change once students have started."}
+      </p>
       <textarea
         value={instructions}
         onChange={(e) => setInstructions(e.target.value)}
@@ -770,9 +809,18 @@ function SectionHeader({ section, questionCount }: { section: EditorSection; que
         placeholder="Instructions shown at the top of this section (optional)"
         className="w-full rounded-md border border-brand-border p-2 text-xs focus-ring"
       />
+      <label className="flex items-center gap-2 text-xs font-medium text-brand-ink">
+        <input type="checkbox" checked={ownMarks} onChange={(e) => setOwnMarks(e.target.checked)} />
+        Marks for this section differ from the rest of the test
+      </label>
+      {ownMarks && (
+        <div className="rounded-md border border-brand-border bg-brand-page p-3">
+          <SchemeFields draft={scheme} setDraft={setScheme} />
+        </div>
+      )}
       <div className="flex items-center gap-2">
         <Button type="button" size="sm" disabled={busy} onClick={save} className="h-8 bg-brand-navy text-xs text-white">
-          {busy ? "Saving…" : "Save section"}
+          {busy ? "Saving\u2026" : "Save section"}
         </Button>
         <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => setEditing(false)}>
           Cancel
@@ -853,29 +901,12 @@ const RULE_ROWS: { type: QuestionType; label: string }[] = [
   { type: "DECIMAL", label: "Decimal" },
 ];
 
-function SchemeEditor({ testId, scheme, submitted }: { testId: string; scheme: MarkingScheme; submitted: number }) {
-  const [draft, setDraft] = useState<MarkingScheme>(scheme);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
-  const changed = JSON.stringify(draft) !== JSON.stringify(scheme);
-
+/** The marks table and presets, editing a draft the caller holds. */
+function SchemeFields({ draft, setDraft }: { draft: MarkingScheme; setDraft: React.Dispatch<React.SetStateAction<MarkingScheme>> }) {
   const setRule = (type: QuestionType, field: "correct" | "wrong", raw: string) => {
     const n = raw === "" || raw === "-" ? 0 : Number(raw);
     if (!Number.isFinite(n)) return;
     setDraft((d) => ({ ...d, [type]: { ...d[type], [field]: field === "wrong" ? -Math.abs(n) : Math.abs(n) } }));
-  };
-
-  const save = async () => {
-    setBusy(true);
-    setMessage(null);
-    try {
-      const res = await updateMarkingScheme(testId, draft);
-      setMessage(res.error ? { tone: "error", text: res.error } : { tone: "ok", text: "Saved." });
-    } catch {
-      setMessage({ tone: "error", text: "Could not reach the server." });
-    } finally {
-      setBusy(false);
-    }
   };
 
   return (
@@ -963,6 +994,32 @@ function SchemeEditor({ testId, scheme, submitted }: { testId: string; scheme: M
         </span>
       </label>
 
+    </div>
+  );
+}
+
+function SchemeEditor({ testId, scheme, submitted }: { testId: string; scheme: MarkingScheme; submitted: number }) {
+  const [draft, setDraft] = useState<MarkingScheme>(scheme);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
+  const changed = JSON.stringify(draft) !== JSON.stringify(scheme);
+
+  const save = async () => {
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await updateMarkingScheme(testId, draft);
+      setMessage(res.error ? { tone: "error", text: res.error } : { tone: "ok", text: "Saved." });
+    } catch {
+      setMessage({ tone: "error", text: "Could not reach the server." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <SchemeFields draft={draft} setDraft={setDraft} />
       <div className="flex items-center gap-2">
         <Button type="button" size="sm" disabled={busy || !changed} onClick={save} className="h-8 bg-brand-navy text-xs text-white">
           {busy ? "Saving…" : "Save marking"}
@@ -1076,6 +1133,7 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
         sections.map((s) => ({
           id: s.id,
           attemptLimit: s.attemptLimit,
+          scheme: s.scheme,
           questions: s.questions.map((q) => ({
             id: q.id,
             key: q.key ?? { type: "SINGLE" as const, options: [] },
@@ -1118,7 +1176,12 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
 
           {sections.map((section) => (
             <section key={section.id} className="space-y-3">
-              <SectionHeader section={section} questionCount={section.questions.length} />
+              <SectionHeader
+                section={section}
+                questionCount={section.questions.length}
+                testScheme={scheme}
+                locked={locked}
+              />
               {section.questions.map((question, i) => {
                 number++;
                 const passage = question.passageId ? passageById.get(question.passageId) : null;
@@ -1127,7 +1190,13 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
                 return (
                   <React.Fragment key={question.id}>
                     {firstOfPassage && passage && <PassageBlock passage={passage} />}
-                    <QuestionCard testId={test.id} number={number} question={question} scheme={scheme} locked={locked} />
+                    <QuestionCard
+                      testId={test.id}
+                      number={number}
+                      question={question}
+                      scheme={section.scheme ?? scheme}
+                      locked={locked}
+                    />
                   </React.Fragment>
                 );
               })}

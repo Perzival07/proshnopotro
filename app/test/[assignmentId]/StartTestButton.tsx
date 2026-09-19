@@ -81,6 +81,8 @@ export function StartTestButton({
   // A paper written in the portal, in place of a link.
   const [paper, setPaper] = useState<StudentPaper | null>(null);
   const [progress, setProgress] = useState({ answered: 0, total: 0 });
+  // Each section's window on this browser's clock, for a paper timed per section.
+  const [windows, setWindows] = useState<{ id: string; opensAtMs: number; closesAtMs: number }[] | null>(null);
   const examRef = useRef<ExamPaperHandle>(null);
   const onProgress = useCallback((answered: number, total: number) => setProgress({ answered, total }), []);
   const fullscreen = useFullscreen();
@@ -175,6 +177,16 @@ export function StartTestButton({
 
     setEmbedUrl(res.embedUrl ?? null);
     setPaper(res.paper ?? null);
+    if (res.paper?.windows && res.serverNow) {
+      const skew = Date.now() - Date.parse(res.serverNow);
+      setWindows(
+        res.paper.windows.map((w) => ({
+          id: w.id,
+          opensAtMs: Date.parse(w.opensAt) + skew,
+          closesAtMs: Date.parse(w.closesAt) + skew,
+        }))
+      );
+    }
     setOpened(true);
     if (res.endsAt && res.serverNow) {
       const fresh = toClientDeadline(res.endsAt, res.serverNow);
@@ -430,6 +442,7 @@ export function StartTestButton({
                 onProgress={onProgress}
                 onEnded={() => void handleExpire()}
                 cameraBadge={cameraActive}
+                windows={windows}
               />
             </FullscreenFrame>
           )}

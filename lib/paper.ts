@@ -151,6 +151,8 @@ export interface StudentSection {
   title: string;
   instructions: string | null;
   attemptLimit: number | null;
+  /** This section's own minutes, when the paper is timed per section. */
+  durationMinutes: number | null;
   questions: StudentQuestion[];
 }
 
@@ -168,6 +170,7 @@ export function toStudentPaper(sections: SectionRow[], testScheme: MarkingScheme
       title: section.title,
       instructions: section.instructions,
       attemptLimit: section.attemptLimit,
+      durationMinutes: section.durationMinutes,
       questions: [...section.questions].sort(byPosition).map((q) => ({
         id: q.id,
         number: ++number,
@@ -234,3 +237,58 @@ export function withinAttemptLimit(
 }
 
 export { isAttempted };
+
+export interface SectionWindow {
+  id: string;
+  /** Milliseconds from the start of the attempt. */
+  opensAt: number;
+  closesAt: number;
+}
+
+/**
+ * The time windows of a paper with a timer per section, as offsets from the
+ * moment the student opened it. Sections run one after another in paper
+ * order, each for its own minutes, and a section that has closed stays
+ * closed.
+ *
+ * Only a paper where every section has its own time is timed this way; with
+ * any section left without one, there are no windows (null) and the paper
+ * runs on the test's single timer.
+ */
+export function sectionWindows(
+  sections: { id: string; position: number; durationMinutes: number | null }[]
+): SectionWindow[] | null {
+  if (sections.length === 0) return null;
+  if (!sections.every((s) => s.durationMinutes && s.durationMinutes > 0)) return null;
+  let at = 0;
+  return [...sections].sort(byPosition).map((s) => {
+    const opensAt = at;
+    at += s.durationMinutes! * 60_000;
+    return { id: s.id, opensAt, closesAt: at };
+  });
+}
+
+/** Total minutes of a paper with a timer per section, or null. */
+export function sectionalDuration(
+  sections: { id: string; position: number; durationMinutes: number | null }[]
+): number | null {
+  const windows = sectionWindows(sections);
+  return windows ? windows[windows.length - 1].closesAt / 60_000 : null;
+}
+
+/**
+ * Whether an answer to a question in this section may be saved at `elapsedMs`
+ * into the attempt. `graceMs` lets an answer sent in the section's last
+ * moment still land.
+ */
+export function sectionOpen(
+  windows: SectionWindow[] | null,
+  sectionId: string,
+  elapsedMs: number,
+  graceMs = 0
+): boolean {
+  if (!windows) return true;
+  const w = windows.find((x) => x.id === sectionId);
+  if (!w) return false;
+  return elapsedMs >= w.opensAt && elapsedMs <= w.closesAt + graceMs;
+}

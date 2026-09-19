@@ -17,6 +17,7 @@ import {
 } from "@/app/test/[assignmentId]/actions";
 import { isAttempted, type ResponseValue } from "@/lib/marking";
 import type { StudentQuestion, StudentSection } from "@/lib/paper";
+import { formatRemaining } from "@/lib/exam-timer";
 import {
   AlertCircle,
   Bookmark,
@@ -42,6 +43,11 @@ interface ExamPaperProps {
   onEnded?: () => void;
   /** Leave room at the bottom for the camera badge, which sits over the page. */
   cameraBadge?: boolean;
+  /**
+   * For a paper timed per section: each section's window on this browser's
+   * clock. Only the open section can be seen and answered.
+   */
+  windows?: { id: string; opensAtMs: number; closesAtMs: number }[] | null;
 }
 
 type SaveState = "saving" | "saved" | "error";
@@ -65,7 +71,7 @@ function formatMarks(correct: number, wrong: number) {
  * the student stands at a glance, as on the NTA exams they are practising for.
  */
 export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function ExamPaper(
-  { assignmentId, paper, onProgress, onEnded, cameraBadge = false },
+  { assignmentId, paper, onProgress, onEnded, cameraBadge = false, windows = null },
   ref
 ) {
   const flat = useMemo(
@@ -86,7 +92,25 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   const [visited, setVisited] = useState<Set<string>>(
     () => new Set([...paper.responses.map((r) => r.questionId), flat[0]?.question.id].filter(Boolean) as string[])
   );
-  const [current, setCurrent] = useState(0);
+  // ── Sections on their own clocks ───────────────────────────
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!windows) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [windows]);
+  const activeWindow = windows?.find((w) => now >= w.opensAtMs && now < w.closesAtMs) ?? null;
+  const canVisit = useCallback(
+    (sectionId: string) => !windows || activeWindow?.id === sectionId,
+    [windows, activeWindow]
+  );
+
+  const [current, setCurrent] = useState(() => {
+    if (!windows) return 0;
+    const open = windows.find((w) => Date.now() >= w.opensAtMs && Date.now() < w.closesAtMs);
+    const index = open ? flat.findIndex((f) => f.section.id === open.id) : -1;
+    return index === -1 ? 0 : index;
+  });
   const [saveState, setSaveState] = useState<Record<string, SaveState>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [showPalette, setShowPalette] = useState(false);
@@ -205,9 +229,28 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   const answeredInSection = (section: StudentSection) =>
     section.questions.filter((q) => isAttempted(answers[q.id])).length;
 
+  // When a section's time runs out, the next one opens and the student is
+  // taken to it; the closed one cannot be gone back to.
+  const activeId = activeWindow?.id ?? null;
+  const previousActive = useRef(activeId);
+  useEffect(() => {
+    if (!windows || previousActive.current === activeId) return;
+    const closed = paper.sections.find((s) => s.id === previousActive.current);
+    previousActive.current = activeId;
+    const opened = paper.sections.find((s) => s.id === activeId);
+    if (!opened) return;
+    const first = flat.findIndex((f) => f.section.id === opened.id);
+    if (first !== -1) {
+      setCurrent(first);
+      setVisited((v) => new Set(v).add(flat[first].question.id));
+    }
+    setNotice(closed ? `Time for ${closed.title} is over. ${opened.title} has started.` : null);
+  }, [activeId, windows, paper.sections, flat]);
+
   // ── Navigation ────────────────────────────────────────────
   const goTo = (index: number) => {
     const bounded = Math.max(0, Math.min(flat.length - 1, index));
+    if (!canVisit(flat[bounded].section.id)) return;
     setCurrent(bounded);
     setNotice(null);
     setShowPalette(false);
@@ -220,10 +263,15 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   const value = answers[question.id] ?? null;
   const marked = review[question.id] ?? false;
   const limit = section.attemptLimit;
+  const sectionClosed = !canVisit(section.id);
   const limitReached =
-    !!limit && !isAttempted(value) && answeredInSection(section) >= limit;
+    sectionClosed || (!!limit && !isAttempted(value) && answeredInSection(section) >= limit);
 
   const setAnswer = (next: ResponseValue, delayMs = 0) => {
+    if (sectionClosed) {
+      setNotice(`Time for ${section.title} is over.`);
+      return;
+    }
     if (limitReached && isAttempted(next)) {
       setNotice(`You can answer only ${limit} questions in ${section.title}. Clear another answer first.`);
       return;
@@ -263,12 +311,15 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
             {paper.sections.map((s) => {
               const first = flat.findIndex((f) => f.section.id === s.id);
               const active = s.id === section.id;
+              const w = windows?.find((x) => x.id === s.id);
+              const state = !w ? null : now >= w.closesAtMs ? "closed" : now < w.opensAtMs ? "later" : "open";
               return (
                 <button
                   key={s.id}
                   type="button"
+                  disabled={!canVisit(s.id)}
                   onClick={() => goTo(first)}
-                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`shrink-0 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                     active
                       ? "border-brand-navy bg-brand-navy text-white"
                       : "border-brand-border bg-white text-brand-navy hover:border-brand-blue"
@@ -276,11 +327,24 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
                 >
                   {s.title}
                   <span className={`ml-1.5 font-normal ${active ? "text-white/70" : "text-brand-ink/50"}`}>
-                    {answeredInSection(s)}/{s.attemptLimit ?? s.questions.length}
+                    {state === "closed"
+                      ? "Closed"
+                      : state === "later"
+                        ? `Opens in ${formatRemaining(w!.opensAtMs - now)}`
+                        : `${answeredInSection(s)}/${s.attemptLimit ?? s.questions.length}`}
                   </span>
                 </button>
               );
             })}
+          </div>
+        )}
+
+        {activeWindow && (
+          <div className="flex items-center justify-between rounded-lg border border-brand-blue/30 bg-brand-tint/60 px-3 py-2 text-xs text-brand-navy">
+            <span className="font-semibold">
+              {paper.sections.find((s) => s.id === activeWindow.id)?.title}: time left in this section
+            </span>
+            <span className="font-mono text-sm font-bold tabular-nums">{formatRemaining(activeWindow.closesAtMs - now)}</span>
           </div>
         )}
 
@@ -395,21 +459,30 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
             <p className="mt-3 flex items-start gap-1.5 text-xs font-medium text-amber-800">
               <AlertCircle className="mt-px h-3.5 w-3.5 shrink-0" />
               {notice ||
-                (limit === 1
+                (sectionClosed
+                  ? `Time for ${section.title} is over.`
+                  : limit === 1
                   ? `You have already answered a question in ${section.title}. Clear it to answer this one instead.`
                   : `You have answered ${limit} questions in ${section.title}. Clear one to answer this one instead.`)}
             </p>
           )}
 
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-brand-border/60 pt-3">
-            <Button type="button" variant="outline" size="sm" disabled={current === 0} onClick={() => goTo(current - 1)} className="h-9 gap-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={current === 0 || !canVisit(flat[current - 1]?.section.id ?? "")}
+              onClick={() => goTo(current - 1)}
+              className="h-9 gap-1"
+            >
               <ChevronLeft className="h-4 w-4" /> Previous
             </Button>
             <Button
               type="button"
               variant="outline"
               size="sm"
-              disabled={!isAttempted(value)}
+              disabled={!isAttempted(value) || sectionClosed}
               onClick={() => setAnswer(null)}
               className="h-9 gap-1"
             >
@@ -428,7 +501,7 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
             <Button
               type="button"
               size="sm"
-              disabled={current === flat.length - 1}
+              disabled={current === flat.length - 1 || !canVisit(flat[current + 1]?.section.id ?? "")}
               onClick={() => goTo(current + 1)}
               className="ml-auto h-9 gap-1 bg-brand-navy text-white hover:bg-brand-navy/90"
             >
@@ -458,6 +531,7 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
           review={review}
           visited={visited}
           onPick={goTo}
+          canVisit={canVisit}
         />
       </aside>
     </div>
@@ -472,6 +546,7 @@ function Palette({
   review,
   visited,
   onPick,
+  canVisit,
 }: {
   sections: StudentSection[];
   flat: { question: StudentQuestion; section: StudentSection }[];
@@ -480,6 +555,7 @@ function Palette({
   review: Record<string, boolean>;
   visited: Set<string>;
   onPick: (index: number) => void;
+  canVisit: (sectionId: string) => boolean;
 }) {
   const indexOf = new Map(flat.map((f, i) => [f.question.id, i]));
   const counts = { answered: 0, notAnswered: 0, review: 0, notVisited: 0 };
@@ -521,10 +597,11 @@ function Palette({
                 <button
                   key={q.id}
                   type="button"
+                  disabled={!canVisit(section.id)}
                   onClick={() => onPick(index)}
                   aria-label={`Question ${q.number}`}
                   aria-current={index === current ? "true" : undefined}
-                  className={`relative h-8 rounded-md border text-xs font-semibold ${style} ${
+                  className={`relative h-8 rounded-md border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${style} ${
                     index === current ? "ring-2 ring-brand-blue ring-offset-1" : ""
                   }`}
                 >
