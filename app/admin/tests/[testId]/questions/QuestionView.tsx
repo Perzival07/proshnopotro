@@ -93,7 +93,7 @@ export function QuestionView({
                 <span className={`mt-0.5 shrink-0 text-xs font-bold ${right ? "text-emerald-700" : "text-brand-navy"}`}>
                   ({option.id})
                 </span>
-                <RichText text={option.text} className="min-w-0 flex-1" />
+                <RichText tall text={option.text} className="min-w-0 flex-1" />
                 {right && <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />}
               </li>
             );

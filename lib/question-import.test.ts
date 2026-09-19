@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseQuestionPaper, questionToText } from "./question-import";
+import { parseAnswerKeyText, parseQuestionPaper, questionToText, splitInlineOptions } from "./question-import";
 
 const paper = (...lines: string[]) => parseQuestionPaper(lines.join("\n"));
 
@@ -197,4 +197,90 @@ describe("questionToText", () => {
     ["own marks", "Q1. Find\nAnswer: 3\nMarks: +3 -1"],
     ["multi-line", "Q1. Line one\n$$x$$\n(A) a\nmore\n(B) b\nAnswer: A\nSolution: one\ntwo"],
   ])("round-trips a %s question", (_, text) => roundTrip(text));
+});
+
+describe("papers typed for print", () => {
+  it("reads questions numbered 1. 2. 3.", () => {
+    const { sections, errors } = paper("1. First", "Answer: 1", "2) Second", "Answer: 2");
+    expect(errors).toEqual([]);
+    expect(sections[0].questions.map((q) => q.stem)).toEqual(["First", "Second"]);
+  });
+
+  it("does not read a numbered list inside a question as questions", () => {
+    const { sections, errors } = paper(
+      "1. Consider the statements:",
+      "1. Light is a wave.",
+      "2. Light is a particle.",
+      "(A) Only 1",
+      "(B) Only 2",
+      "(C) Both",
+      "Answer: C",
+      "2. Next question",
+      "Answer: 4"
+    );
+    expect(errors).toEqual([]);
+    expect(sections[0].questions).toHaveLength(2);
+    expect(sections[0].questions[0].stem).toContain("2. Light is a particle.");
+    expect(sections[0].questions[1].stem).toBe("Next question");
+  });
+
+  it("splits options written on one line", () => {
+    const { sections, errors } = paper("1. Pick one (A) 2 (B) 4 (C) $x^2$ (D) 8", "Answer: C");
+    expect(errors).toEqual([]);
+    const q = sections[0].questions[0];
+    expect(q.stem).toBe("Pick one");
+    expect(q.options.map((o) => `${o.id}:${o.text}`)).toEqual(["A:2", "B:4", "C:$x^2$", "D:8"]);
+  });
+
+  it("takes answers from a key at the end", () => {
+    const { sections, errors } = paper(
+      "1. a",
+      "(a) x",
+      "(b) y",
+      "2. b",
+      "(a) x (b) y (c) z",
+      "3. Find n",
+      "4. Find x",
+      "",
+      "Answer Key",
+      "1. B   2. A, C",
+      "3. 7   4. 2.45 to 2.55"
+    );
+    expect(errors).toEqual([]);
+    expect(sections[0].questions.map((q) => q.key)).toEqual([
+      { type: "SINGLE", options: ["B"] },
+      { type: "MULTIPLE", options: ["A", "C"] },
+      { type: "INTEGER", values: [7] },
+      { type: "DECIMAL", min: 2.45, max: 2.55 },
+    ]);
+  });
+
+  it("says which question the key is missing", () => {
+    const { errors } = paper("1. a", "Answer: 1", "2. b", "Answers: 1. 1");
+    expect(errors[0].message).toContain("nothing for question 2");
+  });
+
+  it("keeps an Answer: line over the key", () => {
+    const { sections } = paper("1. a", "Answer: 5", "Answer key: 1. 9");
+    expect(sections[0].questions[0].key).toEqual({ type: "INTEGER", values: [5] });
+  });
+});
+
+describe("parseAnswerKeyText", () => {
+  it("reads the common layouts", () => {
+    const key = parseAnswerKeyText("1. B 2-C 3) A,D 4 (d) Q5: 12 6. -3 7. 0.5 to 0.6 8. AB");
+    expect(Object.fromEntries(key)).toEqual({
+      1: "B", 2: "C", 3: "A,D", 4: "d", 5: "12", 6: "-3", 7: "0.5 to 0.6", 8: "AB",
+    });
+  });
+});
+
+describe("splitInlineOptions", () => {
+  it("leaves ordinary text alone", () => {
+    expect(splitInlineOptions("Case (a) is harder than case (b)")).toEqual(["Case (a) is harder than case (b)"]);
+    expect(splitInlineOptions("Only (A) here")).toEqual(["Only (A) here"]);
+    expect(splitInlineOptions("Which of (a) and (b) are true?")).toEqual(["Which of (a) and (b) are true?"]);
+  });
+  it("splits lower-case options", () =>
+    expect(splitInlineOptions("(a) one (b) two")).toEqual(["(a) one", "(b) two"]));
 });

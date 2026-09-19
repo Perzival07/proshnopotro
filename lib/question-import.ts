@@ -23,6 +23,15 @@
  * [multiple], [integer], [decimal]. Without it, a question with options is
  * single-correct unless its answer lists more than one option. "Marks: +3 -1"
  * gives one question its own marks.
+ *
+ * Papers typed for print are read too, so a tutor's Word file needs little
+ * rework:
+ *   - questions numbered "1." or "1)" instead of "Q1.", as long as the numbers
+ *     run in order;
+ *   - all four options on one line: "(A) 2 (B) 4 (C) 6 (D) 8";
+ *   - an answer key at the end instead of "Answer:" under each question:
+ *       Answer key
+ *       1. B   2. A, C   3. 7   4. 2.45 to 2.55
  */
 
 import type { AnswerKey, QuestionType } from "./marking";
@@ -74,11 +83,65 @@ const MARKS_RE = /^Marks\s*[:.-]\s*(.*)$/i;
 const PARAGRAPH_RE = /^(?:Paragraph|Passage|Comprehension)\s*[:.-]?\s*(.*)$/i;
 const END_PARAGRAPH_RE = /^End\s+(?:paragraph|passage|comprehension)\s*$/i;
 const ATTEMPT_RE = /\|\s*attempt\s+(?:any\s+)?(\d+)\s*$/i;
+const PLAIN_QUESTION_RE = /^(\d{1,3})\s*[.)]\s+(\S.*)$/;
+const ANSWER_KEY_RE = /^(?:answer\s*keys?|answers)\s*[:.\-\u2013]?\s*(.*)$/i;
+const NUMBER_PATTERN = "-?(?:\\d+\\.?\\d*|\\.\\d+)";
+/** "1. B", "2-A,C", "3) 7", "Q4: 2.45 to 2.55", "5 (c)" */
+const KEY_ENTRY_RE = new RegExp(
+  `(?:Q\\s*)?(\\d{1,3})\\s*[.):\\-\u2013]?\\s*\\(?\\s*(${NUMBER_PATTERN}\\s*(?:to|\u2013)\\s*${NUMBER_PATTERN}|[A-Fa-f](?:\\s*,\\s*[A-Fa-f]|[A-Fa-f])*(?![\\w.])|${NUMBER_PATTERN})\\s*\\)?`,
+  "g"
+);
+
+/**
+ * Reads an answer key: "1. B  2. A, C  3. 7". Returns question number ->
+ * answer text, in the same forms an "Answer:" line takes.
+ */
+export function parseAnswerKeyText(text: string): Map<number, string> {
+  const key = new Map<number, string>();
+  for (const match of Array.from(text.matchAll(KEY_ENTRY_RE))) {
+    key.set(Number(match[1]), match[2].trim());
+  }
+  return key;
+}
+
+/**
+ * Splits options written on one line -- "(A) 2 (B) 4 (C) 6 (D) 8", perhaps
+ * after the question text -- into one line each. Only the bracketed form is
+ * split, only when the letters run A, B, ... in order, and after question
+ * text only when there are at least three, so ordinary prose that mentions
+ * "(a) and (b)" is left alone.
+ */
+export function splitInlineOptions(line: string): string[] {
+  // A table row keeps its cells together.
+  if (line.trimStart().startsWith("|")) return [line];
+  const markers = Array.from(line.matchAll(/(^|\s)\(([A-Fa-f])\)\s/g));
+  const first = markers.findIndex((m) => m[2] === "A" || m[2] === "a");
+  if (first === -1) return [line];
+  const upper = markers[first][2] === "A";
+  const cuts: number[] = [];
+  let expected = 0;
+  for (const m of markers.slice(first)) {
+    const letter = upper ? m[2] : m[2].toUpperCase();
+    if ((upper ? m[2] !== m[2].toUpperCase() : m[2] !== m[2].toLowerCase()) || letter !== OPTION_IDS[expected]) continue;
+    cuts.push(m.index! + m[1].length);
+    expected++;
+  }
+  // Two markers mid-sentence ("compare (a) and (b) ...") are prose, not
+  // options; a line that starts with (A), or runs to (C), is options.
+  if (cuts.length < 2 || (cuts[0] !== 0 && cuts.length < 3)) return [line];
+  const parts = [line.slice(0, cuts[0])];
+  cuts.forEach((cut, i) => parts.push(line.slice(cut, cuts[i + 1] ?? line.length)));
+  return parts.map((p) => p.trim()).filter(Boolean);
+}
 
 type Field = "stem" | "option" | "solution" | "paragraph" | null;
 
 interface Draft {
   line: number;
+  /** The number the paper gives it, for the answer key. */
+  number: number;
+  /** Saw a numbered list ("1. ... 2. ...") inside its text. */
+  sawNumbered: boolean;
   tag: QuestionType | null;
   stem: string[];
   options: ImportedOption[];
@@ -153,7 +216,31 @@ function joinLines(lines: string[]): string {
 }
 
 export function parseQuestionPaper(text: string): ImportedPaper {
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+  const rawLines = text.replace(/\r\n?/g, "\n").split("\n");
+
+  // An answer key at the end is read first, and its lines are left out of
+  // the questions.
+  let keyStart = rawLines.findIndex((l) => {
+    const m = l.trim().match(ANSWER_KEY_RE);
+    return !!m && (m[1] === "" || parseAnswerKeyText(m[1]).size > 0);
+  });
+  if (keyStart === -1) keyStart = rawLines.length;
+  const keyText = rawLines
+    .slice(keyStart)
+    .map((l, i) => (i === 0 ? l.trim().replace(ANSWER_KEY_RE, "$1") : l))
+    .join("\n");
+  const answerKey = parseAnswerKeyText(keyText);
+  const keyLine = keyStart + 1;
+
+  // Options run together on one line are split, keeping each piece's line
+  // number for error messages.
+  const lines: { raw: string; lineNo: number }[] = [];
+  rawLines.slice(0, keyStart).forEach((raw, index) => {
+    const parts = splitInlineOptions(raw);
+    if (parts.length === 1) lines.push({ raw, lineNo: index + 1 });
+    else for (const part of parts) lines.push({ raw: part, lineNo: index + 1 });
+  });
+  let lastNumber = 0;
   const sections: ImportedSection[] = [];
   const passages: string[] = [];
   const errors: ImportError[] = [];
@@ -194,8 +281,18 @@ export function parseQuestionPaper(text: string): ImportedPaper {
       errors.push({ line: d.line, message: `${where} has no text.` });
       return;
     }
+    if ((d.answer === null || !d.answer.trim()) && answerKey.has(d.number)) {
+      d.answer = answerKey.get(d.number)!;
+      d.answerLine = keyLine;
+    }
     if (d.answer === null || !d.answer.trim()) {
-      errors.push({ line: d.line, message: `${where} has no "Answer:" line.` });
+      errors.push({
+        line: d.line,
+        message:
+          answerKey.size > 0
+            ? `${where} has no "Answer:" line, and the answer key has nothing for question ${d.number}.`
+            : `${where} has no "Answer:" line.`,
+      });
       return;
     }
 
@@ -273,13 +370,37 @@ export function parseQuestionPaper(text: string): ImportedPaper {
     });
   };
 
-  lines.forEach((raw, index) => {
-    const lineNo = index + 1;
+  /**
+   * Whether a line starts a question: "Q7." always, a plain "7." only when it
+   * is the next number in the paper. A numbered list inside a question ("1. ...
+   * 2. ...") would otherwise be read as questions, so once one is seen in the
+   * question text, plain numbers start a new question only after the options
+   * or the answer.
+   */
+  const questionStart = (line: string): { number: number; rest: string } | null => {
+    const explicit = line.match(QUESTION_RE);
+    if (explicit) return { number: Number(explicit[1]), rest: explicit[2] };
+    const plain = line.match(PLAIN_QUESTION_RE);
+    if (!plain) return null;
+    const n = Number(plain[1]);
+    const d = draft as Draft | null;
+    const listInText = !!d && d.sawNumbered && (field === "stem" || field === "solution");
+    if (n === lastNumber + 1 && !listInText) return { number: n, rest: plain[2] };
+    if (d) d.sawNumbered = true;
+    return null;
+  };
+
+  lines.forEach(({ raw, lineNo }) => {
     const line = raw.trim();
 
     // Inside a passage, everything is passage text until a question starts it
     // being used, an explicit end, or a new section.
-    if (passageLines && !QUESTION_RE.test(line) && !SECTION_RE.test(line) && !END_PARAGRAPH_RE.test(line)) {
+    if (
+      passageLines &&
+      !(PLAIN_QUESTION_RE.test(line) ? Number(line.match(PLAIN_QUESTION_RE)![1]) === lastNumber + 1 : QUESTION_RE.test(line)) &&
+      !SECTION_RE.test(line) &&
+      !END_PARAGRAPH_RE.test(line)
+    ) {
       passageLines.push(raw);
       return;
     }
@@ -319,11 +440,12 @@ export function parseQuestionPaper(text: string): ImportedPaper {
       return;
     }
 
-    const question = line.match(QUESTION_RE);
+    const question = questionStart(line);
     if (question) {
       finish();
       closePassage();
-      let rest = question[2];
+      lastNumber = question.number;
+      let rest = question.rest;
       let tag: QuestionType | null = null;
       const tagMatch = rest.match(TYPE_TAG_RE);
       if (tagMatch) {
@@ -332,6 +454,8 @@ export function parseQuestionPaper(text: string): ImportedPaper {
       }
       draft = {
         line: lineNo,
+        number: question.number,
+        sawNumbered: false,
         tag,
         stem: rest ? [rest] : [],
         options: [],
@@ -348,7 +472,10 @@ export function parseQuestionPaper(text: string): ImportedPaper {
 
     if (!draft) {
       if (line) {
-        errors.push({ line: lineNo, message: `"${line.slice(0, 40)}" is outside any question. Start questions with "Q1."` });
+        errors.push({
+          line: lineNo,
+          message: `"${line.slice(0, 40)}" is outside any question. Start questions with "Q1." or "1."; if this is a section heading, start it with "#".`,
+        });
       }
       return;
     }

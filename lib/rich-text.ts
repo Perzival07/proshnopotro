@@ -7,15 +7,19 @@
  *   \ce{...}            chemistry, inside maths: $\ce{H2O}$
  *   ![caption](https://...)  an image
  *   \$                  a literal dollar sign
+ *   | a | b |            a table row; consecutive rows form a table, and a
+ *                       |---|---| row under the first is ignored
  *
  * Nothing here produces HTML, so no text a tutor types can inject markup; the
  * component that renders the segments escapes text and hands maths to KaTeX.
  */
 
-export type Segment =
+export type InlineSegment =
   | { kind: "text"; text: string }
   | { kind: "math"; tex: string; display: boolean }
   | { kind: "image"; url: string; alt: string };
+
+export type Segment = InlineSegment | { kind: "table"; rows: InlineSegment[][][] };
 
 const IMAGE_RE = /^!\[([^\]\n]*)\]\((https:\/\/[^\s)]+)\)/;
 
@@ -35,8 +39,66 @@ function findClose(text: string, close: string, from: number): number {
   return at;
 }
 
+const TABLE_ROW_RE = /^\s*\|.*\|\s*$/;
+const TABLE_RULE_RE = /^\s*\|(\s*:?-{2,}:?\s*\|)+\s*$/;
+
+/** Splits "| a | b |" into its cells, keeping "\|" inside a cell. */
+function tableCells(row: string): string[] {
+  // A loop rather than a lookbehind regex: Safari before iOS 16.4 cannot even
+  // parse one, and the whole paper would fail to load.
+  const inner = row.trim().slice(1, -1);
+  const cells: string[] = [];
+  let cell = "";
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] === "\\" && inner[i + 1] === "|") {
+      cell += "|";
+      i++;
+    } else if (inner[i] === "|") {
+      cells.push(cell.trim());
+      cell = "";
+    } else {
+      cell += inner[i];
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
 export function parseRichText(input: string): Segment[] {
+  const lines = input.split("\n");
   const segments: Segment[] = [];
+  let text: string[] = [];
+
+  const flushText = () => {
+    if (text.length) segments.push(...parseInline(text.join("\n")));
+    text = [];
+  };
+
+  for (let i = 0; i < lines.length; ) {
+    if (!TABLE_ROW_RE.test(lines[i])) {
+      text.push(lines[i]);
+      i++;
+      continue;
+    }
+    const rows: string[] = [];
+    while (i < lines.length && TABLE_ROW_RE.test(lines[i])) rows.push(lines[i++]);
+    // A lone "| x |" line is text, not a table.
+    const body = rows.filter((r) => !TABLE_RULE_RE.test(r));
+    if (body.length < 2 && rows.length < 2) {
+      text.push(...rows);
+      continue;
+    }
+    // The line break before the table belongs to the table now.
+    if (text.length && text[text.length - 1] === "") text.pop();
+    flushText();
+    segments.push({ kind: "table", rows: body.map((r) => tableCells(r).map((c) => parseInline(c))) });
+  }
+  flushText();
+  return segments;
+}
+
+function parseInline(input: string): InlineSegment[] {
+  const segments: InlineSegment[] = [];
   let buffer = "";
   let i = 0;
 

@@ -180,7 +180,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                             }`}
                           >
                             <span className="mt-0.5 shrink-0 text-xs font-bold text-brand-navy">({o.id})</span>
-                            <RichText text={o.text} className="min-w-0 flex-1" />
+                            <RichText tall text={o.text} className="min-w-0 flex-1" />
                             <span className="shrink-0 text-[10px] font-semibold">
                               {isChosen && <span className={isRight ? "text-emerald-700" : "text-red-700"}>Your answer</span>}
                               {isRight && !isChosen && <span className="text-emerald-700">Correct answer</span>}

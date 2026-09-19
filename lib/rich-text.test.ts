@@ -46,3 +46,28 @@ describe("parseRichText", () => {
   it("does not let inline maths run across a blank line", () =>
     expect(parseRichText("a $b\n\nc$ d")).toEqual([{ kind: "text", text: "a $b\n\nc$ d" }]));
 });
+
+describe("parseRichText tables", () => {
+  it("reads consecutive pipe rows as a table, dropping the rule row", () => {
+    const segs = parseRichText("Match:\n| List-I | List-II |\n|---|---|\n| (P) $x$ | (1) y |\nDone");
+    expect(segs[0]).toEqual({ kind: "text", text: "Match:" });
+    expect(segs[1].kind).toBe("table");
+    if (segs[1].kind === "table") {
+      expect(segs[1].rows).toHaveLength(2);
+      expect(segs[1].rows[1][0]).toEqual([
+        { kind: "text", text: "(P) " },
+        { kind: "math", tex: "x", display: false },
+      ]);
+    }
+    expect(segs[2]).toEqual({ kind: "text", text: "Done" });
+  });
+
+  it("keeps a single pipe line as text", () =>
+    expect(parseRichText("| alone |")).toEqual([{ kind: "text", text: "| alone |" }]));
+
+  it("keeps an escaped pipe inside a cell", () => {
+    const segs = parseRichText("| a \\| b | c |\n| d | e |");
+    if (segs[0].kind === "table") expect(segs[0].rows[0][0]).toEqual([{ kind: "text", text: "a | b" }]);
+    else throw new Error("not a table");
+  });
+});

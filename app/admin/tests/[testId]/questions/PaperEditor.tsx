@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   ChevronDown,
   Edit2,
+  FileUp,
   Eye,
   EyeOff,
   Gift,
@@ -192,6 +193,99 @@ function ImageButton({ testId, onInsert }: { testId: string; onInsert: (markdown
   );
 }
 
+/**
+ * Reads a Word file into the paste box. Everything happens in the browser:
+ * the file is unzipped and read here, its pictures are uploaded like any
+ * other question image, and the text lands in the box for the tutor to
+ * check against the preview before anything is saved.
+ */
+function WordImportButton({
+  testId,
+  onText,
+}: {
+  testId: string;
+  onText: (text: string, fileName: string, warnings: string[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const read = async (file: File | undefined) => {
+    if (!file) return;
+    setError(null);
+    setBusy("Reading the file\u2026");
+    try {
+      // Loaded only when a tutor imports, so nobody else downloads it.
+      const { readDocx, IMAGE_URL_PREFIX } = await import("@/lib/docx");
+      const result = readDocx(new Uint8Array(await file.arrayBuffer()));
+      const warnings = [...result.warnings];
+      let text = result.text;
+
+      if (result.images.length > 0) {
+        const signed = await getQuestionImageSignature(testId);
+        let done = 0;
+        for (const image of result.images) {
+          setBusy(`Uploading pictures ${++done} of ${result.images.length}\u2026`);
+          const placeholder = `![](${IMAGE_URL_PREFIX}${image.id})`;
+          let url: string | null = null;
+          if (signed.upload && /^image\/(png|jpe?g|gif|webp|bmp)$/.test(image.contentType)) {
+            try {
+              const raw = new File([new Uint8Array(image.data)], image.name, { type: image.contentType });
+              const blob = image.contentType === "image/gif" ? raw : await shrinkImage(raw).catch(() => raw);
+              const uploaded = await uploadToCloudinary(signed.upload, blob, image.name);
+              url = uploaded.secure_url ?? null;
+            } catch {
+              url = null;
+            }
+          }
+          text = text.split(placeholder).join(url ? `![](${url})` : "[picture missing]");
+          if (!url) {
+            warnings.push(
+              signed.upload
+                ? `A picture (${image.name}) could not be uploaded. It is marked "[picture missing]"; add it again with Insert image.`
+                : `Pictures were not uploaded: ${signed.error ?? "image uploads are not set up"}. They are marked "[picture missing]".`
+            );
+          }
+        }
+      }
+
+      if (!text.trim()) throw new Error("No text was found in this file.");
+      onText(text, file.name, Array.from(new Set(warnings)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "The file could not be read.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <span className="inline-flex items-center gap-2">
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="hidden"
+        onChange={(e) => {
+          void read(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={busy !== null}
+        onClick={() => inputRef.current?.click()}
+        className="h-8 gap-1.5 text-xs"
+      >
+        <FileUp className="h-3.5 w-3.5" />
+        {busy ?? "Import Word file"}
+      </Button>
+      {error && <span className="text-[11px] text-red-700">{error}</span>}
+    </span>
+  );
+}
+
 /** Inserts text at the textarea's cursor, keeping React's value in step. */
 function insertAtCursor(
   el: HTMLTextAreaElement | null,
@@ -236,6 +330,7 @@ function ImportPanel({
   const [error, setError] = useState<string | null>(null);
   const [serverErrors, setServerErrors] = useState<ImportError[]>([]);
   const [showHelp, setShowHelp] = useState(!hasQuestions);
+  const [imported, setImported] = useState<{ name: string; warnings: string[] } | null>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
 
   // The preview trails the typing by a frame on a long paper, so the box
@@ -262,6 +357,7 @@ function ImportPanel({
         setServerErrors(res.errors ?? []);
       } else {
         setText("");
+        setImported(null);
       }
     } catch {
       setError("Could not reach the server. Your text is still here; try again.");
@@ -301,11 +397,14 @@ function ImportPanel({
       {showHelp && (
         <div className="space-y-2 rounded-md border border-brand-border bg-brand-page p-3 text-xs text-brand-ink/80">
           <ul className="list-disc space-y-1 pl-4">
+            <li>Or press <strong>Import Word file</strong>: numbered questions, options, equations, tables and pictures come across, and an &ldquo;Answer key&rdquo; at the end fills in the answers.</li>
             <li><code># Physics</code> starts a section. <code># Section B | attempt any 5</code> lets students answer only 5.</li>
-            <li><code>Q1.</code> starts a question; options are <code>(A)</code> to <code>(D)</code>.</li>
+            <li><code>Q1.</code> or <code>1.</code> starts a question; options are <code>(A)</code> to <code>(D)</code>, one per line or all on one line.</li>
             <li><code>Answer: B</code> for one right option, <code>Answer: A, C</code> for more than one. Add <code>[multiple]</code> after <code>Q1.</code> if only one option is right in a &ldquo;one or more&rdquo; question.</li>
             <li>No options means a typed answer: <code>Answer: 7</code> (integer), <code>Answer: 2.45 to 2.55</code> or <code>Answer: 2.5 ± 0.05</code> (decimal).</li>
             <li><code>Solution:</code> is optional. <code>Marks: +3 -1</code> gives one question its own marks.</li>
+            <li>Instead of <code>Answer:</code> lines, end with <code>Answer key</code> and <code>1. B 2. A, C 3. 7</code>.</li>
+            <li>A table is rows like <code>| (P) Force | (1) N |</code>.</li>
             <li><code>Paragraph:</code> starts a passage for the questions after it, until <code>End paragraph</code>.</li>
             <li>Assertion–reason and list-match questions are ordinary single-correct questions.</li>
           </ul>
@@ -325,7 +424,25 @@ function ImportPanel({
         className="w-full rounded-md border border-brand-border bg-white p-3 font-mono text-xs leading-relaxed text-brand-ink focus-ring"
       />
 
+      {imported && (
+        <div className="space-y-1 rounded-md border border-brand-blue/30 bg-brand-tint/50 p-2.5 text-xs text-brand-navy">
+          <p className="font-semibold">
+            Read {imported.name}. Check the preview below before saving &mdash; Word files rarely come across perfectly.
+          </p>
+          {imported.warnings.map((w, i) => (
+            <p key={i} className="text-amber-800">{w}</p>
+          ))}
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
+        <WordImportButton
+          testId={testId}
+          onText={(imported, name, warnings) => {
+            setText((current) => (current.trim() ? `${current.trimEnd()}\n\n${imported}` : imported));
+            setImported({ name, warnings });
+          }}
+        />
         <ImageButton testId={testId} onInsert={(md) => insertAtCursor(areaRef.current, text, md, setText)} />
         <span className="text-[11px] text-brand-ink/60">
           {parsed

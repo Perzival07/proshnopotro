@@ -353,7 +353,7 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
                       >
                         {option.id}
                       </span>
-                      <RichText text={option.text} className="min-w-0 flex-1" />
+                      <RichText tall text={option.text} className="min-w-0 flex-1" />
                     </button>
                   );
                 })}
