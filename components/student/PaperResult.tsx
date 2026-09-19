@@ -7,6 +7,7 @@ import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMa
 import { formatDate } from "@/lib/utils";
 import { parseTranslation } from "@/lib/translation";
 import { MarkedSheets } from "@/components/student/MarkedSheets";
+import { chapterBreakdown } from "@/lib/chapter-report";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, PenLine, XCircle } from "lucide-react";
 
 const STATUS: Record<QuestionStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -88,6 +89,25 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
   const marked = markPaper(markable, answers, scheme);
   const passages = new Map(test.passages.map((p) => [p.id, p.content]));
 
+  // Marks by chapter, when the paper's questions are tagged.
+  const chapterOf: Record<string, string | null> = {};
+  for (const section of test.sections) for (const q of section.questions) chapterOf[q.id] = q.chapterId;
+  const tagged = Object.values(chapterOf).some(Boolean);
+  const byChapter = tagged ? chapterBreakdown(markable, marked, chapterOf, scheme) : [];
+  const chapterNames = tagged
+    ? new Map(
+        (
+          await prisma.chapter.findMany({
+            where: { id: { in: byChapter.map((l) => l.chapterId).filter((id): id is string => !!id) } },
+            select: { id: true, name: true, position: true },
+          })
+        ).map((c) => [c.id, c])
+      )
+    : new Map<string, { name: string; position: number }>();
+  byChapter.sort(
+    (a, b) => (a.chapterId ? chapterNames.get(a.chapterId)?.position ?? 999 : 1000) - (b.chapterId ? chapterNames.get(b.chapterId)?.position ?? 999 : 1000)
+  );
+
   const tally = { CORRECT: 0, PARTIAL: 0, WRONG: 0, UNATTEMPTED: 0, NOT_COUNTED: 0, PENDING: 0, MARKED: 0 } as Record<QuestionStatus, number>;
   for (const s of marked.sections) for (const m of Object.values(s.questions)) tally[m.status]++;
   const percent = marked.maxScore > 0 ? Math.round((marked.score / marked.maxScore) * 1000) / 10 : 0;
@@ -141,6 +161,37 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
           </table>
         )}
       </div>
+
+      {byChapter.length > 0 && (
+        <div className="rounded-xl border border-brand-border bg-white p-5 shadow-card">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-brand-blue">By chapter</p>
+          <table className="w-full text-xs">
+            <tbody>
+              {byChapter.map((line) => {
+                const pct = line.max > 0 ? Math.max(0, line.scored / line.max) : 0;
+                return (
+                  <tr key={line.chapterId ?? "none"} className="border-b border-brand-border/50 last:border-0">
+                    <td className="py-1.5 pr-2 text-brand-navy">
+                      {line.chapterId ? chapterNames.get(line.chapterId)?.name ?? "Chapter" : "Other questions"}
+                    </td>
+                    <td className="w-28 py-1.5 pr-2">
+                      <div className="h-1.5 overflow-hidden rounded-full bg-brand-tint">
+                        <div
+                          className={`h-full ${pct >= 0.75 ? "bg-emerald-500" : pct >= 0.4 ? "bg-amber-500" : "bg-red-500"}`}
+                          style={{ width: `${Math.round(pct * 100)}%` }}
+                        />
+                      </div>
+                    </td>
+                    <td className="w-20 py-1.5 text-right font-mono">
+                      {formatNumber(line.scored)} / {formatNumber(line.max)}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {tally.PENDING > 0 && (
         <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">

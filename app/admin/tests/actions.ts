@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
+import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
 import { parseDurationMinutes } from "@/lib/exam-timer";
 import { ANSWER_DELIVERY_TYPE, destroyNoteFile, getCloudinary } from "@/lib/cloudinary";
 import { answerFolder } from "@/lib/answer-upload";
@@ -27,6 +28,9 @@ export interface TestInput {
   answerSheets?: boolean;
   /** QUESTIONS only: show an on-screen calculator during the paper. */
   calculator?: boolean;
+  /** QUESTIONS only: the syllabus questions are tagged against. */
+  board?: string | null;
+  classLevel?: string | null;
   /** Minutes the student gets once they open the paper. Blank/null = untimed. */
   durationMinutes?: number | string | null;
   proctored?: boolean;
@@ -82,6 +86,8 @@ function questionSettings(data: TestInput, format: TestFormat, creating: boolean
     resultRelease: data.resultRelease === "INSTANT" ? ("INSTANT" as const) : ("ON_RELEASE" as const),
     answerSheets: data.answerSheets ?? false,
     calculator: data.calculator ?? false,
+    board: data.board && (BOARDS as readonly string[]).includes(data.board) ? data.board : null,
+    classLevel: data.classLevel && (CLASS_LEVELS as readonly string[]).includes(data.classLevel) ? data.classLevel : null,
     ...(creating ? { markingScheme: JSON.parse(JSON.stringify(SCHEME_PRESETS[preset].scheme)) } : {}),
   };
 }

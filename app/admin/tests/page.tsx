@@ -6,6 +6,8 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminTestsPage() {
   const tests = await prisma.test.findMany({
+    // Past papers live in the question bank, not among the tests.
+    where: { bank: false },
     include: {
       _count: {
         select: { assignments: true },
@@ -39,6 +41,8 @@ export default async function AdminTestsPage() {
       resultRelease: t.resultRelease,
       answerSheets: t.answerSheets,
       calculator: t.calculator,
+      board: t.board,
+      classLevel: t.classLevel,
       createdAt: t.createdAt,
       _count: t._count,
       submittedCount,

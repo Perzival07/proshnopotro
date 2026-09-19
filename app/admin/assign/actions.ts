@@ -74,6 +74,9 @@ export async function assignTestToStudents(
   if (!test) {
     return { ...emptyResult(), error: "Selected test does not exist." };
   }
+  if (test.bank) {
+    return { ...emptyResult(), error: "That is a past paper in the question bank. Make a test from it to assign it." };
+  }
 
   const dueAt = new Date(dueAtIsoString);
   if (isNaN(dueAt.getTime())) {

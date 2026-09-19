@@ -16,6 +16,7 @@ import {
 } from "@/lib/marking";
 import type { OptionRow } from "@/lib/paper";
 import { matchTranslation, type QuestionTranslation } from "@/lib/translation";
+import { findChapter } from "@/lib/syllabus";
 import { shrinkImage } from "@/lib/shrink-image";
 import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 import {
@@ -25,6 +26,7 @@ import {
   regradeAll,
   removeTranslation,
   saveTranslation,
+  setQuestionTags,
   setQuestionBonus,
   setResultsReleased,
   updateMarkingScheme,
@@ -66,6 +68,8 @@ export interface EditorQuestion {
   translation: QuestionTranslation | null;
   /** Internal choice: alternatives share this. */
   choiceGroup: string | null;
+  chapterId: string | null;
+  topic: string | null;
 }
 
 export interface EditorSection {
@@ -90,7 +94,13 @@ interface PaperEditorProps {
     started: number;
     submitted: number;
     secondLanguage: string | null;
+    /** "CBSE Class 12 Physics", when the test has a board and class. */
+    syllabus: string | null;
+    bank: boolean;
+    year: number | null;
+    examName: string | null;
   };
+  chapters: { id: string; name: string }[];
   scheme: MarkingScheme;
   sections: EditorSection[];
   passages: { id: string; content: string; translation: string | null }[];
@@ -370,11 +380,15 @@ function ImportPanel({
   scheme,
   hasQuestions,
   locked,
+  chapters,
+  syllabus,
 }: {
   testId: string;
   scheme: MarkingScheme;
   hasQuestions: boolean;
   locked: boolean;
+  chapters: { id: string; name: string }[];
+  syllabus: string | null;
 }) {
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -387,7 +401,24 @@ function ImportPanel({
   // The preview trails the typing by a frame on a long paper, so the box
   // never stutters while the tutor types.
   const deferred = useDeferredValue(text);
-  const parsed = useMemo(() => (deferred.trim() ? parseQuestionPaper(deferred) : null), [deferred]);
+  const parsed = useMemo(() => {
+    if (!deferred.trim()) return null;
+    const paper = parseQuestionPaper(deferred);
+    // "Chapter:" lines are checked against the syllabus here too, so a typo
+    // shows before saving rather than after.
+    const chapterErrors: ImportError[] = [];
+    for (const q of paper.sections.flatMap((s) => s.questions)) {
+      if (!q.chapter) continue;
+      if (!syllabus) {
+        chapterErrors.push({ line: q.line, message: "To tag chapters, first set this test's board and class (Edit test)." });
+        break;
+      }
+      if (!findChapter(chapters, q.chapter)) {
+        chapterErrors.push({ line: q.line, message: `Chapter "${q.chapter}" is not in ${syllabus}. Check the spelling, or add it on the Syllabus page.` });
+      }
+    }
+    return { ...paper, errors: [...paper.errors, ...chapterErrors] };
+  }, [deferred, chapters, syllabus]);
   const count = parsed ? parsed.sections.reduce((n, s) => n + s.questions.length, 0) : 0;
 
   const save = async (mode: "APPEND" | "REPLACE") => {
@@ -455,6 +486,7 @@ function ImportPanel({
             <li>No options means a typed answer: <code>Answer: 7</code> (integer), <code>Answer: 2.45 to 2.55</code> or <code>Answer: 2.5 ± 0.05</code> (decimal).</li>
             <li><code>Solution:</code> is optional. <code>Marks: +3 -1</code> gives one question its own marks.</li>
             <li>Instead of <code>Answer:</code> lines, end with <code>Answer key</code> and <code>1. B 2. A, C 3. 7</code>.</li>
+            <li><code>Chapter: Laws of Motion</code> (or its number, <code>Chapter: 4</code>) and <code>Topic: Friction</code> tag a question, once the test has a board and class.</li>
             <li>A table is rows like <code>| (P) Force | (1) N |</code>.</li>
             <li><code>Paragraph:</code> starts a passage for the questions after it, until <code>End paragraph</code>.</li>
             <li>Assertion–reason and list-match questions are ordinary single-correct questions.</li>
@@ -557,6 +589,13 @@ function ImportPanel({
                         <RichText text={parsed.passages[q.passage]} />
                       </div>
                     )}
+                    {(q.chapter || q.topic) && (
+                      <p className="mb-2 text-[11px] text-brand-blue">
+                        {q.chapter && <>Chapter: {findChapter(chapters, q.chapter)?.name ?? q.chapter}</>}
+                        {q.chapter && q.topic && " · "}
+                        {q.topic && <>Topic: {q.topic}</>}
+                      </p>
+                    )}
                     <QuestionView
                       number={number}
                       type={q.type}
@@ -593,6 +632,8 @@ function QuestionCard({
   scheme,
   locked,
   language,
+  chapters,
+  syllabus,
 }: {
   testId: string;
   number: number;
@@ -601,6 +642,8 @@ function QuestionCard({
   locked: boolean;
   /** The paper's second language, when it has one. */
   language: string | null;
+  chapters: { id: string; name: string }[];
+  syllabus: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
@@ -760,7 +803,10 @@ function QuestionCard({
           )}
         </div>
       )}
-      <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-brand-border/60 pt-2">
+      <div className="mt-3 border-t border-brand-border/60 pt-2">
+        <TagRow question={question} chapters={chapters} syllabus={syllabus} />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-1">
         <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={startEditing}>
           <Edit2 className="h-3.5 w-3.5" /> Edit
         </Button>
@@ -791,6 +837,83 @@ function QuestionCard({
         )}
         {error && <span className="ml-2 text-[11px] text-red-700">{error}</span>}
       </div>
+    </div>
+  );
+}
+
+/** A question's chapter and topic, saved as soon as either changes. */
+function TagRow({
+  question,
+  chapters,
+  syllabus,
+}: {
+  question: EditorQuestion;
+  chapters: { id: string; name: string }[];
+  syllabus: string | null;
+}) {
+  const [chapterId, setChapterId] = useState(question.chapterId ?? "");
+  const [topic, setTopic] = useState(question.topic ?? "");
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const saved = useRef({ chapterId: question.chapterId ?? "", topic: question.topic ?? "" });
+
+  if (!syllabus) return null;
+  if (chapters.length === 0) {
+    return (
+      <p className="text-[11px] text-brand-ink/50">
+        No chapters for {syllabus} yet.{" "}
+        <Link href="/admin/syllabus" className="font-semibold text-brand-blue hover:underline">
+          Add them on the Syllabus page
+        </Link>{" "}
+        to tag questions.
+      </p>
+    );
+  }
+
+  const save = async (nextChapter = chapterId, nextTopic = topic) => {
+    if (nextChapter === saved.current.chapterId && nextTopic.trim() === saved.current.topic) return;
+    setState("saving");
+    try {
+      const res = await setQuestionTags(question.id, nextChapter || null, nextTopic);
+      if (res.error) setState("error");
+      else {
+        saved.current = { chapterId: nextChapter, topic: nextTopic.trim() };
+        setState("saved");
+      }
+    } catch {
+      setState("error");
+    }
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+      <select
+        value={chapterId}
+        onChange={(e) => {
+          setChapterId(e.target.value);
+          void save(e.target.value);
+        }}
+        aria-label="Chapter"
+        className="h-7 max-w-[260px] rounded-md border border-brand-border bg-white px-1.5 text-[11px] text-brand-ink"
+      >
+        <option value="">No chapter</option>
+        {chapters.map((c, i) => (
+          <option key={c.id} value={c.id}>
+            {i + 1}. {c.name}
+          </option>
+        ))}
+      </select>
+      <input
+        value={topic}
+        onChange={(e) => setTopic(e.target.value)}
+        onBlur={() => void save()}
+        onKeyDown={(e) => e.key === "Enter" && void save()}
+        placeholder="Topic (optional)"
+        aria-label="Topic"
+        className="h-7 w-44 rounded-md border border-brand-border px-2 text-[11px]"
+      />
+      {state === "saving" && <span className="text-brand-ink/50">Saving…</span>}
+      {state === "saved" && <span className="text-emerald-700">Tagged</span>}
+      {state === "error" && <span className="text-red-700">Not saved</span>}
     </div>
   );
 }
@@ -1217,12 +1340,20 @@ function ResultsCard({ test }: { test: PaperEditorProps["test"] }) {
         </div>
       )}
       {test.submitted > 0 && (
-        <Link
-          href={`/admin/tests/${test.id}/marking`}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline"
-        >
-          Mark answer sheets &rarr;
-        </Link>
+        <div className="flex flex-col gap-1">
+          <Link
+            href={`/admin/tests/${test.id}/marking`}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline"
+          >
+            Mark answer sheets &rarr;
+          </Link>
+          <Link
+            href={`/admin/tests/${test.id}/analysis`}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline"
+          >
+            How the class did, by chapter &rarr;
+          </Link>
+        </div>
       )}
       <Button
         type="button"
@@ -1390,7 +1521,7 @@ function Card({ title, children }: { title: string; children: React.ReactNode })
   );
 }
 
-export function PaperEditor({ test, scheme, sections, passages }: PaperEditorProps) {
+export function PaperEditor({ test, scheme, sections, passages, chapters }: PaperEditorProps) {
   const locked = test.started > 0;
   const questionCount = sections.reduce((n, s) => n + s.questions.length, 0);
   const passageById = new Map(passages.map((p) => [p.id, p]));
@@ -1421,12 +1552,17 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
     <div className="mx-auto max-w-6xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
       <div>
         <Link
-          href="/admin/tests"
+          href={test.bank ? "/admin/bank" : "/admin/tests"}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:text-brand-blue"
         >
-          <ArrowLeft className="h-3.5 w-3.5" /> All tests
+          <ArrowLeft className="h-3.5 w-3.5" /> {test.bank ? "Question bank" : "All tests"}
         </Link>
         <h1 className="mt-2 font-heading text-xl font-bold text-brand-navy">{test.title}</h1>
+        {test.bank && (
+          <p className="mt-0.5 text-xs font-semibold text-brand-blue">
+            Question bank &middot; {[test.year, test.examName, test.syllabus].filter(Boolean).join(" · ")}
+          </p>
+        )}
         <p className="mt-0.5 text-xs text-brand-ink/60">
           {test.subject} &middot; {questionCount} {questionCount === 1 ? "question" : "questions"} &middot; {maxScore} marks
           {locked && (
@@ -1440,7 +1576,14 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 space-y-5">
           <Card title={questionCount ? "Add questions" : "Add your questions"}>
-            <ImportPanel testId={test.id} scheme={scheme} hasQuestions={questionCount > 0} locked={locked} />
+            <ImportPanel
+              testId={test.id}
+              scheme={scheme}
+              hasQuestions={questionCount > 0}
+              locked={locked}
+              chapters={chapters}
+              syllabus={test.syllabus}
+            />
           </Card>
 
           {sections.map((section) => (
@@ -1471,6 +1614,8 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
                       scheme={section.scheme ?? scheme}
                       locked={locked}
                       language={test.secondLanguage}
+                      chapters={chapters}
+                      syllabus={test.syllabus}
                     />
                   </React.Fragment>
                 );
@@ -1483,9 +1628,11 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
           <Card title="Marking">
             <SchemeEditor testId={test.id} scheme={scheme} submitted={test.submitted} />
           </Card>
-          <Card title="Results">
-            <ResultsCard test={test} />
-          </Card>
+          {!test.bank && (
+            <Card title="Results">
+              <ResultsCard test={test} />
+            </Card>
+          )}
           {questionCount > 0 && (
             <Card title="Second language">
               <TranslationPanel testId={test.id} language={test.secondLanguage} sections={sections} />

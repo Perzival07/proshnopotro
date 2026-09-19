@@ -28,6 +28,8 @@ import {
   Timer,
 } from "lucide-react";
 import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
+import { SUBJECTS } from "@/lib/subjects";
+import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
 import { detectTestFormat, toEmbedUrl, type LinkFormat, type TestFormat } from "@/lib/test-resource";
 import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
 
@@ -48,6 +50,8 @@ interface TestModalProps {
     resultRelease?: "INSTANT" | "ON_RELEASE";
     answerSheets?: boolean;
     calculator?: boolean;
+    board?: string | null;
+    classLevel?: string | null;
   } | null;
 }
 
@@ -61,6 +65,8 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [resultRelease, setResultRelease] = useState<"INSTANT" | "ON_RELEASE">("ON_RELEASE");
   const [answerSheets, setAnswerSheets] = useState(false);
   const [calculator, setCalculator] = useState(false);
+  const [board, setBoard] = useState<string>("");
+  const [classLevel, setClassLevel] = useState<string>("");
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("Physics");
   const [description, setDescription] = useState("");
@@ -90,6 +96,8 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setResultRelease(testToEdit.resultRelease ?? "ON_RELEASE");
       setAnswerSheets(testToEdit.answerSheets ?? false);
       setCalculator(testToEdit.calculator ?? false);
+      setBoard(testToEdit.board ?? "");
+      setClassLevel(testToEdit.classLevel ?? "");
     } else {
       setTitle("");
       setSubject("Physics");
@@ -104,6 +112,8 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setResultRelease("ON_RELEASE");
       setAnswerSheets(false);
       setCalculator(false);
+      setBoard("");
+      setClassLevel("");
     }
     setError(null);
   }, [testToEdit, isOpen]);
@@ -125,6 +135,8 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       resultRelease,
       answerSheets: mode === "QUESTIONS" ? answerSheets : undefined,
       calculator: mode === "QUESTIONS" ? calculator : undefined,
+      board: mode === "QUESTIONS" ? board || null : undefined,
+      classLevel: mode === "QUESTIONS" ? classLevel || null : undefined,
       durationMinutes,
       proctored,
       active,
@@ -192,13 +204,11 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                   <SelectValue placeholder="Select Subject" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Physics">Physics</SelectItem>
-                  <SelectItem value="Chemistry">Chemistry</SelectItem>
-                  <SelectItem value="Mathematics">Mathematics</SelectItem>
-                  <SelectItem value="Biology">Biology</SelectItem>
-                  <SelectItem value="Computer Science">Computer Science</SelectItem>
-                  <SelectItem value="General Science">General Science</SelectItem>
-                  <SelectItem value="English">English</SelectItem>
+                  {SUBJECTS.map((name) => (
+                    <SelectItem key={name} value={name}>
+                      {name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -382,6 +392,37 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                     photograph their sheets after the objective questions.
                   </span>
                 </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs font-semibold text-brand-navy">
+                  Board
+                  <Select value={board || "none"} onValueChange={(v) => setBoard(v === "none" ? "" : v)}>
+                    <SelectTrigger className="mt-1 bg-white"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not set</SelectItem>
+                      {BOARDS.map((b) => (
+                        <SelectItem key={b} value={b}>{b}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+                <label className="text-xs font-semibold text-brand-navy">
+                  Class
+                  <Select value={classLevel || "none"} onValueChange={(v) => setClassLevel(v === "none" ? "" : v)}>
+                    <SelectTrigger className="mt-1 bg-white"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not set</SelectItem>
+                      {CLASS_LEVELS.map((c) => (
+                        <SelectItem key={c} value={c}>Class {c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </label>
+                <p className="col-span-2 -mt-1 text-[11px] text-brand-ink/55">
+                  Optional. With both set, questions can be tagged by chapter from the Syllabus page, and results
+                  are broken down by chapter.
+                </p>
               </div>
 
               <div className="flex items-start space-x-2">

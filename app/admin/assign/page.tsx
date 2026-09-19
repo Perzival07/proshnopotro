@@ -10,6 +10,7 @@ export default async function AdminAssignPage() {
   // crowd the picker.
   const [tests, students, classrooms] = await Promise.all([
     prisma.test.findMany({
+      where: { bank: false },
       select: {
         id: true,
         title: true,

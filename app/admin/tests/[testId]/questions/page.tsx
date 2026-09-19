@@ -19,6 +19,11 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       resultRelease: true,
       resultsReleasedAt: true,
       secondLanguage: true,
+      board: true,
+      classLevel: true,
+      bank: true,
+      year: true,
+      examName: true,
       passages: { select: { id: true, content: true, translation: true } },
       sections: {
         orderBy: { position: "asc" },
@@ -28,6 +33,15 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
     },
   });
   if (!test || test.format !== "QUESTIONS") notFound();
+
+  const chapters =
+    test.board && test.classLevel
+      ? await prisma.chapter.findMany({
+          where: { board: test.board, classLevel: test.classLevel, subject: test.subject },
+          orderBy: { position: "asc" },
+          select: { id: true, name: true },
+        })
+      : [];
 
   const [started, submitted] = await Promise.all([
     prisma.assignment.count({ where: { testId: test.id, startedAt: { not: null } } }),
@@ -55,6 +69,8 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       passageId: q.passageId,
       translation: parseTranslation(q.translation),
       choiceGroup: q.choiceGroup,
+      chapterId: q.chapterId,
+      topic: q.topic,
     })),
   }));
 
@@ -70,7 +86,12 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
         started,
         submitted,
         secondLanguage: test.secondLanguage,
+        syllabus: test.board && test.classLevel ? `${test.board} Class ${test.classLevel} ${test.subject}` : null,
+        bank: test.bank,
+        year: test.year,
+        examName: test.examName,
       }}
+      chapters={chapters}
       scheme={normalizeScheme(test.markingScheme)}
       sections={sections}
       passages={test.passages}

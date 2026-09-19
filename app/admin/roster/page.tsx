@@ -12,6 +12,7 @@ interface RosterPageProps {
 
 export default async function AdminRosterPage({ searchParams }: RosterPageProps) {
   const tests = await prisma.test.findMany({
+    where: { bank: false },
     select: {
       id: true,
       title: true,

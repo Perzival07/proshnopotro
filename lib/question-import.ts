@@ -70,6 +70,9 @@ export interface ImportedQuestion {
   rule: { correct?: number; wrong?: number } | null;
   /** Internal choice: alternatives share this. */
   choiceGroup: string | null;
+  /** "Chapter: ..." and "Topic: ..." as written; the chapter is looked up later. */
+  chapter: string | null;
+  topic: string | null;
 }
 
 export interface ImportedSection {
@@ -101,6 +104,8 @@ const TYPE_TAG_RE =
   /^\[(single|multiple|multi|integer|decimal|numerical|matrix|matrix match|subjective|written|short|long|short answer|long answer)\]\s*/i;
 const MARKS_EACH_RE = /\|\s*(\d+(?:\.\d+)?)\s*marks?(?:\s+each)?\s*$/i;
 const OR_RE = /^\(?\s*(?:OR|अथवा)\s*\)?$/i;
+const CHAPTER_RE = /^(?:Chapter|अध्याय)\s*[:.-]\s*(.+)$/i;
+const TOPIC_RE = /^(?:Topic|विषय)\s*[:.-]\s*(.+)$/i;
 const SAME_NUMBER_RE = /^(?:Q(?:uestion)?|प्रश्न)?\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
 const COLUMN_OPTION_RE = /^\(?([P-Tp-t])[.)]\s+(.*)$/;
 const COLUMN_HEADER_RE = /^(?:Column|List)[\s-]*(I{1,2}|1|2)\b\s*[:.-]?\s*$/i;
@@ -184,6 +189,8 @@ interface Draft {
   marksLine: number;
   passage: number | null;
   choiceGroup: string | null;
+  chapter: string | null;
+  topic: string | null;
 }
 
 function tagToType(tag: string): QuestionType {
@@ -368,6 +375,8 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         passage: d.passage,
         rule,
         choiceGroup: d.choiceGroup,
+        chapter: d.chapter,
+        topic: d.topic,
       });
       return;
     }
@@ -388,6 +397,8 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         passage: d.passage,
         rule: null,
         choiceGroup: d.choiceGroup,
+        chapter: d.chapter,
+        topic: d.topic,
       });
       return;
     }
@@ -503,6 +514,8 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       passage: d.passage,
       rule,
       choiceGroup: d.choiceGroup,
+      chapter: d.chapter,
+      topic: d.topic,
     });
   };
 
@@ -607,6 +620,9 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         marksLine: before.marksLine,
         passage: before.passage,
         choiceGroup: group,
+        // An alternative is usually on the same chapter; it can say otherwise.
+        chapter: before.chapter,
+        topic: before.topic,
       };
       field = "stem";
       return;
@@ -657,6 +673,8 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         marksLine: lineNo,
         passage: currentPassage,
         choiceGroup: null,
+        chapter: null,
+        topic: null,
       };
       field = "stem";
       return;
@@ -685,6 +703,19 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
     if (solution) {
       d.solution = solution[1] ? [solution[1]] : [];
       field = "solution";
+      return;
+    }
+
+    const chapter = line.match(CHAPTER_RE);
+    if (chapter) {
+      d.chapter = chapter[1].trim();
+      field = null;
+      return;
+    }
+    const topic = line.match(TOPIC_RE);
+    if (topic) {
+      d.topic = topic[1].trim().slice(0, 120);
+      field = null;
       return;
     }
 

@@ -8,6 +8,7 @@ import { parseQuestionPaper, type ImportError, type ImportedPaper } from "@/lib/
 import { normalizeScheme, parseMatrixOptions, parseOptions, sectionalDuration } from "@/lib/paper";
 import type { ImportedQuestion } from "@/lib/question-import";
 import { matchTranslation } from "@/lib/translation";
+import { findChapter } from "@/lib/syllabus";
 
 /** How a question's options are stored: a list, or both columns of a matrix. */
 function storedOptions(q: Pick<ImportedQuestion, "type" | "options" | "columns">): Prisma.InputJsonValue {
@@ -37,7 +38,7 @@ function refresh(testId: string) {
 async function loadQuestionTest(testId: string) {
   const test = await prisma.test.findUnique({
     where: { id: testId },
-    select: { id: true, format: true },
+    select: { id: true, format: true, board: true, classLevel: true, subject: true },
   });
   if (!test) return { error: "Test not found." } as const;
   if (test.format !== "QUESTIONS") {
@@ -60,11 +61,48 @@ function lockedMessage(started: number) {
   return `${started} ${started === 1 ? "student has" : "students have"} already opened this paper, so questions can no longer be added, removed or reordered. You can still correct a question's wording, answer or marks.`;
 }
 
+/**
+ * Looks up each "Chapter:" in the test's syllabus. Returns the chapter id for
+ * every question that names one, or the lines that name a chapter the
+ * syllabus does not have.
+ */
+async function resolveChapters(
+  test: { board: string | null; classLevel: string | null; subject: string },
+  paper: ImportedPaper
+): Promise<{ ids: Map<ImportedQuestion, string>; errors: ImportError[] }> {
+  const named = paper.sections.flatMap((s) => s.questions).filter((q) => q.chapter);
+  const ids = new Map<ImportedQuestion, string>();
+  if (named.length === 0) return { ids, errors: [] };
+  if (!test.board || !test.classLevel) {
+    return {
+      ids,
+      errors: [{ line: named[0].line, message: "To tag chapters, first set this test's board and class (Edit test)." }],
+    };
+  }
+  const chapters = await prisma.chapter.findMany({
+    where: { board: test.board, classLevel: test.classLevel, subject: test.subject },
+    orderBy: { position: "asc" },
+  });
+  const errors: ImportError[] = [];
+  for (const q of named) {
+    const chapter = findChapter(chapters, q.chapter!);
+    if (chapter) ids.set(q, chapter.id);
+    else {
+      errors.push({
+        line: q.line,
+        message: `Chapter "${q.chapter}" is not in the ${test.board} Class ${test.classLevel} ${test.subject} syllabus. Check the spelling, or add it on the Syllabus page.`,
+      });
+    }
+  }
+  return { ids, errors };
+}
+
 /** Writes parsed questions into the test, after any it already has. */
 async function writePaper(
   tx: Prisma.TransactionClient,
   testId: string,
-  paper: ImportedPaper
+  paper: ImportedPaper,
+  chapterIds: Map<ImportedQuestion, string> = new Map()
 ) {
   const passageIds: string[] = [];
   for (const content of paper.passages) {
@@ -114,6 +152,8 @@ async function writePaper(
         marksWrong: q.rule?.wrong ?? null,
         passageId: q.passage !== null ? passageIds[q.passage] : null,
         choiceGroup: q.choiceGroup ? `${importToken}-${q.choiceGroup}` : null,
+        chapterId: chapterIds.get(q) ?? null,
+        topic: q.topic,
       })),
     });
   }
@@ -147,12 +187,17 @@ export async function importQuestions(
   const started = await startedCount(testId);
   if (started > 0) return { error: lockedMessage(started) };
 
+  const chapters = await resolveChapters(loaded.test, paper);
+  if (chapters.errors.length) {
+    return { error: "Fix the chapters below, then try again. Nothing was saved.", errors: chapters.errors };
+  }
+
   await prisma.$transaction(async (tx) => {
     if (mode === "REPLACE") {
       await tx.testSection.deleteMany({ where: { testId } });
       await tx.passage.deleteMany({ where: { testId } });
     }
-    await writePaper(tx, testId, paper);
+    await writePaper(tx, testId, paper, chapters.ids);
   });
 
   refresh(testId);
@@ -169,7 +214,12 @@ export async function updateQuestion(questionId: string, text: string): Promise<
 
   const question = await prisma.question.findUnique({
     where: { id: questionId },
-    select: { id: true, type: true, options: true, section: { select: { testId: true } } },
+    select: {
+      id: true,
+      type: true,
+      options: true,
+      section: { select: { testId: true, test: { select: { board: true, classLevel: true, subject: true } } } },
+    },
   });
   if (!question) return { error: "Question not found." };
   const testId = question.section.testId;
@@ -180,6 +230,8 @@ export async function updateQuestion(questionId: string, text: string): Promise<
   const all = paper.sections.flatMap((s) => s.questions);
   if (all.length !== 1) return { error: "Keep exactly one question in the box." };
   const q = all[0];
+  const tagged = await resolveChapters(question.section.test, paper);
+  if (tagged.errors.length) return { error: "Fix the chapter below. Nothing was saved.", errors: tagged.errors };
 
   if ((await startedCount(testId)) > 0) {
     const before = optionShape(question.type, question.options);
@@ -202,6 +254,10 @@ export async function updateQuestion(questionId: string, text: string): Promise<
       solution: q.solution,
       marksCorrect: q.rule?.correct ?? null,
       marksWrong: q.rule?.wrong ?? null,
+      // A "Chapter:" or "Topic:" line in the box changes the tag; without one
+      // the tag set from the menu stays as it is.
+      ...(q.chapter ? { chapterId: tagged.ids.get(q) ?? null } : {}),
+      ...(q.topic ? { topic: q.topic } : {}),
     },
   });
 
@@ -447,5 +503,31 @@ export async function removeTranslation(testId: string): Promise<Result> {
     prisma.test.update({ where: { id: testId }, data: { secondLanguage: null } }),
   ]);
   refresh(testId);
+  return { success: true };
+}
+
+/** Tags a question with a chapter of the test's syllabus, and a topic. */
+export async function setQuestionTags(
+  questionId: string,
+  chapterId: string | null,
+  topic: string
+): Promise<Result> {
+  await requireAdmin();
+  const question = await prisma.question.findUnique({
+    where: { id: questionId },
+    select: { section: { select: { test: { select: { board: true, classLevel: true, subject: true } } } } },
+  });
+  if (!question) return { error: "Question not found." };
+  if (chapterId) {
+    const t = question.section.test;
+    const chapter = await prisma.chapter.findUnique({ where: { id: chapterId } });
+    if (!chapter || chapter.board !== t.board || chapter.classLevel !== t.classLevel || chapter.subject !== t.subject) {
+      return { error: "That chapter is not in this test's syllabus." };
+    }
+  }
+  await prisma.question.update({
+    where: { id: questionId },
+    data: { chapterId, topic: topic.trim().slice(0, 120) || null },
+  });
   return { success: true };
 }

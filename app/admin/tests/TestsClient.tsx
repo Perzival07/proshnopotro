@@ -53,6 +53,8 @@ interface TestItem {
   resultRelease: "INSTANT" | "ON_RELEASE";
   answerSheets: boolean;
   calculator: boolean;
+  board: string | null;
+  classLevel: string | null;
   createdAt: Date;
   _count: {
     assignments: number;

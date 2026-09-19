@@ -149,6 +149,15 @@ model Test {
   /// The name of the paper's second language, as students see it ("हिन्दी"),
   /// when its questions have translations. null = one language only.
   secondLanguage    String?
+  /// The syllabus the paper follows, for tagging questions by chapter:
+  /// "CBSE", "ICSE", "ISC" ... and "11", "12" ...
+  board             String?
+  classLevel        String?
+  /// A past paper kept in the question bank, never assigned to students.
+  bank              Boolean       @default(false)
+  /// Bank papers: the year sat, and the exam's own name ("Board exam, Set 1").
+  year              Int?
+  examName          String?
   /// Set when the tutor releases results. Only read for ON_RELEASE tests.
   resultsReleasedAt DateTime?
   createdAt       DateTime   @default(now())
@@ -157,6 +166,8 @@ model Test {
   assignments Assignment[]
   sections    TestSection[]
   passages    Passage[]
+
+  @@index([bank])
 
   @@index([active])
 }
@@ -282,6 +293,9 @@ model Question {
   bonus       Boolean      @default(false)
   /// Internal choice ("Q16 ... OR ..."): questions sharing a group count once.
   choiceGroup String?
+  /// The syllabus chapter it tests, and a finer topic within it.
+  chapterId   String?
+  topic       String?
   /// The question in the test's second language: { stem, options, columns,
   /// solution }, as lib/translation.ts QuestionTranslation. Marked with the
   /// same key.
@@ -290,9 +304,28 @@ model Question {
 
   section   TestSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)
   passage   Passage?           @relation(fields: [passageId], references: [id], onDelete: SetNull)
+  chapter   Chapter?           @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   responses QuestionResponse[]
 
   @@index([sectionId])
+  @@index([chapterId])
+}
+
+/// One chapter of a board's syllabus for a class and subject, in book order.
+/// Loaded from the NCERT presets or pasted in (CISCE), and editable.
+model Chapter {
+  id         String   @id @default(cuid())
+  board      String
+  classLevel String
+  subject    String
+  name       String
+  position   Int
+  createdAt  DateTime @default(now())
+
+  questions Question[]
+
+  @@unique([board, classLevel, subject, name])
+  @@index([board, classLevel, subject])
 }
 
 /// A student's answer to one question, saved as they go.

@@ -13,6 +13,8 @@ import {
   NotebookText,
   School,
   ChevronRight,
+  Library,
+  ListTree,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
@@ -23,6 +25,12 @@ export const NAV_ITEMS = [
     href: "/admin/tests",
     icon: FileText,
     description: "Create, edit & configure tests",
+  },
+  {
+    name: "Question Bank",
+    href: "/admin/bank",
+    icon: Library,
+    description: "Past papers by year; reuse questions",
   },
   {
     name: "Assign Tests",
@@ -47,6 +55,12 @@ export const NAV_ITEMS = [
     href: "/admin/notes",
     icon: NotebookText,
     description: "Share study material with a class",
+  },
+  {
+    name: "Syllabus",
+    href: "/admin/syllabus",
+    icon: ListTree,
+    description: "Chapters for tagging questions",
   },
   {
     name: "Test Rosters",
