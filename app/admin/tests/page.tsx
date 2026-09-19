@@ -42,6 +42,7 @@ export default async function AdminTestsPage() {
       answerSheets: t.answerSheets,
       calculator: t.calculator,
       board: t.board,
+      uploadMinutes: t.uploadMinutes,
       classLevel: t.classLevel,
       createdAt: t.createdAt,
       _count: t._count,

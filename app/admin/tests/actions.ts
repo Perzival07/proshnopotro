@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
 import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
+import { MAX_UPLOAD_MINUTES } from "@/lib/answer-upload";
 import { parseDurationMinutes } from "@/lib/exam-timer";
 import { ANSWER_DELIVERY_TYPE, destroyNoteFile, getCloudinary } from "@/lib/cloudinary";
 import { answerFolder } from "@/lib/answer-upload";
@@ -28,6 +29,8 @@ export interface TestInput {
   answerSheets?: boolean;
   /** QUESTIONS only: show an on-screen calculator during the paper. */
   calculator?: boolean;
+  /** Minutes to upload answer photos after the paper closes. */
+  uploadMinutes?: number | string | null;
   /** QUESTIONS only: the syllabus questions are tagged against. */
   board?: string | null;
   classLevel?: string | null;
@@ -47,6 +50,12 @@ function validateTestInput(data: TestInput): { error: string } | { format: TestF
   }
   const duration = parseDurationMinutes(data.durationMinutes);
   if (duration.error) return { error: duration.error };
+  if (data.uploadMinutes !== undefined && data.uploadMinutes !== null && data.uploadMinutes !== "") {
+    const m = Number(data.uploadMinutes);
+    if (!Number.isInteger(m) || m < 1 || m > MAX_UPLOAD_MINUTES) {
+      return { error: `The upload time must be a whole number of minutes, from 1 to ${MAX_UPLOAD_MINUTES}.` };
+    }
+  }
 
   // A paper written in the portal has no link to check.
   if (data.mode === "QUESTIONS") return { format: "QUESTIONS" };
@@ -80,7 +89,11 @@ function validateTestInput(data: TestInput): { error: string } | { format: TestF
  * paper's own page, where changing it re-marks attempts.
  */
 function questionSettings(data: TestInput, format: TestFormat, creating: boolean) {
-  if (format !== "QUESTIONS") return { answerSheets: data.answerSheets ?? true };
+  const upload =
+    data.uploadMinutes !== undefined && data.uploadMinutes !== null && data.uploadMinutes !== ""
+      ? { uploadMinutes: Number(data.uploadMinutes) }
+      : {};
+  if (format !== "QUESTIONS") return { answerSheets: data.answerSheets ?? true, ...upload };
   const preset = data.schemePreset && SCHEME_PRESETS[data.schemePreset] ? data.schemePreset : "JEE_MAIN";
   return {
     resultRelease: data.resultRelease === "INSTANT" ? ("INSTANT" as const) : ("ON_RELEASE" as const),
@@ -88,6 +101,7 @@ function questionSettings(data: TestInput, format: TestFormat, creating: boolean
     calculator: data.calculator ?? false,
     board: data.board && (BOARDS as readonly string[]).includes(data.board) ? data.board : null,
     classLevel: data.classLevel && (CLASS_LEVELS as readonly string[]).includes(data.classLevel) ? data.classLevel : null,
+    ...upload,
     ...(creating ? { markingScheme: JSON.parse(JSON.stringify(SCHEME_PRESETS[preset].scheme)) } : {}),
   };
 }

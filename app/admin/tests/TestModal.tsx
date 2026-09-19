@@ -52,6 +52,7 @@ interface TestModalProps {
     calculator?: boolean;
     board?: string | null;
     classLevel?: string | null;
+    uploadMinutes?: number;
   } | null;
 }
 
@@ -66,6 +67,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [answerSheets, setAnswerSheets] = useState(false);
   const [calculator, setCalculator] = useState(false);
   const [board, setBoard] = useState<string>("");
+  const [uploadMinutes, setUploadMinutes] = useState("2");
   const [classLevel, setClassLevel] = useState<string>("");
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("Physics");
@@ -97,6 +99,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setAnswerSheets(testToEdit.answerSheets ?? false);
       setCalculator(testToEdit.calculator ?? false);
       setBoard(testToEdit.board ?? "");
+      setUploadMinutes(String(testToEdit.uploadMinutes ?? 2));
       setClassLevel(testToEdit.classLevel ?? "");
     } else {
       setTitle("");
@@ -114,6 +117,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setCalculator(false);
       setBoard("");
       setClassLevel("");
+      setUploadMinutes("2");
     }
     setError(null);
   }, [testToEdit, isOpen]);
@@ -136,6 +140,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       answerSheets: mode === "QUESTIONS" ? answerSheets : undefined,
       calculator: mode === "QUESTIONS" ? calculator : undefined,
       board: mode === "QUESTIONS" ? board || null : undefined,
+      uploadMinutes: mode === "LINK" || answerSheets ? uploadMinutes : undefined,
       classLevel: mode === "QUESTIONS" ? classLevel || null : undefined,
       durationMinutes,
       proctored,
@@ -469,6 +474,29 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               reaches zero. It never runs past the submission deadline.
             </p>
           </div>
+
+          {(mode === "LINK" || answerSheets) && (
+            <div>
+              <Label htmlFor="upload-minutes" className="text-xs font-semibold text-brand-navy">
+                Minutes to upload answer photos
+              </Label>
+              <Input
+                id="upload-minutes"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                max={30}
+                step={1}
+                value={uploadMinutes}
+                onChange={(e) => setUploadMinutes(e.target.value)}
+                className="mt-1 w-28"
+              />
+              <p className="mt-1 text-[11px] text-brand-ink/55">
+                Counted from when the paper closes. Short stops students writing after time; allow about 10
+                minutes for a board paper&apos;s long answer booklet. Leaving the page still ends it at once.
+              </p>
+            </div>
+          )}
 
           <div className="flex items-start space-x-2 pt-2">
             <Checkbox

@@ -18,8 +18,18 @@ import { attemptDeadline, isTimed } from "./exam-timer";
  * (which enforces them) and the page (which only displays them) agree.
  */
 
-/** Minutes after the attempt ends that the upload stays open. */
+/**
+ * Minutes after the attempt ends that the upload stays open, unless the test
+ * sets its own (Test.uploadMinutes): short by default so the time after the
+ * bell cannot be spent writing, longer for board papers' answer booklets.
+ */
 export const UPLOAD_WINDOW_MINUTES = 2;
+
+/** The window a paper with written answers gets unless the tutor says otherwise. */
+export const WRITTEN_UPLOAD_MINUTES = 10;
+
+/** The longest window a tutor can set. */
+export const MAX_UPLOAD_MINUTES = 30;
 
 /**
  * Extra time the server still accepts a save that was signed inside the
@@ -44,7 +54,7 @@ export interface UploadableAssignment {
   startedAt?: Date | string | null;
   endedAt?: Date | string | null;
   answersUploadedAt?: Date | string | null;
-  test: { durationMinutes?: number | null };
+  test: { durationMinutes?: number | null; uploadMinutes?: number | null };
 }
 
 /**
@@ -63,7 +73,8 @@ export function attemptEndedAt(assignment: UploadableAssignment): Date | null {
 /** When the upload window closes, or null when there is no window at all. */
 export function uploadClosesAt(assignment: UploadableAssignment): Date | null {
   const ended = attemptEndedAt(assignment);
-  return ended ? new Date(ended.getTime() + UPLOAD_WINDOW_MINUTES * 60_000) : null;
+  const minutes = assignment.test.uploadMinutes ?? UPLOAD_WINDOW_MINUTES;
+  return ended ? new Date(ended.getTime() + minutes * 60_000) : null;
 }
 
 export type UploadState = "NOT_ENDED" | "OPEN" | "UPLOADED" | "EXPIRED";

@@ -7,6 +7,7 @@ import { SCHEME_PRESETS, maxMarksFor } from "@/lib/marking";
 import { normalizeScheme, toMarkableSections } from "@/lib/paper";
 import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
 import { SUBJECTS } from "@/lib/subjects";
+import { WRITTEN_UPLOAD_MINUTES } from "@/lib/answer-upload";
 
 type Result = { success?: true; error?: string; testId?: string };
 
@@ -163,6 +164,9 @@ export async function makeTestFromBankPaper(bankId: string): Promise<Result> {
           formUrl: "",
           markingScheme: (source.markingScheme ?? undefined) as Prisma.InputJsonValue | undefined,
           answerSheets: source.sections.some((s) => s.questions.some((q) => q.type === "SUBJECTIVE")),
+          uploadMinutes: source.sections.some((s) => s.questions.some((q) => q.type === "SUBJECTIVE"))
+            ? WRITTEN_UPLOAD_MINUTES
+            : undefined,
           calculator: source.calculator,
           secondLanguage: source.secondLanguage,
           board: source.board,
@@ -242,6 +246,10 @@ export async function addBankQuestionsToTest(
       await copyQuestions(tx, testId, section.id, start, questions, marksFor);
       if (questions.some((q) => q.type === "SUBJECTIVE")) {
         await tx.test.update({ where: { id: testId }, data: { answerSheets: true } });
+        await tx.test.updateMany({
+          where: { id: testId, uploadMinutes: { lt: WRITTEN_UPLOAD_MINUTES } },
+          data: { uploadMinutes: WRITTEN_UPLOAD_MINUTES },
+        });
       }
     },
     { timeout: 30_000 }

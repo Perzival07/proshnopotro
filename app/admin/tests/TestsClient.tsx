@@ -55,6 +55,7 @@ interface TestItem {
   calculator: boolean;
   board: string | null;
   classLevel: string | null;
+  uploadMinutes: number;
   createdAt: Date;
   _count: {
     assignments: number;

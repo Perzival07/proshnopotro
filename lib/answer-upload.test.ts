@@ -142,3 +142,12 @@ describe("fitWithin", () => {
     expect(fitWithin(0, 100)).toEqual({ width: 0, height: 0 });
   });
 });
+
+describe("a test's own upload window", () => {
+  it("stays open for the test's minutes instead of the default", () => {
+    const booklet = attempt({ test: { durationMinutes: 60, uploadMinutes: 10 } });
+    expect(uploadClosesAt(booklet)).toEqual(minutes(10));
+    expect(uploadState(booklet, minutes(9))).toBe("OPEN");
+    expect(uploadState(booklet, minutes(11))).toBe("EXPIRED");
+  });
+});

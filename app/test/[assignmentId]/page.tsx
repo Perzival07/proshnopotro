@@ -12,7 +12,7 @@ import { formatDate } from "@/lib/utils";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { attemptDeadline, formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
 import { closeExpiredAttempts } from "@/lib/close-expired";
-import { UPLOAD_WINDOW_MINUTES, uploadState } from "@/lib/answer-upload";
+import { uploadState } from "@/lib/answer-upload";
 import { AlertTriangle, ArrowLeft, Calendar, Shield, Timer } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +48,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           active: true,
           format: true,
           durationMinutes: true,
+          uploadMinutes: true,
           proctored: true,
           answerSheets: true,
           // formUrl is explicitly OMITTED to prevent leakage into HTML
@@ -281,7 +282,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
                 {(assignment.test.format !== "QUESTIONS" || assignment.test.answerSheets) && (
                 <p className="text-xs leading-relaxed font-medium">
                   When you finish or the time runs out, the paper closes. You then
-                  have {UPLOAD_WINDOW_MINUTES} minutes to photograph your answers
+                  have {assignment.test.uploadMinutes} minutes to photograph your answers
                   and upload them &mdash; you can upload only once, or finish without
                   uploading. Leaving the page closes the upload. After uploading, send
                   &ldquo;Work done&rdquo; to your tutor on WhatsApp.

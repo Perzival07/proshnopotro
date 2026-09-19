@@ -566,7 +566,7 @@ async function loadOwnAssignment(assignmentId: string) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     include: {
-      test: { select: { durationMinutes: true } },
+      test: { select: { durationMinutes: true, uploadMinutes: true } },
       result: { select: { id: true } },
       _count: { select: { answerImages: true } },
     },

@@ -143,6 +143,10 @@ model Test {
   /// Whether students photograph and upload answer sheets after the paper.
   /// Off for a purely objective paper; on for written and subjective ones.
   answerSheets      Boolean       @default(true)
+  /// Minutes students get to photograph and upload answer sheets once the
+  /// paper closes. Short, so the time after the bell is not writing time;
+  /// longer for papers with long written answers.
+  uploadMinutes     Int           @default(2)
   /// QUESTIONS tests: show an on-screen calculator (as GATE's CBT does; JEE
   /// Main and NEET do not allow one).
   calculator        Boolean       @default(false)

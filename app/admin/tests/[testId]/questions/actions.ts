@@ -9,6 +9,7 @@ import { normalizeScheme, parseMatrixOptions, parseOptions, sectionalDuration } 
 import type { ImportedQuestion } from "@/lib/question-import";
 import { matchTranslation } from "@/lib/translation";
 import { findChapter } from "@/lib/syllabus";
+import { WRITTEN_UPLOAD_MINUTES } from "@/lib/answer-upload";
 
 /** How a question's options are stored: a list, or both columns of a matrix. */
 function storedOptions(q: Pick<ImportedQuestion, "type" | "options" | "columns">): Prisma.InputJsonValue {
@@ -158,9 +159,14 @@ async function writePaper(
     });
   }
 
-  // Written answers are photographed, so a paper with any collects sheets.
+  // Written answers are photographed, so a paper with any collects sheets,
+  // with time enough to photograph a booklet (unless already set longer).
   if (paper.sections.some((s) => s.questions.some((q) => q.type === "SUBJECTIVE"))) {
     await tx.test.update({ where: { id: testId }, data: { answerSheets: true } });
+    await tx.test.updateMany({
+      where: { id: testId, uploadMinutes: { lt: WRITTEN_UPLOAD_MINUTES } },
+      data: { uploadMinutes: WRITTEN_UPLOAD_MINUTES },
+    });
   }
 }
 
