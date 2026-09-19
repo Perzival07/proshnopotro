@@ -19,6 +19,14 @@
  *   Paragraph:                    <- a passage shared by the questions after
  *   ...                              it, until "End paragraph" or a new section
  *
+ *   # Section C | 3 marks each     <- every question here is worth 3, no negative
+ *
+ *   Q16. [subjective] Derive ...   <- a written answer, marked by the tutor;
+ *   Marks: 3                          no "Answer:" needed (one is kept as the
+ *   OR                                model answer). "OR" on its own line makes
+ *   Explain ...                       what follows an internal choice with the
+ *                                     question before; it may repeat the number.
+ *
  *   Q3. [matrix] Match the columns  <- matrix match: Column I is (A)-(D),
  *   (A) ...                            Column II is (P)-(T), each row may
  *   Column II:                         match more than one column
@@ -60,11 +68,15 @@ export interface ImportedQuestion {
   /** Index into the paper's passages, or null. */
   passage: number | null;
   rule: { correct?: number; wrong?: number } | null;
+  /** Internal choice: alternatives share this. */
+  choiceGroup: string | null;
 }
 
 export interface ImportedSection {
   title: string;
   attemptLimit: number | null;
+  /** "| 3 marks each": each question's marks, where it sets none itself. */
+  marksEach: number | null;
   questions: ImportedQuestion[];
 }
 
@@ -85,7 +97,11 @@ const SECTION_RE = /^#\s*(.+?)\s*$/;
 // Hindi papers use प्रश्न (question), उत्तर (answer), हल (solution) and
 // अनुच्छेद (paragraph); both spellings are read everywhere.
 const QUESTION_RE = /^(?:Q(?:uestion)?|प्रश्न)\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
-const TYPE_TAG_RE = /^\[(single|multiple|multi|integer|decimal|numerical|matrix|matrix match)\]\s*/i;
+const TYPE_TAG_RE =
+  /^\[(single|multiple|multi|integer|decimal|numerical|matrix|matrix match|subjective|written|short|long|short answer|long answer)\]\s*/i;
+const MARKS_EACH_RE = /\|\s*(\d+(?:\.\d+)?)\s*marks?(?:\s+each)?\s*$/i;
+const OR_RE = /^\(?\s*(?:OR|अथवा)\s*\)?$/i;
+const SAME_NUMBER_RE = /^(?:Q(?:uestion)?|प्रश्न)?\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
 const COLUMN_OPTION_RE = /^\(?([P-Tp-t])[.)]\s+(.*)$/;
 const COLUMN_HEADER_RE = /^(?:Column|List)[\s-]*(I{1,2}|1|2)\b\s*[:.-]?\s*$/i;
 const COLUMN_IDS = ["P", "Q", "R", "S", "T"];
@@ -167,6 +183,7 @@ interface Draft {
   marks: string | null;
   marksLine: number;
   passage: number | null;
+  choiceGroup: string | null;
 }
 
 function tagToType(tag: string): QuestionType {
@@ -175,6 +192,7 @@ function tagToType(tag: string): QuestionType {
   if (t === "integer") return "INTEGER";
   if (t === "decimal" || t === "numerical") return "DECIMAL";
   if (t.startsWith("matrix")) return "MATRIX";
+  if (["subjective", "written", "short", "long", "short answer", "long answer"].includes(t)) return "SUBJECTIVE";
   return "SINGLE";
 }
 
@@ -290,7 +308,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
 
   const ensureSection = () => {
     if (!section) {
-      section = { title: "Questions", attemptLimit: null, questions: [] };
+      section = { title: "Questions", attemptLimit: null, marksEach: null, questions: [] };
       sections.push(section);
     }
     return section;
@@ -318,6 +336,42 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       errors.push({ line: d.line, message: `${where} has no text.` });
       return;
     }
+    // A section's "N marks each" for questions that set no marks of their own,
+    // with no negative marking, as on board papers.
+    const each = (section as ImportedSection | null)?.marksEach ?? null;
+    const sectionRule = each !== null ? { correct: each, wrong: 0 } : null;
+
+    if (d.tag === "SUBJECTIVE") {
+      if (d.options.length || d.columns.length) {
+        errors.push({ line: d.line, message: `${where} is a written answer, so it cannot have options.` });
+        return;
+      }
+      let rule: ImportedQuestion["rule"] = sectionRule;
+      if (d.marks !== null) {
+        const parsed = parseMarks(d.marks);
+        if (!parsed) {
+          errors.push({ line: d.marksLine, message: `Marks "${d.marks}" should look like "3".` });
+          return;
+        }
+        rule = { correct: parsed.correct, wrong: 0 };
+      }
+      // Any "Answer:" or "Solution:" given is the model answer.
+      const model = [d.answer?.trim(), d.solution ? joinLines(d.solution) : null].filter(Boolean).join("\n");
+      ensureSection().questions.push({
+        line: d.line,
+        type: "SUBJECTIVE",
+        stem,
+        options: [],
+        columns: [],
+        key: { type: "SUBJECTIVE" },
+        solution: model || null,
+        passage: d.passage,
+        rule,
+        choiceGroup: d.choiceGroup,
+      });
+      return;
+    }
+
     if ((d.answer === null || !d.answer.trim()) && answerKey.has(d.number)) {
       d.answer = answerKey.get(d.number)!;
       d.answerLine = keyLine;
@@ -333,6 +387,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         solution: d.solution ? joinLines(d.solution) || null : null,
         passage: d.passage,
         rule: null,
+        choiceGroup: d.choiceGroup,
       });
       return;
     }
@@ -428,7 +483,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       type = key.type;
     }
 
-    let rule: ImportedQuestion["rule"] = null;
+    let rule: ImportedQuestion["rule"] = sectionRule;
     if (d.marks !== null) {
       rule = parseMarks(d.marks);
       if (!rule) {
@@ -447,6 +502,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       solution: d.solution ? joinLines(d.solution) || null : null,
       passage: d.passage,
       rule,
+      choiceGroup: d.choiceGroup,
     });
   };
 
@@ -492,12 +548,21 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       currentPassage = null;
       let title = sectionMatch[1];
       let attemptLimit: number | null = null;
-      const attempt = title.match(ATTEMPT_RE);
-      if (attempt) {
-        attemptLimit = Number(attempt[1]);
-        title = title.replace(ATTEMPT_RE, "").trim();
+      let marksEach: number | null = null;
+      // "| attempt any 5" and "| 2 marks each", in either order.
+      for (let i = 0; i < 2; i++) {
+        const attempt = title.match(ATTEMPT_RE);
+        if (attempt) {
+          attemptLimit = Number(attempt[1]);
+          title = title.replace(ATTEMPT_RE, "").trim();
+        }
+        const each = title.match(MARKS_EACH_RE);
+        if (each) {
+          marksEach = Number(each[1]);
+          title = title.replace(MARKS_EACH_RE, "").trim();
+        }
       }
-      section = { title, attemptLimit, questions: [] };
+      section = { title, attemptLimit, marksEach, questions: [] };
       sections.push(section);
       field = null;
       return;
@@ -518,6 +583,50 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
       passageLines = paragraph[1] ? [paragraph[1]] : [];
       field = "paragraph";
       return;
+    }
+
+    // "OR": what follows is an internal choice with the question before.
+    if (OR_RE.test(line) && draft) {
+      const before: Draft = draft;
+      const group = before.choiceGroup ?? `or${lineNo}`;
+      before.choiceGroup = group;
+      finish();
+      draft = {
+        line: lineNo + 1,
+        number: before.number,
+        sawNumbered: false,
+        tag: before.tag,
+        stem: [],
+        options: [],
+        columns: [],
+        inColumns: false,
+        answer: null,
+        answerLine: lineNo,
+        solution: null,
+        marks: before.marks,
+        marksLine: before.marksLine,
+        passage: before.passage,
+        choiceGroup: group,
+      };
+      field = "stem";
+      return;
+    }
+
+    // The alternative may repeat its number: "OR" then "16. ...".
+    if (draft && draft.choiceGroup && draft.stem.length === 0 && draft.options.length === 0) {
+      const same = line.match(SAME_NUMBER_RE);
+      if (same && Number(same[1]) === draft.number) {
+        let rest = same[2];
+        const tagMatch = rest.match(TYPE_TAG_RE);
+        if (tagMatch) {
+          draft.tag = tagToType(tagMatch[1]);
+          rest = rest.slice(tagMatch[0].length);
+        }
+        draft.line = lineNo;
+        if (rest) draft.stem.push(rest);
+        field = "stem";
+        return;
+      }
     }
 
     const question = questionStart(line);
@@ -547,6 +656,7 @@ export function parseQuestionPaper(text: string, options: ParseOptions = {}): Im
         marks: null,
         marksLine: lineNo,
         passage: currentPassage,
+        choiceGroup: null,
       };
       field = "stem";
       return;
@@ -657,6 +767,8 @@ function keyToAnswer(key: AnswerKey): string {
       return Object.entries(key.rows)
         .map(([row, cols]) => `${row}-${cols.join(",")}`)
         .join("; ");
+    case "SUBJECTIVE":
+      return "";
   }
 }
 
@@ -678,7 +790,8 @@ export function questionToText(
     (type === "MULTIPLE" && key.type === "MULTIPLE" && key.options.length === 1) ||
     (type === "SINGLE" && key.type === "SINGLE" && key.options.length > 1) ||
     (type === "DECIMAL" && key.type === "DECIMAL" && Number.isInteger(key.min) && key.min === key.max);
-  const tag = type === "MATRIX" ? "[matrix] " : needsTag ? `[${type.toLowerCase()}] ` : "";
+  const tag =
+    type === "MATRIX" ? "[matrix] " : type === "SUBJECTIVE" ? "[subjective] " : needsTag ? `[${type.toLowerCase()}] ` : "";
 
   const lines = [`Q${number}. ${tag}${question.stem}`];
   for (const option of question.options) lines.push(`(${option.id}) ${option.text}`);
@@ -686,7 +799,7 @@ export function questionToText(
     lines.push("Column II:");
     for (const column of question.columns ?? []) lines.push(`(${column.id}) ${column.text}`);
   }
-  lines.push(`Answer: ${keyToAnswer(key)}`);
+  if (type !== "SUBJECTIVE") lines.push(`Answer: ${keyToAnswer(key)}`);
   if (question.rule && (question.rule.correct !== undefined || question.rule.wrong !== undefined)) {
     const correct = question.rule.correct ?? 0;
     const wrong = question.rule.wrong ?? 0;

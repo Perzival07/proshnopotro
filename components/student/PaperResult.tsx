@@ -2,18 +2,20 @@ import React from "react";
 import { prisma } from "@/lib/prisma";
 import { RichText } from "@/components/RichText";
 import { MatrixColumns } from "@/components/MatrixColumns";
-import { markPaper, type QuestionStatus, type ResponseValue } from "@/lib/marking";
+import { markPaper, maxMarksFor, type QuestionStatus, type ResponseValue } from "@/lib/marking";
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { formatDate } from "@/lib/utils";
 import { parseTranslation } from "@/lib/translation";
-import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, XCircle } from "lucide-react";
+import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, PenLine, XCircle } from "lucide-react";
 
 const STATUS: Record<QuestionStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
   CORRECT: { label: "Correct", className: "border-emerald-200 bg-emerald-50 text-emerald-800", Icon: CheckCircle2 },
   PARTIAL: { label: "Partly correct", className: "border-sky-200 bg-sky-50 text-sky-800", Icon: MinusCircle },
   WRONG: { label: "Wrong", className: "border-red-200 bg-red-50 text-red-800", Icon: XCircle },
   UNATTEMPTED: { label: "Not attempted", className: "border-brand-border bg-brand-page text-brand-ink/70", Icon: CircleDashed },
-  NOT_COUNTED: { label: "Over the attempt limit", className: "border-amber-200 bg-amber-50 text-amber-800", Icon: CircleSlash },
+  NOT_COUNTED: { label: "Not counted", className: "border-amber-200 bg-amber-50 text-amber-800", Icon: CircleSlash },
+  PENDING: { label: "Awaiting marking", className: "border-sky-200 bg-sky-50 text-sky-800", Icon: Clock },
+  MARKED: { label: "Marked by your tutor", className: "border-brand-blue/30 bg-brand-tint text-brand-navy", Icon: PenLine },
 };
 
 function signed(n: number) {
@@ -50,7 +52,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
           passages: { select: { id: true, content: true } },
         },
       },
-      responses: { select: { questionId: true, value: true } },
+      responses: { select: { questionId: true, value: true, manualMarks: true, feedback: true } },
     },
   });
   if (!assignment) return null;
@@ -72,13 +74,15 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
   }
 
   const scheme = normalizeScheme(test.markingScheme);
-  const markable = toMarkableSections(test.sections, scheme);
+  const manual = Object.fromEntries(assignment.responses.map((r) => [r.questionId, r.manualMarks]));
+  const feedback = new Map(assignment.responses.map((r) => [r.questionId, r.feedback]));
+  const markable = toMarkableSections(test.sections, scheme, manual);
   const answers: Record<string, ResponseValue> = {};
   for (const r of assignment.responses) answers[r.questionId] = r.value as ResponseValue;
   const marked = markPaper(markable, answers, scheme);
   const passages = new Map(test.passages.map((p) => [p.id, p.content]));
 
-  const tally = { CORRECT: 0, PARTIAL: 0, WRONG: 0, UNATTEMPTED: 0, NOT_COUNTED: 0 } as Record<QuestionStatus, number>;
+  const tally = { CORRECT: 0, PARTIAL: 0, WRONG: 0, UNATTEMPTED: 0, NOT_COUNTED: 0, PENDING: 0, MARKED: 0 } as Record<QuestionStatus, number>;
   for (const s of marked.sections) for (const m of Object.values(s.questions)) tally[m.status]++;
   const percent = marked.maxScore > 0 ? Math.round((marked.score / marked.maxScore) * 1000) / 10 : 0;
 
@@ -101,6 +105,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
             {tally.PARTIAL > 0 && <span className="text-sky-700">{tally.PARTIAL} partly correct</span>}
             <span className="text-red-700">{tally.WRONG} wrong</span>
             <span className="text-brand-ink/60">{tally.UNATTEMPTED} not attempted</span>
+            {tally.PENDING > 0 && <span className="text-sky-700">{tally.PENDING} written, awaiting marking</span>}
           </div>
         </div>
 
@@ -134,7 +139,8 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
         <section key={section.id} className="space-y-3">
           <h2 className="font-heading text-base font-bold text-brand-navy">{section.title}</h2>
           {section.questions.map((q, qi) => {
-            number++;
+            const alternative = !!q.choiceGroup && qi > 0 && section.questions[qi - 1].choiceGroup === q.choiceGroup;
+            if (!alternative) number++;
             const mark = marked.sections[si].questions[q.id];
             const status = STATUS[mark.status];
             const key = parseAnswerKey(q.type, q.answerKey);
@@ -155,7 +161,10 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                 )}
                 <div className="space-y-3 rounded-xl border border-brand-border bg-white p-4">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-heading text-sm font-bold text-brand-navy">Q{number}</span>
+                    <span className="font-heading text-sm font-bold text-brand-navy">
+                      Q{number}
+                      {alternative && <span className="ml-1 text-xs text-brand-blue">(OR)</span>}
+                    </span>
                     <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${status.className}`}>
                       <status.Icon className="h-3 w-3" />
                       {status.label}
@@ -197,7 +206,19 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                     );
                   })()}
 
-                  {q.type === "MATRIX" ? (
+                  {q.type === "SUBJECTIVE" ? (
+                    <div className="space-y-1 text-xs">
+                      <p className="text-brand-ink/70">
+                        Written answer, {mark.status === "MARKED" ? `${formatNumber(mark.marks)} of ${formatNumber(maxMarksFor(markable[si].questions.find((m) => m.id === q.id)!, markable[si].scheme ?? scheme))} marks` : "not marked yet"}.
+                      </p>
+                      {feedback.get(q.id) && (
+                        <p className="rounded-md border border-brand-blue/20 bg-brand-tint/40 p-2 text-brand-navy">
+                          <span className="font-semibold">Tutor&apos;s comment: </span>
+                          {feedback.get(q.id)}
+                        </p>
+                      )}
+                    </div>
+                  ) : q.type === "MATRIX" ? (
                     <div className="space-y-2">
                       <MatrixColumns {...parseMatrixOptions(q.options)} />
                       <table className="w-full max-w-md text-xs">

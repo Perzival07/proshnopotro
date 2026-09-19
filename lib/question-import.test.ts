@@ -342,3 +342,74 @@ describe("matrix match", () => {
     expect({ ...again, line: 0 }).toEqual({ ...q, line: 0 });
   });
 });
+
+describe("board papers", () => {
+  const CBSE = [
+    "# Section A | 1 mark each",
+    "1. The SI unit of charge is",
+    "(A) ampere (B) coulomb (C) volt (D) ohm",
+    "Answer: B",
+    "2. Assertion (A): Like charges repel. Reason (R): Force is inverse square.",
+    "(A) Both true, R explains A",
+    "(B) Both true, R does not explain A",
+    "(C) A true, R false",
+    "(D) A false, R true",
+    "Answer: B",
+    "# Section C | 3 marks each",
+    "3. [subjective] State Gauss's law and derive the field of a line charge.",
+    "Solution: E = λ/(2πε₀r)",
+    "OR",
+    "Derive the field of an infinite plane sheet.",
+    "4. [subjective] Explain dispersion.",
+    "Marks: 2",
+    "OR",
+    "4. Explain scattering.",
+    "# Section E | 4 marks each",
+    "Paragraph:",
+    "A case study about capacitors.",
+    "5. [subjective] Find the capacitance.",
+    "End paragraph",
+  ];
+
+  it("reads sections with marks each, written answers and internal choice", () => {
+    const { sections, errors } = paper(...CBSE);
+    expect(errors).toEqual([]);
+    expect(sections.map((s) => [s.title, s.marksEach])).toEqual([
+      ["Section A", 1],
+      ["Section C", 3],
+      ["Section E", 4],
+    ]);
+    const [a, c, e] = sections;
+    expect(a.questions[0].rule).toEqual({ correct: 1, wrong: 0 });
+    const [q3, q3or, q4, q4or] = c.questions;
+    expect(q3.type).toBe("SUBJECTIVE");
+    expect(q3.solution).toBe("E = λ/(2πε₀r)");
+    expect(q3.rule).toEqual({ correct: 3, wrong: 0 });
+    expect(q3or.stem).toBe("Derive the field of an infinite plane sheet.");
+    expect(q3or.type).toBe("SUBJECTIVE");
+    expect(q3.choiceGroup).not.toBeNull();
+    expect(q3or.choiceGroup).toBe(q3.choiceGroup);
+    expect(q4.rule).toEqual({ correct: 2, wrong: 0 });
+    expect(q4or.stem).toBe("Explain scattering.");
+    expect(q4or.rule).toEqual({ correct: 2, wrong: 0 });
+    expect(q4or.choiceGroup).not.toBe(q3.choiceGroup);
+    expect(e.questions[0].passage).toBe(0);
+  });
+
+  it("reads Hindi's अथवा like OR", () => {
+    const { sections, errors } = paper("1. [subjective] क", "अथवा", "ख");
+    expect(errors).toEqual([]);
+    expect(sections[0].questions).toHaveLength(2);
+  });
+
+  it("refuses options on a written answer", () => {
+    const { errors } = paper("1. [subjective] Pick", "(A) x", "(B) y");
+    expect(errors[0].message).toContain("cannot have options");
+  });
+
+  it("round-trips a written question", () => {
+    const q = paper("1. [subjective] Explain.", "Marks: 3", "Solution: Because.").sections[0].questions[0];
+    const again = parseQuestionPaper(questionToText(q)).sections[0].questions[0];
+    expect({ ...again, line: 0 }).toEqual({ ...q, line: 0 });
+  });
+});

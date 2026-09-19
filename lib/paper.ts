@@ -39,6 +39,8 @@ export interface QuestionRow {
   passageId: string | null;
   /** The question in the test's second language, as stored. */
   translation?: unknown;
+  /** Internal choice: questions sharing a group count once. */
+  choiceGroup?: string | null;
 }
 
 export interface SectionRow {
@@ -79,6 +81,7 @@ export function normalizeScheme(raw: unknown): MarkingScheme {
     },
     INTEGER: readRule(r.INTEGER, base.INTEGER),
     DECIMAL: readRule(r.DECIMAL, base.DECIMAL),
+    SUBJECTIVE: { ...readRule(r.SUBJECTIVE, base.SUBJECTIVE), wrong: 0 },
     MATRIX: {
       ...readRule(r.MATRIX, base.MATRIX),
       perRow: typeof (r.MATRIX as Record<string, unknown> | undefined)?.perRow === "boolean"
@@ -104,6 +107,8 @@ export function parseAnswerKey(type: QuestionType, raw: unknown): AnswerKey | nu
         : null;
     case "DECIMAL":
       return isNum(r.min) && isNum(r.max) && r.min <= r.max ? { type, min: r.min, max: r.max } : null;
+    case "SUBJECTIVE":
+      return { type };
     case "MATRIX": {
       const rows = r.rows as Record<string, unknown> | undefined;
       if (!rows || typeof rows !== "object" || Array.isArray(rows)) return null;
@@ -140,7 +145,9 @@ const byPosition = <T extends { position: number }>(a: T, b: T) => a.position - 
  */
 export function toMarkableSections(
   sections: SectionRow[],
-  testScheme: MarkingScheme
+  testScheme: MarkingScheme,
+  /** Written answers: question id -> the marks the tutor gave. */
+  manualMarks: Record<string, number | null | undefined> = {}
 ): MarkableSection[] {
   return [...sections].sort(byPosition).map((section) => ({
     id: section.id,
@@ -156,6 +163,8 @@ export function toMarkableSections(
             ? { correct: q.marksCorrect ?? undefined, wrong: q.marksWrong ?? undefined }
             : null,
         bonus: q.bonus || key === null,
+        choiceGroup: q.choiceGroup ?? null,
+        manualMarks: manualMarks[q.id] ?? null,
       };
     }),
   }));
@@ -173,6 +182,10 @@ export interface StudentQuestion {
   columns?: OptionRow[];
   /** The question in the paper's second language, when it has one. */
   translation?: QuestionTranslation | null;
+  /** Internal choice: the alternatives share this and their number. */
+  choiceGroup?: string | null;
+  /** The second (third ...) alternative of an internal choice. */
+  alternative?: boolean;
 }
 
 export interface StudentSection {
@@ -200,9 +213,15 @@ export function toStudentPaper(sections: SectionRow[], testScheme: MarkingScheme
       instructions: section.instructions,
       attemptLimit: section.attemptLimit,
       durationMinutes: section.durationMinutes,
-      questions: [...section.questions].sort(byPosition).map((q) => ({
+      questions: [...section.questions].sort(byPosition).map((q, i, all) => {
+        // Alternatives of an internal choice share their number, as printed
+        // on board papers: "16 ... OR ...".
+        const alternative = !!q.choiceGroup && i > 0 && all[i - 1].choiceGroup === q.choiceGroup;
+        return {
         id: q.id,
-        number: ++number,
+        number: alternative ? number : ++number,
+        choiceGroup: q.choiceGroup ?? null,
+        alternative,
         type: q.type,
         stem: q.stem,
         ...(q.type === "MATRIX"
@@ -218,7 +237,8 @@ export function toStudentPaper(sections: SectionRow[], testScheme: MarkingScheme
           const t = parseTranslation(q.translation);
           return t ? { ...t, solution: null } : null;
         })(),
-      })),
+        };
+      }),
     };
   });
 }
@@ -238,6 +258,8 @@ export function checkResponse(
 ): ResponseCheck {
   if (raw === null || raw === undefined || raw === "") return { ok: true, value: null };
   if (!QUESTION_TYPES.includes(type)) return { ok: false, error: "Unknown question type." };
+
+  if (type === "SUBJECTIVE") return { ok: false, error: "Write this answer on paper; it is uploaded as a photo." };
 
   if (type === "MATRIX") {
     if (typeof raw !== "object" || Array.isArray(raw)) return { ok: false, error: "Match each row to its columns." };

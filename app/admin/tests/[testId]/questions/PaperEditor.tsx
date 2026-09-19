@@ -64,6 +64,8 @@ export interface EditorQuestion {
   passageId: string | null;
   /** The question in the paper's second language, if it has one. */
   translation: QuestionTranslation | null;
+  /** Internal choice: alternatives share this. */
+  choiceGroup: string | null;
 }
 
 export interface EditorSection {
@@ -119,6 +121,44 @@ Answer: 2
 Q4. [decimal] The pH of $\\pu{0.01 M}$ $\\ce{HCl}$ is
 Answer: 1.99 to 2.01
 Marks: +4 -0`;
+
+const BOARD_EXAMPLE = `# Section A | 1 mark each
+1. The SI unit of electric charge is
+(A) ampere (B) coulomb (C) volt (D) ohm
+Answer: B
+
+2. Assertion (A): Like charges repel each other.
+Reason (R): The electrostatic force obeys an inverse-square law.
+(A) Both A and R are true, and R explains A
+(B) Both A and R are true, but R does not explain A
+(C) A is true, but R is false
+(D) A is false, but R is true
+Answer: B
+
+# Section B | 2 marks each
+3. [subjective] Define electric flux. Write its SI unit.
+
+# Section C | 3 marks each
+4. [subjective] State Gauss's law and use it to find the field of an infinitely long charged wire.
+Solution: $E = \\dfrac{\\lambda}{2\\pi\\varepsilon_0 r}$
+OR
+Use Gauss's law to find the field of an infinite plane sheet of charge.
+
+# Section D | 5 marks each
+5. [subjective] Derive the expression for the capacitance of a parallel-plate capacitor with a dielectric slab.
+
+# Section E | 4 marks each
+Paragraph:
+A capacitor stores energy in its electric field. (Case study text here.)
+6. [subjective] What is the energy stored in a capacitor of capacitance $C$ at voltage $V$?
+Marks: 1
+7. [subjective] How does the energy change if a dielectric is inserted at constant charge?
+Marks: 1
+8. [subjective] Two capacitors are joined in series. Find the total energy stored.
+Marks: 2
+OR
+Two capacitors are joined in parallel. Find the total energy stored.
+End paragraph`;
 
 function ErrorList({ errors }: { errors: ImportError[] }) {
   if (errors.length === 0) return null;
@@ -418,10 +458,16 @@ function ImportPanel({
             <li>A table is rows like <code>| (P) Force | (1) N |</code>.</li>
             <li><code>Paragraph:</code> starts a passage for the questions after it, until <code>End paragraph</code>.</li>
             <li>Assertion–reason and list-match questions are ordinary single-correct questions.</li>
+            <li>Board papers: <code># Section C | 3 marks each</code> sets each question&apos;s marks; <code>[subjective]</code> after <code>Q1.</code> makes a written answer you mark from the photos; a line with just <code>OR</code> makes an internal choice.</li>
           </ul>
-          <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setText(EXAMPLE)}>
-            Load an example
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setText(EXAMPLE)}>
+              Load an example
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-7 text-xs" onClick={() => setText(BOARD_EXAMPLE)}>
+              Load a CBSE board pattern
+            </Button>
+          </div>
         </div>
       )}
 
@@ -955,6 +1001,7 @@ const RULE_ROWS: { type: QuestionType; label: string }[] = [
   { type: "INTEGER", label: "Integer" },
   { type: "DECIMAL", label: "Decimal" },
   { type: "MATRIX", label: "Matrix match (whole question)" },
+  { type: "SUBJECTIVE", label: "Written answer (unless set per question)" },
 ];
 
 /** The marks table and presets, editing a draft the caller holds. */
@@ -1008,6 +1055,8 @@ function SchemeFields({ draft, setDraft }: { draft: MarkingScheme; setDraft: Rea
                   step="any"
                   max={0}
                   value={draft[row.type].wrong}
+                  disabled={row.type === "SUBJECTIVE"}
+                  title={row.type === "SUBJECTIVE" ? "Written answers are never negative" : undefined}
                   onChange={(e) => setRule(row.type, "wrong", e.target.value)}
                   className="h-8 w-20 text-xs"
                 />
@@ -1349,6 +1398,7 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
             id: q.id,
             key: q.key ?? { type: "SINGLE" as const, options: [] },
             rule: { correct: q.marksCorrect ?? undefined, wrong: q.marksWrong ?? undefined },
+            choiceGroup: q.choiceGroup,
           })),
         })),
         {},
@@ -1394,12 +1444,17 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
                 locked={locked}
               />
               {section.questions.map((question, i) => {
-                number++;
+                const alternative =
+                  !!question.choiceGroup && i > 0 && section.questions[i - 1].choiceGroup === question.choiceGroup;
+                if (!alternative) number++;
                 const passage = question.passageId ? passageById.get(question.passageId) : null;
                 const firstOfPassage =
                   passage && (i === 0 || section.questions[i - 1].passageId !== question.passageId);
                 return (
                   <React.Fragment key={question.id}>
+                    {alternative && (
+                      <p className="text-center text-xs font-bold tracking-widest text-brand-navy">OR</p>
+                    )}
                     {firstOfPassage && passage && <PassageBlock passage={passage} language={test.secondLanguage} />}
                     <QuestionCard
                       testId={test.id}

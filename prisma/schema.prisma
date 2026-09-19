@@ -40,6 +40,7 @@ enum QuestionType {
   INTEGER
   DECIMAL
   MATRIX
+  SUBJECTIVE
 }
 
 /// When a student sees their score and the answers for a QUESTIONS test.
@@ -270,6 +271,8 @@ model Question {
   marksWrong   Float?
   /// Dropped from the paper: full marks to everyone who attempted it.
   bonus       Boolean      @default(false)
+  /// Internal choice ("Q16 ... OR ..."): questions sharing a group count once.
+  choiceGroup String?
   /// The question in the test's second language: { stem, options, columns,
   /// solution }, as lib/translation.ts QuestionTranslation. Marked with the
   /// same key.
@@ -294,6 +297,9 @@ model QuestionResponse {
   /// Filled in when the attempt is marked.
   marks           Float?
   status          String?
+  /// Written answers: the marks the tutor gave, and a note for the student.
+  manualMarks     Float?
+  feedback        String?  @db.Text
   updatedAt       DateTime @updatedAt
 
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)

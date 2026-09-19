@@ -54,6 +54,7 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       bonus: q.bonus,
       passageId: q.passageId,
       translation: parseTranslation(q.translation),
+      choiceGroup: q.choiceGroup,
     })),
   }));
 

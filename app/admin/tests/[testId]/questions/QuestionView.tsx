@@ -11,6 +11,7 @@ export const TYPE_LABELS: Record<QuestionType, string> = {
   INTEGER: "Integer answer",
   DECIMAL: "Decimal answer",
   MATRIX: "Matrix match",
+  SUBJECTIVE: "Written answer",
 };
 
 function formatNumber(n: number) {
@@ -33,6 +34,8 @@ export function describeKey(key: AnswerKey | null): string {
       return Object.entries(key.rows)
         .map(([row, cols]) => `${row} \u2192 ${cols.join(", ")}`)
         .join(";  ");
+    case "SUBJECTIVE":
+      return "Marked by you from the answer photos";
   }
 }
 
@@ -111,7 +114,7 @@ export function QuestionView({
         </ul>
       )}
 
-      {(options.length === 0 || type === "MATRIX") && (
+      {(options.length === 0 || type === "MATRIX") && type !== "SUBJECTIVE" && (
         <p className="text-xs">
           <span className="font-semibold text-brand-navy">Answer: </span>
           <span className="font-mono text-emerald-700">{describeKey(answerKey)}</span>
@@ -123,9 +126,15 @@ export function QuestionView({
         </p>
       )}
 
+      {type === "SUBJECTIVE" && (
+        <p className="text-xs text-brand-ink/60">Answered on paper and photographed; you mark it from the photos.</p>
+      )}
+
       {solution && (
         <details className="rounded-md border border-brand-border bg-brand-page px-2.5 py-1.5 text-sm">
-          <summary className="cursor-pointer text-xs font-semibold text-brand-navy">Solution</summary>
+          <summary className="cursor-pointer text-xs font-semibold text-brand-navy">
+            {type === "SUBJECTIVE" ? "Model answer" : "Solution"}
+          </summary>
           <RichText text={solution} className="mt-2" />
         </details>
       )}

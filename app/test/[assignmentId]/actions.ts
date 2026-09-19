@@ -273,6 +273,7 @@ export async function saveQuestionResponse(
       type: true,
       options: true,
       sectionId: true,
+      choiceGroup: true,
       section: { select: { testId: true, attemptLimit: true } },
     },
   });
@@ -322,6 +323,21 @@ export async function saveQuestionResponse(
       return {
         error: `You can answer only ${question.section.attemptLimit} questions in this section. Clear another answer first.`,
       };
+    }
+  }
+
+  // Internal choice: one side only. Answering the other means clearing this.
+  if (question.choiceGroup && isAttempted(checked.value)) {
+    const others = await prisma.questionResponse.findMany({
+      where: {
+        assignmentId,
+        questionId: { not: questionId },
+        question: { choiceGroup: question.choiceGroup, section: { testId: assignment.test.id } },
+      },
+      select: { value: true },
+    });
+    if (others.some((o) => isAttempted(o.value as ResponseValue))) {
+      return { error: "You have answered the other choice of this question. Clear that answer to answer this one." };
     }
   }
 

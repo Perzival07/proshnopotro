@@ -14,15 +14,21 @@
  *              is how "correct to two decimal places" is marked.
  *   MATRIX   - matrix match: each row of Column I matches one or more entries
  *              of Column II. Marked row by row, or all or nothing.
+ *   SUBJECTIVE - a written answer (board papers' short and long answers),
+ *              answered on paper and marked by the tutor, never automatically.
+ *
+ * Internal choice ("Q16 ... OR ...") puts questions in a choice group: only
+ * one of them counts -- the one attempted, or for written answers the one
+ * the tutor gave most marks.
  *
  * Paragraph and assertion-reason questions are SINGLE (or MULTIPLE) questions
  * with a shared passage or fixed options; list-match questions in the current
  * JEE Advanced pattern are SINGLE too. None of them needs its own rule.
  */
 
-export type QuestionType = "SINGLE" | "MULTIPLE" | "INTEGER" | "DECIMAL" | "MATRIX";
+export type QuestionType = "SINGLE" | "MULTIPLE" | "INTEGER" | "DECIMAL" | "MATRIX" | "SUBJECTIVE";
 
-export const QUESTION_TYPES: readonly QuestionType[] = ["SINGLE", "MULTIPLE", "INTEGER", "DECIMAL", "MATRIX"];
+export const QUESTION_TYPES: readonly QuestionType[] = ["SINGLE", "MULTIPLE", "INTEGER", "DECIMAL", "MATRIX", "SUBJECTIVE"];
 
 export type AnswerKey =
   | { type: "SINGLE"; options: string[] }
@@ -30,7 +36,9 @@ export type AnswerKey =
   | { type: "INTEGER"; values: number[] }
   | { type: "DECIMAL"; min: number; max: number }
   /** Row id (A, B, ...) -> the column ids (P, Q, ...) it matches. */
-  | { type: "MATRIX"; rows: Record<string, string[]> };
+  | { type: "MATRIX"; rows: Record<string, string[]> }
+  /** Written on paper and marked by hand; the solution holds the model answer. */
+  | { type: "SUBJECTIVE" };
 
 /**
  * What the student entered. Option ids for the choice types; the typed text
@@ -68,6 +76,8 @@ export interface MarkingScheme {
    * be right for any marks.
    */
   MATRIX: MarkRule & { perRow: boolean };
+  /** A written answer's marks, when the question sets none of its own. */
+  SUBJECTIVE: MarkRule;
 }
 
 export type SchemePreset = "JEE_MAIN" | "NEET" | "JEE_ADVANCED" | "NO_NEGATIVE";
@@ -86,6 +96,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       INTEGER: { correct: 4, wrong: -1 },
       DECIMAL: { correct: 4, wrong: -1 },
       MATRIX: { correct: 4, wrong: -1, perRow: false },
+      SUBJECTIVE: { correct: 4, wrong: 0 },
     },
   },
   NEET: {
@@ -96,6 +107,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       INTEGER: { correct: 4, wrong: -1 },
       DECIMAL: { correct: 4, wrong: -1 },
       MATRIX: { correct: 4, wrong: -1, perRow: false },
+      SUBJECTIVE: { correct: 4, wrong: 0 },
     },
   },
   JEE_ADVANCED: {
@@ -106,6 +118,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       INTEGER: { correct: 4, wrong: 0 },
       DECIMAL: { correct: 4, wrong: 0 },
       MATRIX: { correct: 8, wrong: 0, perRow: true },
+      SUBJECTIVE: { correct: 4, wrong: 0 },
     },
   },
   NO_NEGATIVE: {
@@ -116,11 +129,25 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       INTEGER: { correct: 1, wrong: 0 },
       DECIMAL: { correct: 1, wrong: 0 },
       MATRIX: { correct: 4, wrong: 0, perRow: true },
+      SUBJECTIVE: { correct: 2, wrong: 0 },
     },
   },
 };
 
-export type QuestionStatus = "CORRECT" | "PARTIAL" | "WRONG" | "UNATTEMPTED" | "NOT_COUNTED";
+/**
+ * PENDING: a written answer the tutor has not marked yet.
+ * MARKED:  a written answer the tutor has marked.
+ * NOT_COUNTED: over an "attempt any N" limit, or the other side of an
+ *          internal choice.
+ */
+export type QuestionStatus =
+  | "CORRECT"
+  | "PARTIAL"
+  | "WRONG"
+  | "UNATTEMPTED"
+  | "NOT_COUNTED"
+  | "PENDING"
+  | "MARKED";
 
 export interface QuestionMark {
   status: QuestionStatus;
@@ -135,6 +162,10 @@ export interface MarkableQuestion {
   rule?: Partial<MarkRule> | null;
   /** Dropped from the paper (a wrong question): full marks to everyone who attempted it. */
   bonus?: boolean;
+  /** Internal choice: questions sharing a group count once between them. */
+  choiceGroup?: string | null;
+  /** Written answers: the marks the tutor gave, once marked. */
+  manualMarks?: number | null;
 }
 
 /**
@@ -176,6 +207,13 @@ export function markQuestion(
   value: ResponseValue | undefined,
   scheme: MarkingScheme
 ): QuestionMark {
+  // Written answers are on paper: only the tutor's marks count, within 0 and
+  // the question's marks.
+  if (question.key.type === "SUBJECTIVE") {
+    if (question.manualMarks === null || question.manualMarks === undefined) return { status: "PENDING", marks: 0 };
+    const max = ruleFor(scheme, question).correct;
+    return { status: "MARKED", marks: Math.min(Math.max(question.manualMarks, 0), max) };
+  }
   if (!isAttempted(value)) return { status: "UNATTEMPTED", marks: 0 };
 
   const rule = ruleFor(scheme, question);
@@ -269,11 +307,20 @@ export interface PaperMark {
   sections: SectionMark[];
 }
 
+/** Whether a mark means the student answered the question at all. */
+const answered = (m: QuestionMark) => m.status !== "UNATTEMPTED" && m.status !== "PENDING";
+
 /**
  * Marks a whole paper.
  *
- * With an attempt limit, the section's maximum is the N best-scoring
- * questions, since that is the most anyone could earn there.
+ * Each question is marked on its own first. Then internal choices are
+ * settled -- of a group, the answered question counts (for written answers,
+ * the best-marked one) and the rest are NOT_COUNTED -- and then any
+ * "attempt any N" limit counts the first N answered, a choice group being one
+ * question for this.
+ *
+ * With an attempt limit, the section's maximum is its N best-scoring units,
+ * since that is the most anyone could earn there.
  */
 export function markPaper(
   sections: MarkableSection[],
@@ -286,23 +333,50 @@ export function markPaper(
       section.attemptLimit && section.attemptLimit > 0 ? section.attemptLimit : null;
 
     const questions: Record<string, QuestionMark> = {};
+    for (const question of section.questions) {
+      questions[question.id] = markQuestion(question, responses[question.id], scheme);
+    }
+
+    // Units: a lone question, or the questions of one internal choice, in
+    // paper order of their first question.
+    const units: MarkableQuestion[][] = [];
+    const byGroup = new Map<string, MarkableQuestion[]>();
+    for (const question of section.questions) {
+      const group = question.choiceGroup;
+      if (!group) {
+        units.push([question]);
+      } else if (byGroup.has(group)) {
+        byGroup.get(group)!.push(question);
+      } else {
+        const unit = [question];
+        byGroup.set(group, unit);
+        units.push(unit);
+      }
+    }
+
     let score = 0;
     let attempted = 0;
-
-    for (const question of section.questions) {
-      const value = responses[question.id];
-      if (limit !== null && isAttempted(value) && attempted >= limit) {
-        questions[question.id] = { status: "NOT_COUNTED", marks: 0 };
+    for (const unit of units) {
+      // The member that counts: the best-marked answered one, or the first.
+      const counted =
+        unit
+          .filter((q) => answered(questions[q.id]))
+          .sort((a, b) => questions[b.id].marks - questions[a.id].marks)[0] ?? unit[0];
+      for (const q of unit) {
+        if (q !== counted && answered(questions[q.id])) questions[q.id] = { status: "NOT_COUNTED", marks: 0 };
+      }
+      const mark = questions[counted.id];
+      if (!answered(mark)) continue;
+      if (limit !== null && attempted >= limit) {
+        questions[counted.id] = { status: "NOT_COUNTED", marks: 0 };
         continue;
       }
-      const mark = markQuestion(question, value, scheme);
-      if (mark.status !== "UNATTEMPTED") attempted++;
-      questions[question.id] = mark;
+      attempted++;
       score += mark.marks;
     }
 
-    const maxima = section.questions
-      .map((q) => maxMarksFor(q, scheme))
+    const maxima = units
+      .map((unit) => Math.max(...unit.map((q) => maxMarksFor(q, scheme))))
       .sort((a, b) => b - a);
     const maxScore = (limit !== null ? maxima.slice(0, limit) : maxima).reduce(
       (sum, m) => sum + m,

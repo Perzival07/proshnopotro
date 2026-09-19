@@ -209,3 +209,66 @@ describe("MATRIX", () => {
   it("treats an empty grid as unattempted", () =>
     expect(markQuestion(matrix, { A: [] }, ADV)).toEqual({ status: "UNATTEMPTED", marks: 0 }));
 });
+
+describe("written answers (SUBJECTIVE)", () => {
+  const written = (manualMarks: number | null, own?: number): MarkableQuestion => ({
+    id: "w",
+    key: { type: "SUBJECTIVE" },
+    manualMarks,
+    rule: own ? { correct: own } : null,
+  });
+
+  it("waits for the tutor's marks", () =>
+    expect(markQuestion(written(null, 3), null, BOARDS)).toEqual({ status: "PENDING", marks: 0 }));
+  it("uses the tutor's marks, within 0 and the question's marks", () => {
+    expect(markQuestion(written(2.5, 3), null, BOARDS)).toEqual({ status: "MARKED", marks: 2.5 });
+    expect(markQuestion(written(9, 3), null, BOARDS).marks).toBe(3);
+    expect(markQuestion(written(-1, 3), null, BOARDS).marks).toBe(0);
+  });
+  it("counts towards the maximum even before marking", () => {
+    const r = markPaper([{ id: "s", questions: [{ ...written(null, 5), id: "a" }] }], {}, BOARDS);
+    expect(r.maxScore).toBe(5);
+    expect(r.score).toBe(0);
+  });
+});
+
+describe("internal choice", () => {
+  const mcq = (id: string, group: string | null): MarkableQuestion => ({
+    id,
+    key: { type: "SINGLE", options: ["A"] },
+    choiceGroup: group,
+  });
+
+  it("counts whichever alternative was answered, once in the maximum", () => {
+    const r = markPaper([{ id: "s", questions: [mcq("q1", null), mcq("q2", "g"), mcq("q2or", "g")] }], { q1: "A", q2or: "A" }, MAIN);
+    expect(r.sections[0].questions.q2).toEqual({ status: "UNATTEMPTED", marks: 0 });
+    expect(r.sections[0].questions.q2or).toEqual({ status: "CORRECT", marks: 4 });
+    expect(r.score).toBe(8);
+    expect(r.maxScore).toBe(8);
+  });
+
+  it("counts only the better one if both were answered", () => {
+    const r = markPaper([{ id: "s", questions: [mcq("a", "g"), mcq("b", "g")] }], { a: "B", b: "A" }, MAIN);
+    expect(r.sections[0].questions.a).toEqual({ status: "NOT_COUNTED", marks: 0 });
+    expect(r.score).toBe(4);
+  });
+
+  it("takes the better-marked written alternative", () => {
+    const w = (id: string, m: number | null): MarkableQuestion => ({ id, key: { type: "SUBJECTIVE" }, choiceGroup: "g", manualMarks: m, rule: { correct: 5 } });
+    const r = markPaper([{ id: "s", questions: [w("x", 2), w("y", 4)] }], {}, BOARDS);
+    expect(r.sections[0].questions.x.status).toBe("NOT_COUNTED");
+    expect(r.score).toBe(4);
+    expect(r.maxScore).toBe(5);
+  });
+
+  it("treats a choice as one question under an attempt limit", () => {
+    const r = markPaper(
+      [{ id: "s", attemptLimit: 1, questions: [mcq("a", "g"), mcq("b", "g"), mcq("c", null)] }],
+      { b: "A", c: "A" },
+      MAIN
+    );
+    expect(r.sections[0].questions.b.status).toBe("CORRECT");
+    expect(r.sections[0].questions.c.status).toBe("NOT_COUNTED");
+    expect(r.maxScore).toBe(4);
+  });
+});

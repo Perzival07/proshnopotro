@@ -29,7 +29,7 @@ export async function gradeAssignment(assignmentId: string): Promise<void> {
           sections: { include: { questions: true } },
         },
       },
-      responses: { select: { questionId: true, value: true } },
+      responses: { select: { questionId: true, value: true, manualMarks: true } },
     },
   });
 
@@ -37,7 +37,8 @@ export async function gradeAssignment(assignmentId: string): Promise<void> {
   if (assignment.status !== "SUBMITTED") return;
 
   const scheme = normalizeScheme(assignment.test.markingScheme);
-  const sections = toMarkableSections(assignment.test.sections, scheme);
+  const manual = Object.fromEntries(assignment.responses.map((r) => [r.questionId, r.manualMarks]));
+  const sections = toMarkableSections(assignment.test.sections, scheme, manual);
   const answers: Record<string, ResponseValue> = {};
   for (const r of assignment.responses) answers[r.questionId] = r.value as ResponseValue;
 

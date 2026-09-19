@@ -28,8 +28,8 @@ export const UPLOAD_WINDOW_MINUTES = 2;
  */
 export const SAVE_GRACE_MINUTES = 10;
 
-/** Pages accepted in one upload. */
-export const MAX_ANSWER_IMAGES = 20;
+/** Pages accepted in one upload. Board answer booklets run long. */
+export const MAX_ANSWER_IMAGES = 40;
 
 /** Longest edge of an uploaded photo, in pixels. Enough to read handwriting. */
 export const MAX_IMAGE_EDGE = 1600;

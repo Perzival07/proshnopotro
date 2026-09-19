@@ -78,6 +78,9 @@ async function writePaper(
     orderBy: { position: "asc" },
   });
   let nextPosition = existing.length;
+  // Choice groups from the paste are only unique within it; this makes them
+  // unique within the test, so an appended "OR" never joins an older one.
+  const importToken = Date.now().toString(36);
 
   for (const section of paper.sections) {
     // A pasted section with the same name as one already in the paper is
@@ -110,8 +113,14 @@ async function writePaper(
         marksCorrect: q.rule?.correct ?? null,
         marksWrong: q.rule?.wrong ?? null,
         passageId: q.passage !== null ? passageIds[q.passage] : null,
+        choiceGroup: q.choiceGroup ? `${importToken}-${q.choiceGroup}` : null,
       })),
     });
+  }
+
+  // Written answers are photographed, so a paper with any collects sheets.
+  if (paper.sections.some((s) => s.questions.some((q) => q.type === "SUBJECTIVE"))) {
+    await tx.test.update({ where: { id: testId }, data: { answerSheets: true } });
   }
 }
 

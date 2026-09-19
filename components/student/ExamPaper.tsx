@@ -59,6 +59,7 @@ const TYPE_HINT: Record<StudentQuestion["type"], string> = {
   INTEGER: "Type a whole number",
   DECIMAL: "Type a number",
   MATRIX: "Match each row to one or more columns",
+  SUBJECTIVE: "Write your answer on paper",
 };
 
 function formatMarks(correct: number, wrong: number) {
@@ -229,10 +230,12 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   );
 
   // ── Progress ──────────────────────────────────────────────
-  const answeredCount = flat.filter(({ question }) => isAttempted(answers[question.id])).length;
+  // Written answers are on paper, so progress counts the on-screen ones.
+  const onScreen = flat.filter(({ question }) => question.type !== "SUBJECTIVE");
+  const answeredCount = onScreen.filter(({ question }) => isAttempted(answers[question.id])).length;
   useEffect(() => {
-    onProgress?.(answeredCount, flat.length);
-  }, [answeredCount, flat.length, onProgress]);
+    onProgress?.(answeredCount, onScreen.length);
+  }, [answeredCount, onScreen.length, onProgress]);
 
   const answeredInSection = (section: StudentSection) =>
     section.questions.filter((q) => isAttempted(answers[q.id])).length;
@@ -272,8 +275,19 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   const marked = review[question.id] ?? false;
   const limit = section.attemptLimit;
   const sectionClosed = !canVisit(section.id);
+  // Internal choice: answering one side locks the other until it is cleared.
+  const otherChoice = question.choiceGroup
+    ? flat.find(
+        (f) =>
+          f.question.choiceGroup === question.choiceGroup &&
+          f.question.id !== question.id &&
+          isAttempted(answers[f.question.id])
+      )
+    : undefined;
   const limitReached =
-    sectionClosed || (!!limit && !isAttempted(value) && answeredInSection(section) >= limit);
+    sectionClosed ||
+    (!!otherChoice && !isAttempted(value)) ||
+    (!!limit && !isAttempted(value) && answeredInSection(section) >= limit);
 
   const setAnswer = (next: ResponseValue, delayMs = 0) => {
     if (sectionClosed) {
@@ -391,7 +405,9 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
                       ? "Closed"
                       : state === "later"
                         ? `Opens in ${formatRemaining(w!.opensAtMs - now)}`
-                        : `${answeredInSection(s)}/${s.attemptLimit ?? s.questions.length}`}
+                        : s.questions.every((q) => q.type === "SUBJECTIVE")
+                          ? "Written"
+                          : `${answeredInSection(s)}/${s.attemptLimit ?? s.questions.filter((q) => q.type !== "SUBJECTIVE").length}`}
                   </span>
                 </button>
               );
@@ -453,7 +469,10 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
 
         <div className="rounded-xl border border-brand-border bg-white p-4 shadow-xs sm:p-5">
           <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-brand-border/60 pb-3">
-            <span className="font-heading text-base font-bold text-brand-navy">Question {question.number}</span>
+            <span className="font-heading text-base font-bold text-brand-navy">
+              Question {question.number}
+              {question.alternative && <span className="ml-1 text-sm font-semibold text-brand-blue">(OR)</span>}
+            </span>
             <span className="text-[11px] text-brand-ink/60">{TYPE_HINT[question.type]}</span>
             <span className="font-mono text-[11px] text-brand-ink/60">{formatMarks(question.marks.correct, question.marks.wrong)}</span>
             {marked && (
@@ -477,6 +496,11 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
               {section.instructions}
             </p>
           )}
+          {question.choiceGroup && (
+            <p className="mb-3 text-[11px] font-medium text-brand-blue">
+              Internal choice: answer only one of the alternatives of question {question.number}.
+            </p>
+          )}
           {limit ? (
             <p className="mb-3 text-[11px] font-medium text-brand-blue">
               Answer any {limit} of the {section.questions.length} questions in {section.title}.
@@ -496,7 +520,12 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
           )}
 
           <div className="mt-4">
-            {question.type === "MATRIX" ? (
+            {question.type === "SUBJECTIVE" ? (
+              <div className="rounded-lg border border-dashed border-brand-blue/40 bg-brand-tint/40 p-3 text-sm text-brand-navy">
+                Write this answer on your answer sheet, headed <strong>Q{question.number}{question.alternative ? " (OR)" : ""}</strong>.
+                You photograph your sheets after you submit; your tutor marks them.
+              </div>
+            ) : question.type === "MATRIX" ? (
               <div className="space-y-3">
                 {showFirst && <MatrixColumns rows={question.options} columns={question.columns ?? []} />}
                 {showSecond && t && <MatrixColumns rows={t.options} columns={t.columns} />}
@@ -621,6 +650,8 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
               {notice ||
                 (sectionClosed
                   ? `Time for ${section.title} is over.`
+                  : otherChoice
+                  ? `You answered the other choice of question ${question.number}. Clear it to answer this one instead.`
                   : limit === 1
                   ? `You have already answered a question in ${section.title}. Clear it to answer this one instead.`
                   : `You have answered ${limit} questions in ${section.title}. Clear one to answer this one instead.`)}
@@ -709,7 +740,7 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   );
 });
 
-type PaletteState = "notVisited" | "notAnswered" | "answered" | "marked" | "answeredMarked";
+type PaletteState = "notVisited" | "notAnswered" | "answered" | "marked" | "answeredMarked" | "written";
 
 /**
  * The NTA palette's five states, drawn in its shapes: answered points up,
@@ -731,6 +762,7 @@ function PaletteMark({
     answered: { className: "bg-[#1ea55b] text-white", clip: "polygon(50% 0, 100% 28%, 100% 100%, 0 100%, 0 28%)" },
     marked: { className: "rounded-full bg-[#7b3fbf] text-white" },
     answeredMarked: { className: "rounded-full bg-[#7b3fbf] text-white" },
+    written: { className: "rounded-md border-2 border-dashed border-brand-blue bg-white text-brand-navy" },
   };
   const s = shape[state];
   return (
@@ -770,13 +802,22 @@ function Palette({
   canVisit: (sectionId: string) => boolean;
 }) {
   const indexOf = new Map(flat.map((f, i) => [f.question.id, i]));
+  const written = new Set(flat.filter((f) => f.question.type === "SUBJECTIVE").map((f) => f.question.id));
   const stateOf = (id: string): PaletteState => {
+    if (written.has(id)) return review[id] ? "marked" : "written";
     const answered = isAttempted(answers[id]);
     if (review[id]) return answered ? "answeredMarked" : "marked";
     if (answered) return "answered";
     return visited.has(id) ? "notAnswered" : "notVisited";
   };
-  const counts: Record<PaletteState, number> = { notVisited: 0, notAnswered: 0, answered: 0, marked: 0, answeredMarked: 0 };
+  const counts: Record<PaletteState, number> = {
+    notVisited: 0,
+    notAnswered: 0,
+    answered: 0,
+    marked: 0,
+    answeredMarked: 0,
+    written: 0,
+  };
   for (const { question } of flat) counts[stateOf(question.id)]++;
 
   return (
@@ -786,6 +827,11 @@ function Palette({
         <Legend state="notAnswered" count={counts.notAnswered} label="Not Answered" />
         <Legend state="notVisited" count={counts.notVisited} label="Not Visited" />
         <Legend state="marked" count={counts.marked} label="Marked for Review" />
+        {written.size > 0 && (
+          <div className="col-span-2">
+            <Legend state="written" count={counts.written} label="Written on paper (marked by your tutor)" />
+          </div>
+        )}
         <div className="col-span-2">
           <Legend
             state="answeredMarked"
@@ -817,6 +863,7 @@ function Palette({
                 >
                   <PaletteMark state={stateOf(q.id)} className="h-9 w-full text-xs">
                     {q.number}
+                    {q.alternative && <sup className="ml-px text-[8px] font-bold">OR</sup>}
                   </PaletteMark>
                 </button>
               );
