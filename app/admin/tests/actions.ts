@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
 import { parseDurationMinutes } from "@/lib/exam-timer";
-import { destroyNoteFile } from "@/lib/cloudinary";
+import { ANSWER_DELIVERY_TYPE, destroyNoteFile, getCloudinary } from "@/lib/cloudinary";
+import { answerFolder } from "@/lib/answer-upload";
 import { NO_PAPER, paperFile } from "@/lib/question-paper";
 
 export interface TestInput {
@@ -192,5 +193,104 @@ export async function toggleTestActive(id: string, active: boolean) {
     return { success: true };
   } catch (error) {
     return { error: "Failed to update test status." };
+  }
+}
+
+export interface TestDeletionImpact {
+  title: string;
+  questions: number;
+  assigned: number;
+  started: number;
+  submitted: number;
+  scores: number;
+  photos: number;
+}
+
+/**
+ * What deleting a test would take with it, so the tutor sees exactly what is
+ * lost before confirming.
+ */
+export async function getTestDeletionImpact(
+  id: string
+): Promise<{ impact?: TestDeletionImpact; error?: string }> {
+  await requireAdmin();
+  const test = await prisma.test.findUnique({ where: { id }, select: { id: true, title: true } });
+  if (!test) return { error: "This test no longer exists." };
+
+  const [questions, assigned, started, submitted, scores, photos] = await Promise.all([
+    prisma.question.count({ where: { section: { testId: id } } }),
+    prisma.assignment.count({ where: { testId: id } }),
+    prisma.assignment.count({ where: { testId: id, startedAt: { not: null } } }),
+    prisma.assignment.count({ where: { testId: id, OR: [{ status: "SUBMITTED" }, { result: { isNot: null } }] } }),
+    prisma.result.count({ where: { assignment: { testId: id } } }),
+    prisma.answerImage.count({ where: { assignment: { testId: id } } }),
+  ]);
+  return { impact: { title: test.title, questions, assigned, started, submitted, scores, photos } };
+}
+
+/**
+ * Deletes a test and everything that hangs off it: its questions, every
+ * student's assignment, their saved answers, scores and answer photos.
+ *
+ * The tutor must type the test's name to confirm, checked here as well as on
+ * the page, because nothing brings a deleted test back. The files in
+ * Cloudinary go afterwards, best effort: the database is the record of what
+ * exists, and a file left behind is one nobody has a link to.
+ */
+export async function deleteTest(id: string, confirmTitle: string) {
+  await requireAdmin();
+
+  const test = await prisma.test.findUnique({
+    where: { id },
+    select: {
+      id: true,
+      title: true,
+      paperPublicId: true,
+      paperVersion: true,
+      assignments: { select: { id: true } },
+    },
+  });
+  if (!test) return { error: "This test no longer exists." };
+  if (confirmTitle.trim().toLowerCase() !== test.title.trim().toLowerCase()) {
+    return { error: "The name you typed does not match this test's name. Nothing was deleted." };
+  }
+
+  try {
+    await prisma.test.delete({ where: { id } });
+  } catch (error) {
+    console.error("Error deleting test:", error);
+    return { error: "The test could not be deleted. Nothing was removed." };
+  }
+
+  await removeTestFiles(test);
+
+  revalidatePath("/admin/tests");
+  revalidatePath("/admin/assign");
+  revalidatePath("/admin/roster");
+  revalidatePath("/admin/results");
+  revalidatePath("/");
+  return { success: true };
+}
+
+/** Answer photos, question images and any old uploaded paper, from Cloudinary. */
+async function removeTestFiles(test: {
+  id: string;
+  paperPublicId: string | null;
+  paperVersion: number | null;
+  assignments: { id: string }[];
+}) {
+  const c = getCloudinary();
+  if (!c) return;
+  const jobs: Promise<unknown>[] = [
+    c.cloudinary.api.delete_resources_by_prefix(`proshnopotro/questions/${test.id}/`, { type: "upload" }),
+    ...test.assignments.map((a) =>
+      c.cloudinary.api.delete_resources_by_prefix(`${answerFolder(a.id)}/`, { type: ANSWER_DELIVERY_TYPE })
+    ),
+  ];
+  if (test.paperPublicId) jobs.push(discardPaper(test));
+  const results = await Promise.allSettled(jobs);
+  const failed = results.filter((r) => r.status === "rejected");
+  if (failed.length) {
+    console.error(`Deleted test ${test.id}, but ${failed.length} Cloudinary cleanups failed:`, failed);
   }
 }

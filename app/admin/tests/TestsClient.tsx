@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { TestModal } from "./TestModal";
+import { DeleteTestDialog } from "./DeleteTestDialog";
 import { toggleTestActive } from "./actions";
 import { formatDateShort } from "@/lib/utils";
 import { formatDurationLabel } from "@/lib/exam-timer";
@@ -34,6 +35,7 @@ import {
   Timer,
   Eye,
   ListChecks,
+  Trash2,
 } from "lucide-react";
 
 interface TestItem {
@@ -71,6 +73,7 @@ export function TestsClient({ tests }: TestsClientProps) {
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [testToEdit, setTestToEdit] = useState<TestItem | null>(null);
+  const [testToDelete, setTestToDelete] = useState<TestItem | null>(null);
 
   // Status-toggle feedback
   const [togglingId, setTogglingId] = useState<string | null>(null);
@@ -343,6 +346,13 @@ export function TestsClient({ tests }: TestsClientProps) {
                   >
                     <Power className="h-4 w-4" />
                   </button>
+                  <button
+                    onClick={() => setTestToDelete(test)}
+                    aria-label="Delete test"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-red-700 transition-colors hover:bg-red-50"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -522,6 +532,14 @@ export function TestsClient({ tests }: TestsClientProps) {
                       >
                         <Power className="h-3.5 w-3.5" />
                       </button>
+
+                      <button
+                        onClick={() => setTestToDelete(test)}
+                        title="Delete Test"
+                        className="p-1.5 rounded-md text-red-700 hover:bg-red-50 transition-colors"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -566,6 +584,12 @@ export function TestsClient({ tests }: TestsClientProps) {
           )}
         </div>
       </div>
+
+      <DeleteTestDialog
+        test={testToDelete}
+        onClose={() => setTestToDelete(null)}
+        onDeactivate={(id) => void handleToggleActive(id, true)}
+      />
 
       {/* Create / Edit Dialog */}
       <TestModal
