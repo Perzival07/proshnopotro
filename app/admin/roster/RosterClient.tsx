@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Table,
   TableBody,
@@ -527,6 +528,19 @@ export function RosterClient({
                     )}
                     {isSubmitted && (
                       <Button
+                        asChild
+                        size="sm"
+                        variant="outline"
+                        className="h-9 gap-1.5 border-brand-blue/30 bg-brand-tint px-3 text-[11px] font-medium text-brand-navy hover:bg-brand-tint/70"
+                      >
+                        <Link href={`/admin/mark/${a.id}`} aria-label="Mark this attempt">
+                          <PenLine className="h-3 w-3" />
+                          <span>Mark</span>
+                        </Link>
+                      </Button>
+                    )}
+                    {isSubmitted && (
+                      <Button
                         size="sm"
                         variant="outline"
                         onClick={() => handleOpenReassign(a)}
@@ -745,6 +759,20 @@ export function RosterClient({
                           >
                             <Images className="h-3 w-3" />
                             <span>Answers ({a.answerPageCount})</span>
+                          </Button>
+                        )}
+                        {isSubmitted && (
+                          <Button
+                            asChild
+                            size="sm"
+                            variant="outline"
+                            title="Mark the answer sheets, give marks and feedback"
+                            className="h-7 gap-1.5 border-brand-blue/30 bg-brand-tint px-2.5 text-[11px] font-medium text-brand-navy hover:bg-brand-tint/70"
+                          >
+                            <Link href={`/admin/mark/${a.id}`}>
+                              <PenLine className="h-3 w-3" />
+                              <span>Mark</span>
+                            </Link>
                           </Button>
                         )}
                         {isSubmitted && (

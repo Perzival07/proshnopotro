@@ -25,7 +25,12 @@ export default async function StudentDashboardPage() {
       studentEmail: user.email.toLowerCase(),
     },
     include: {
-      test: true,
+      test: {
+        include: {
+          // Just enough to know whether the paper has written answers.
+          sections: { select: { questions: { where: { type: "SUBJECTIVE" }, select: { id: true }, take: 1 } } },
+        },
+      },
       result: true,
     },
     orderBy: [
@@ -51,13 +56,14 @@ export default async function StudentDashboardPage() {
     )
     // A score the tutor has not released yet is not shown -- it is marked,
     // but students still writing must not learn it from a classmate's card.
-    .map((a) =>
-      a.test.format === "QUESTIONS" &&
-      a.test.resultRelease === "ON_RELEASE" &&
-      !a.test.resultsReleasedAt
-        ? { ...a, result: null }
-        : a
-    );
+    .map((a) => {
+      const hidden =
+        a.test.format === "QUESTIONS" &&
+        ((a.test.resultRelease === "ON_RELEASE" && !a.test.resultsReleasedAt) ||
+          // A paper with written answers scores only once the copy is back.
+          (a.test.sections.some((s) => s.questions.length > 0) && !a.returnedAt));
+      return hidden ? { ...a, result: null } : a;
+    });
 
   const availableCount = cards.filter(
     (a) => deriveCardStatus(a) === "AVAILABLE"

@@ -6,6 +6,7 @@ import { markPaper, maxMarksFor, type QuestionStatus, type ResponseValue } from 
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { formatDate } from "@/lib/utils";
 import { parseTranslation } from "@/lib/translation";
+import { MarkedSheets } from "@/components/student/MarkedSheets";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, PenLine, XCircle } from "lucide-react";
 
 const STATUS: Record<QuestionStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -41,6 +42,8 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
     select: {
       endedAt: true,
       autoSubmitted: true,
+      feedback: true,
+      returnedAt: true,
       test: {
         select: {
           id: true,
@@ -74,8 +77,11 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
   }
 
   const scheme = normalizeScheme(test.markingScheme);
-  const manual = Object.fromEntries(assignment.responses.map((r) => [r.questionId, r.manualMarks]));
-  const feedback = new Map(assignment.responses.map((r) => [r.questionId, r.feedback]));
+  // Written answers stay "awaiting marking" until the tutor returns the copy,
+  // however far the marking has got, so a half-marked paper is never shown.
+  const returned = assignment.returnedAt !== null;
+  const manual = returned ? Object.fromEntries(assignment.responses.map((r) => [r.questionId, r.manualMarks])) : {};
+  const feedback = new Map(returned ? assignment.responses.map((r) => [r.questionId, r.feedback]) : []);
   const markable = toMarkableSections(test.sections, scheme, manual);
   const answers: Record<string, ResponseValue> = {};
   for (const r of assignment.responses) answers[r.questionId] = r.value as ResponseValue;
@@ -106,6 +112,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
             <span className="text-red-700">{tally.WRONG} wrong</span>
             <span className="text-brand-ink/60">{tally.UNATTEMPTED} not attempted</span>
             {tally.PENDING > 0 && <span className="text-sky-700">{tally.PENDING} written, awaiting marking</span>}
+            {tally.MARKED > 0 && <span className="text-brand-navy">{tally.MARKED} written, marked</span>}
           </div>
         </div>
 
@@ -134,6 +141,19 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
           </table>
         )}
       </div>
+
+      {tally.PENDING > 0 && (
+        <p className="rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-900">
+          Your tutor is marking your written answers. Your score will include them once your marked copy is returned.
+        </p>
+      )}
+
+      {returned && assignment.feedback && (
+        <div className="rounded-xl border border-brand-blue/30 bg-brand-tint/40 p-4 text-sm text-brand-navy">
+          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-brand-blue">Your tutor&apos;s feedback</p>
+          <p className="whitespace-pre-line">{assignment.feedback}</p>
+        </div>
+      )}
 
       {test.sections.map((section, si) => (
         <section key={section.id} className="space-y-3">
@@ -307,6 +327,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
           })}
         </section>
       ))}
+      {returned && <MarkedSheets assignmentId={assignmentId} />}
     </div>
   );
 }

@@ -17,6 +17,8 @@ interface StudentTestCardProps {
     id: string;
     dueAt: Date;
     startedAt?: Date | null;
+    /** When the tutor handed back the marked copy. */
+    returnedAt?: Date | null;
     status: "ASSIGNED" | "SUBMITTED";
     test: {
       id: string;
@@ -147,7 +149,7 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
           ) : (
             <p className="text-xs text-brand-ink/50 mt-1.5 italic">
               {test.format === "QUESTIONS"
-                ? "Answered on screen \u2014 marked automatically"
+                ? "Answered on screen \u2014 marked in the portal"
                 : test.format && isWrittenPaper(test.format)
                 ? "Written paper \u2014 answers uploaded as photos"
                 : "Google Form online test"}
@@ -195,10 +197,12 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
                 <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
               </Link>
             </Button>
-          ) : cardStatus === "SUBMITTED" && test.format === "QUESTIONS" ? (
+          ) : cardStatus === "SUBMITTED" && (test.format === "QUESTIONS" || assignment.returnedAt) ? (
             <Button asChild variant="outline" className="w-full font-medium">
               <Link href={`/test/${assignment.id}`} className="flex items-center justify-center gap-2">
-                <span>{result ? "View Your Result" : "View Submission"}</span>
+                <span>
+                  {assignment.returnedAt ? "View Marked Copy" : result ? "View Your Result" : "View Submission"}
+                </span>
                 <ArrowRight className="h-4 w-4" />
               </Link>
             </Button>

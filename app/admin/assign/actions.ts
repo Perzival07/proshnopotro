@@ -185,6 +185,8 @@ export async function assignTestToStudents(
       prisma.result.deleteMany({ where: { assignmentId: { in: ids } } }),
       // The retake uploads its own photos; the old attempt's go with it.
       prisma.answerImage.deleteMany({ where: { assignmentId: { in: ids } } }),
+      // So do its saved answers and marks: the retake starts blank.
+      prisma.questionResponse.deleteMany({ where: { assignmentId: { in: ids } } }),
       prisma.assignment.updateMany({
         where: { id: { in: ids } },
         data: { ...REOPEN_DATA, dueAt, assignedAt: new Date() },

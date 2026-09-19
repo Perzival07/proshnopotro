@@ -1216,6 +1216,14 @@ function ResultsCard({ test }: { test: PaperEditorProps["test"] }) {
           </Button>
         </div>
       )}
+      {test.submitted > 0 && (
+        <Link
+          href={`/admin/tests/${test.id}/marking`}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-brand-blue hover:underline"
+        >
+          Mark answer sheets &rarr;
+        </Link>
+      )}
       <Button
         type="button"
         size="sm"

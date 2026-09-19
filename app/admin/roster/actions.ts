@@ -123,6 +123,7 @@ export async function toggleAssignmentStatus(
         await prisma.$transaction([
           prisma.result.delete({ where: { assignmentId } }),
           prisma.answerImage.deleteMany({ where: { assignmentId } }),
+          prisma.questionResponse.deleteMany({ where: { assignmentId } }),
           prisma.assignment.update({
             where: { id: assignmentId },
             data: REOPEN_DATA,
@@ -139,6 +140,7 @@ export async function toggleAssignmentStatus(
       // Reopening clears the upload stamp, so the old photos go with it.
       await prisma.$transaction([
         prisma.answerImage.deleteMany({ where: { assignmentId } }),
+        prisma.questionResponse.deleteMany({ where: { assignmentId } }),
         prisma.assignment.update({ where: { id: assignmentId }, data: REOPEN_DATA }),
       ]);
     } else {
@@ -243,6 +245,7 @@ export async function reassignAssignment(
         ? [prisma.result.delete({ where: { assignmentId } })]
         : []),
       prisma.answerImage.deleteMany({ where: { assignmentId } }),
+      prisma.questionResponse.deleteMany({ where: { assignmentId } }),
       prisma.assignment.update({ where: { id: assignmentId }, data: reopen }),
     ]);
 

@@ -183,6 +183,11 @@ model Assignment {
   /// upload is refused while this is filled in. Also stamped, with no pages,
   /// when the student finished without uploading or left the upload page.
   answersUploadedAt DateTime?
+  /// The tutor's overall comment on this attempt.
+  feedback          String?   @db.Text
+  /// When the tutor handed the marked copy back. Until then the student sees
+  /// written answers as awaiting marking, however far the marking has got.
+  returnedAt        DateTime?
 
   test         Test          @relation(fields: [testId], references: [id], onDelete: Cascade)
   result       Result?
@@ -209,6 +214,10 @@ model AnswerImage {
   bytes        Int?
   /// Page order as the student arranged them.
   position     Int
+  /// The tutor's marks drawn on this page -- pen strokes, ticks, crosses and
+  /// notes -- in the image's own pixels, as lib/annotations.ts Annotation[].
+  /// Drawn over the photo, never into it, so the original is kept.
+  annotations  Json?
   createdAt    DateTime @default(now())
 
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)

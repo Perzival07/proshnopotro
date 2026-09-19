@@ -36,6 +36,7 @@ import {
   Eye,
   ListChecks,
   Trash2,
+  PenLine,
 } from "lucide-react";
 
 interface TestItem {
@@ -307,6 +308,15 @@ export function TestsClient({ tests }: TestsClientProps) {
                 {/* h-9 w-9 targets: comfortably tappable, unlike the 14px
                     desktop icon buttons. */}
                 <div className="flex items-center gap-1">
+                  {test.answerSheets && (
+                    <Link
+                      href={`/admin/tests/${test.id}/marking`}
+                      aria-label="Mark answer sheets"
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-md text-brand-navy transition-colors hover:bg-brand-tint"
+                    >
+                      <PenLine className="h-4 w-4" />
+                    </Link>
+                  )}
                   {test.format === "QUESTIONS" && (
                     <Link
                       href={`/admin/tests/${test.id}/questions`}
@@ -480,6 +490,15 @@ export function TestsClient({ tests }: TestsClientProps) {
 
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1.5">
+                      {test.answerSheets && (
+                        <Link
+                          href={`/admin/tests/${test.id}/marking`}
+                          title="Mark Answer Sheets"
+                          className="p-1.5 rounded-md text-brand-navy hover:bg-brand-tint transition-colors"
+                        >
+                          <PenLine className="h-3.5 w-3.5" />
+                        </Link>
+                      )}
                       {test.format === "QUESTIONS" && (
                         <Link
                           href={`/admin/tests/${test.id}/questions`}

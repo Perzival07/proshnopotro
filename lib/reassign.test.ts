@@ -33,6 +33,8 @@ describe("REOPEN_DATA", () => {
       tabSwitches: 0,
       endedAt: null,
       answersUploadedAt: null,
+      feedback: null,
+      returnedAt: null,
     });
   });
 });

@@ -20,7 +20,8 @@ import { isAssignmentSubmitted } from "./assignment-status";
  * leftover upload stamp would refuse the retake's answer photos.
  *
  * Scalars only, so it works in `updateMany` too. The old attempt's photo rows
- * must be deleted alongside it -- see `clearAnswerImages`.
+ * and saved answers must be deleted alongside it, or the retake would open
+ * with the old answers already filled in.
  */
 export const REOPEN_DATA = {
   status: "ASSIGNED",
@@ -29,6 +30,8 @@ export const REOPEN_DATA = {
   tabSwitches: 0,
   endedAt: null,
   answersUploadedAt: null,
+  feedback: null,
+  returnedAt: null,
 } as const;
 
 /**
