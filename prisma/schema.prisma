@@ -333,6 +333,7 @@ model Question {
   passage   Passage?           @relation(fields: [passageId], references: [id], onDelete: SetNull)
   chapter   Chapter?           @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   responses QuestionResponse[]
+  doubts    Doubt[]
 
   @@index([sectionId])
   @@index([chapterId])
@@ -347,6 +348,47 @@ model TestSeries {
   createdAt   DateTime @default(now())
 
   tests Test[]
+}
+
+enum DoubtStatus {
+  /// Waiting for the tutor.
+  OPEN
+  /// The tutor has replied; the student may follow up or resolve it.
+  ANSWERED
+  RESOLVED
+}
+
+/// A student's doubt about one question: a thread of messages between them
+/// and their tutors. One thread per student per question.
+model Doubt {
+  id           String      @id @default(cuid())
+  questionId   String
+  studentEmail String
+  status       DoubtStatus @default(OPEN)
+  createdAt    DateTime    @default(now())
+  /// The last message, for ordering the inbox.
+  updatedAt    DateTime    @default(now())
+
+  question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  messages DoubtMessage[]
+
+  @@unique([questionId, studentEmail])
+  @@index([status, updatedAt])
+  @@index([studentEmail])
+}
+
+model DoubtMessage {
+  id          String   @id @default(cuid())
+  doubtId     String
+  authorEmail String
+  /// True when a tutor wrote it.
+  fromTutor   Boolean  @default(false)
+  body        String   @db.Text
+  createdAt   DateTime @default(now())
+
+  doubt Doubt @relation(fields: [doubtId], references: [id], onDelete: Cascade)
+
+  @@index([doubtId, createdAt])
 }
 
 /// One chapter of a board's syllabus for a class and subject, in book order.

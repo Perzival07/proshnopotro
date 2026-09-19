@@ -132,7 +132,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           </Link>
           <p className="text-xs font-semibold uppercase tracking-wider text-brand-blue">{assignment.test.subject}</p>
           <h1 className="mb-6 font-heading text-xl sm:text-2xl font-bold text-brand-navy">{assignment.test.title}</h1>
-          <PaperResult assignmentId={assignment.id} />
+          <PaperResult assignmentId={assignment.id} studentEmail={user.email.toLowerCase()} />
         </main>
         <Footer />
       </div>

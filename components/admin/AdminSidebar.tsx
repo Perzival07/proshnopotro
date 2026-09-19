@@ -16,6 +16,7 @@ import {
   Library,
   ListTree,
   Layers,
+  MessageCircleQuestion,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
@@ -68,6 +69,12 @@ export const NAV_ITEMS = [
     href: "/admin/syllabus",
     icon: ListTree,
     description: "Chapters for tagging questions",
+  },
+  {
+    name: "Doubts",
+    href: "/admin/doubts",
+    icon: MessageCircleQuestion,
+    description: "Answer students' questions",
   },
   {
     name: "Test Rosters",

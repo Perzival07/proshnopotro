@@ -11,6 +11,7 @@ import { chapterBreakdown } from "@/lib/chapter-report";
 import { resultsVisible } from "@/lib/results-visibility";
 import { chapterVerdict, formatDuration, standing, summarizeAttempt } from "@/lib/analytics";
 import { videoEmbed } from "@/lib/video";
+import { DoubtThread } from "@/components/student/DoubtThread";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, PenLine, XCircle } from "lucide-react";
 
 const STATUS: Record<QuestionStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -50,7 +51,7 @@ function Stat({ label, value, note }: { label: string; value: string; note: stri
   );
 }
 
-export async function PaperResult({ assignmentId }: { assignmentId: string }) {
+export async function PaperResult({ assignmentId, studentEmail }: { assignmentId: string; studentEmail: string }) {
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     select: {
@@ -104,6 +105,23 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
   for (const r of assignment.responses) answers[r.questionId] = r.value as ResponseValue;
   const marked = markPaper(markable, answers, scheme);
   const passages = new Map(test.passages.map((p) => [p.id, p.content]));
+
+  // The student's doubt threads on this paper's questions.
+  const doubts = new Map(
+    (
+      await prisma.doubt.findMany({
+        where: { studentEmail, question: { section: { testId: test.id } } },
+        include: { messages: { orderBy: { createdAt: "asc" } } },
+      })
+    ).map((d) => [
+      d.questionId,
+      {
+        id: d.id,
+        status: d.status,
+        messages: d.messages.map((m) => ({ id: m.id, fromTutor: m.fromTutor, body: m.body, at: m.createdAt.toISOString() })),
+      },
+    ])
+  );
 
   // Marks by chapter, when the paper's questions are tagged.
   const chapterOf: Record<string, string | null> = {};
@@ -459,6 +477,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                       <RichText text={q.solution} className="mt-2" />
                     </details>
                   )}
+                  <DoubtThread assignmentId={assignmentId} questionId={q.id} initial={doubts.get(q.id) ?? null} />
                   {q.videoUrl && videoEmbed(q.videoUrl) && (
                     <details className="rounded-md border border-brand-border bg-brand-page px-3 py-2 text-sm">
                       <summary className="cursor-pointer text-xs font-semibold text-brand-navy">Video explanation</summary>

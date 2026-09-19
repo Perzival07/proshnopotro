@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import { LogOut, ShieldCheck, BookOpen, Layers, NotebookText, Users, TrendingUp } from "lucide-react";
+import { LogOut, ShieldCheck, BookOpen, Layers, NotebookText, Users, TrendingUp, MessageCircleQuestion } from "lucide-react";
 import { signOut } from "next-auth/react";
 
 interface NavbarProps {
@@ -80,6 +80,16 @@ export function Navbar({ user }: NavbarProps) {
                 }`}
               >
                 Progress
+              </Link>
+              <Link
+                href="/doubts"
+                className={`text-xs uppercase font-heading tracking-wider px-2.5 py-1 rounded transition-colors ${
+                  pathname.startsWith("/doubts")
+                    ? "bg-white/20 text-white font-semibold"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                Doubts
               </Link>
             </div>
           )}
@@ -167,6 +177,12 @@ export function Navbar({ user }: NavbarProps) {
                   <Link href="/progress" className="flex items-center gap-2 text-xs">
                     <TrendingUp className="h-4 w-4 text-brand-navy" />
                     <span>Progress</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/doubts" className="flex items-center gap-2 text-xs">
+                    <MessageCircleQuestion className="h-4 w-4 text-brand-navy" />
+                    <span>Doubts</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
