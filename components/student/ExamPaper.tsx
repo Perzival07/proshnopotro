@@ -10,6 +10,7 @@ import React, {
   useState,
 } from "react";
 import { RichText } from "@/components/RichText";
+import { MatrixColumns } from "@/components/MatrixColumns";
 import { Button } from "@/components/ui/button";
 import {
   saveQuestionResponse,
@@ -57,6 +58,7 @@ const TYPE_HINT: Record<StudentQuestion["type"], string> = {
   MULTIPLE: "Choose one or more answers",
   INTEGER: "Type a whole number",
   DECIMAL: "Type a number",
+  MATRIX: "Match each row to one or more columns",
 };
 
 function formatMarks(correct: number, wrong: number) {
@@ -292,6 +294,17 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
     setAnswer(chosen.size ? Array.from(chosen).sort() : null);
   };
 
+  const toggleCell = (row: string, column: string) => {
+    const grid: Record<string, string[]> =
+      value && typeof value === "object" && !Array.isArray(value) ? { ...value } : {};
+    const cols = new Set(grid[row] ?? []);
+    if (cols.has(column)) cols.delete(column);
+    else cols.add(column);
+    if (cols.size) grid[row] = Array.from(cols).sort();
+    else delete grid[row];
+    setAnswer(Object.keys(grid).length ? grid : null);
+  };
+
   const toggleReview = () => {
     const next = !marked;
     setReview((r) => ({ ...r, [question.id]: next }));
@@ -392,7 +405,58 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
           <RichText text={question.stem} className="text-[15px] text-brand-ink" />
 
           <div className="mt-4">
-            {question.options.length > 0 ? (
+            {question.type === "MATRIX" ? (
+              <div className="space-y-3">
+                <MatrixColumns rows={question.options} columns={question.columns ?? []} />
+                <div className="overflow-x-auto">
+                  <table className="border-separate border-spacing-1.5 text-sm">
+                    <thead>
+                      <tr>
+                        <th />
+                        {(question.columns ?? []).map((c) => (
+                          <th key={c.id} className="w-11 text-center text-xs font-bold text-brand-navy">
+                            {c.id}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {question.options.map((row) => {
+                        const picked =
+                          value && typeof value === "object" && !Array.isArray(value) ? value[row.id] ?? [] : [];
+                        return (
+                          <tr key={row.id}>
+                            <th className="pr-1 text-left text-xs font-bold text-brand-navy">{row.id}</th>
+                            {(question.columns ?? []).map((c) => {
+                              const on = picked.includes(c.id);
+                              return (
+                                <td key={c.id}>
+                                  <button
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={on}
+                                    aria-label={`${row.id} matches ${c.id}`}
+                                    disabled={limitReached && !isAttempted(value)}
+                                    onClick={() => toggleCell(row.id, c.id)}
+                                    className={`flex h-10 w-11 items-center justify-center rounded-md border text-xs font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                      on
+                                        ? "border-brand-navy bg-brand-navy text-white"
+                                        : "border-brand-border bg-white text-brand-ink/40 hover:border-brand-blue"
+                                    }`}
+                                  >
+                                    {on ? <CheckCircle2 className="h-4 w-4" /> : c.id}
+                                  </button>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : question.options.length > 0 ? (
               <div className="space-y-2" role={question.type === "SINGLE" ? "radiogroup" : "group"}>
                 {question.options.map((option) => {
                   const chosen = Array.isArray(value) ? value.includes(option.id) : value === option.id;

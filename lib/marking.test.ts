@@ -184,3 +184,28 @@ describe("markPaper", () => {
     expect(result.sections.map((s) => s.score)).toEqual([-1, 0]);
   });
 });
+
+describe("MATRIX", () => {
+  const matrix: MarkableQuestion = {
+    id: "x",
+    key: { type: "MATRIX", rows: { A: ["P", "Q"], B: ["R"], C: ["S"], D: ["P"] } },
+  };
+
+  it("gives full marks when every row matches exactly", () =>
+    expect(markQuestion(matrix, { A: ["Q", "P"], B: ["R"], C: ["S"], D: ["P"] }, ADV)).toEqual({ status: "CORRECT", marks: 8 }));
+
+  it("gives each exactly matched row its share under JEE Advanced", () =>
+    expect(markQuestion(matrix, { A: ["P"], B: ["R"], C: ["S"] }, ADV)).toEqual({ status: "PARTIAL", marks: 4 }));
+
+  it("takes the wrong marks per wrong row when set", () => {
+    const scheme = { ...ADV, MATRIX: { correct: 8, wrong: -4, perRow: true } };
+    expect(markQuestion(matrix, { A: ["P", "Q"], B: ["S"] }, scheme)).toEqual({ status: "PARTIAL", marks: 1 });
+  });
+
+  it("is all or nothing without per-row marking", () => {
+    expect(markQuestion(matrix, { A: ["P", "Q"], B: ["R"], C: ["S"] }, MAIN)).toEqual({ status: "WRONG", marks: -1 });
+  });
+
+  it("treats an empty grid as unattempted", () =>
+    expect(markQuestion(matrix, { A: [] }, ADV)).toEqual({ status: "UNATTEMPTED", marks: 0 }));
+});

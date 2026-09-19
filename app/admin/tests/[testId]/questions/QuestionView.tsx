@@ -1,5 +1,6 @@
 import React from "react";
 import { RichText } from "@/components/RichText";
+import { MatrixColumns } from "@/components/MatrixColumns";
 import type { AnswerKey, QuestionType } from "@/lib/marking";
 import type { OptionRow } from "@/lib/paper";
 import { CheckCircle2 } from "lucide-react";
@@ -9,6 +10,7 @@ export const TYPE_LABELS: Record<QuestionType, string> = {
   MULTIPLE: "One or more correct",
   INTEGER: "Integer answer",
   DECIMAL: "Decimal answer",
+  MATRIX: "Matrix match",
 };
 
 function formatNumber(n: number) {
@@ -27,6 +29,10 @@ export function describeKey(key: AnswerKey | null): string {
       return key.min === key.max
         ? formatNumber(key.min)
         : `${formatNumber(key.min)} to ${formatNumber(key.max)}`;
+    case "MATRIX":
+      return Object.entries(key.rows)
+        .map(([row, cols]) => `${row} \u2192 ${cols.join(", ")}`)
+        .join(";  ");
   }
 }
 
@@ -43,6 +49,7 @@ export function QuestionView({
   type,
   stem,
   options,
+  columns = [],
   answerKey,
   solution,
   marks,
@@ -52,6 +59,7 @@ export function QuestionView({
   type: QuestionType;
   stem: string;
   options: OptionRow[];
+  columns?: OptionRow[];
   answerKey: AnswerKey | null;
   solution: string | null;
   marks: { correct: number; wrong: number };
@@ -79,7 +87,9 @@ export function QuestionView({
 
       <RichText text={stem} className="text-sm text-brand-ink" />
 
-      {options.length > 0 && (
+      {type === "MATRIX" && <MatrixColumns rows={options} columns={columns} />}
+
+      {options.length > 0 && type !== "MATRIX" && (
         <ul className="space-y-1.5">
           {options.map((option) => {
             const right = correctOptions.has(option.id);
@@ -101,7 +111,7 @@ export function QuestionView({
         </ul>
       )}
 
-      {options.length === 0 && (
+      {(options.length === 0 || type === "MATRIX") && (
         <p className="text-xs">
           <span className="font-semibold text-brand-navy">Answer: </span>
           <span className="font-mono text-emerald-700">{describeKey(answerKey)}</span>

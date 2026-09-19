@@ -39,6 +39,7 @@ enum QuestionType {
   MULTIPLE
   INTEGER
   DECIMAL
+  MATRIX
 }
 
 /// When a student sees their score and the answers for a QUESTIONS test.
@@ -249,7 +250,8 @@ model Question {
   position    Int
   type        QuestionType
   stem        String       @db.Text
-  /// [{ id: "A", text: "..." }, ...]; empty for numeric questions.
+  /// [{ id: "A", text: "..." }, ...]; empty for numeric questions. For a
+  /// MATRIX question, { rows: [...], columns: [...] }.
   options     Json
   /// The answer key, as lib/marking.ts AnswerKey. Never sent to a student
   /// before their results are released.

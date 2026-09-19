@@ -22,6 +22,7 @@ import {
   checkResponse,
   isAttempted,
   normalizeScheme,
+  parseMatrixOptions,
   parseOptions,
   sectionOpen,
   sectionWindows,
@@ -137,7 +138,10 @@ export async function resolveSecureFormUrl(
     if (paper.sections.every((s) => s.questions.length === 0)) {
       return { error: "This paper has no questions yet. Please tell your tutor." };
     }
-    const startedAt = await ensureStarted(assignment);
+    // Always stamped for a paper written here, timed or not: answers are only
+    // taken once it has been opened, and the tutor's editor locks the paper's
+    // shape from that moment.
+    const startedAt = await ensureStarted(assignment, true);
     const windows = sectionWindows(
       paper.sections.map((s, position) => ({ id: s.id, position, durationMinutes: s.durationMinutes }))
     );
@@ -288,10 +292,12 @@ export async function saveQuestionResponse(
     };
   }
 
+  const matrix = question.type === "MATRIX" ? parseMatrixOptions(question.options) : null;
   const checked = checkResponse(
     question.type,
-    parseOptions(question.options).map((o) => o.id),
-    value
+    (matrix ? matrix.rows : parseOptions(question.options)).map((o) => o.id),
+    value,
+    matrix?.columns.map((o) => o.id) ?? []
   );
   if (!checked.ok) return { error: checked.error };
 
@@ -323,19 +329,22 @@ export async function saveQuestionResponse(
 }
 
 /**
- * Stamps `startedAt` the first time a timed paper is opened and returns the
- * value now in force.
+ * Stamps `startedAt` the first time a timed paper is opened (or any paper,
+ * with `always`) and returns the value now in force.
  *
  * The write is conditional on the column still being null so that two tabs
  * opening at once cannot restart the clock -- whoever loses the race reads the
  * winner's timestamp back rather than overwriting it.
  */
-async function ensureStarted(assignment: {
-  id: string;
-  startedAt: Date | null;
-  test: { durationMinutes: number | null };
-}): Promise<Date | null> {
-  if (!isTimed(assignment) || assignment.startedAt) return assignment.startedAt;
+async function ensureStarted(
+  assignment: {
+    id: string;
+    startedAt: Date | null;
+    test: { durationMinutes: number | null };
+  },
+  always = false
+): Promise<Date | null> {
+  if ((!always && !isTimed(assignment)) || assignment.startedAt) return assignment.startedAt;
 
   const now = new Date();
   const claimed = await prisma.assignment.updateMany({

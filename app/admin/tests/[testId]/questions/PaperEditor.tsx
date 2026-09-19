@@ -51,6 +51,8 @@ export interface EditorQuestion {
   type: QuestionType;
   stem: string;
   options: OptionRow[];
+  /** Matrix questions: Column II. */
+  columns: OptionRow[];
   key: AnswerKey | null;
   solution: string | null;
   marksCorrect: number | null;
@@ -508,6 +510,7 @@ function ImportPanel({
                       type={q.type}
                       stem={q.stem}
                       options={q.options}
+                      columns={q.columns}
                       answerKey={q.key}
                       solution={q.solution}
                       marks={marksFor(scheme, {
@@ -566,6 +569,7 @@ function QuestionCard({
               type: question.type,
               stem: question.stem,
               options: question.options,
+              columns: question.columns,
               key: question.key,
               solution: question.solution,
               rule:
@@ -646,6 +650,7 @@ function QuestionCard({
               type={preview.q.type}
               stem={preview.q.stem}
               options={preview.q.options}
+              columns={preview.q.columns}
               answerKey={preview.q.key}
               solution={preview.q.solution}
               marks={marksFor(scheme, {
@@ -668,6 +673,7 @@ function QuestionCard({
         type={question.type}
         stem={question.stem}
         options={question.options}
+        columns={question.columns}
         answerKey={question.key}
         solution={question.solution}
         marks={marksFor(scheme, question)}
@@ -899,6 +905,7 @@ const RULE_ROWS: { type: QuestionType; label: string }[] = [
   { type: "MULTIPLE", label: "One or more correct" },
   { type: "INTEGER", label: "Integer" },
   { type: "DECIMAL", label: "Decimal" },
+  { type: "MATRIX", label: "Matrix match (whole question)" },
 ];
 
 /** The marks table and presets, editing a draft the caller holds. */
@@ -991,6 +998,19 @@ function SchemeFields({ draft, setDraft }: { draft: MarkingScheme; setDraft: Rea
             className="mx-1 w-12 rounded border border-brand-border px-1 py-0.5 text-xs"
           />
           for each right option picked, when no wrong option is picked.
+        </span>
+      </label>
+
+      <label className="flex items-start gap-2 text-xs">
+        <input
+          type="checkbox"
+          className="mt-0.5"
+          checked={draft.MATRIX.perRow}
+          onChange={(e) => setDraft((d) => ({ ...d, MATRIX: { ...d.MATRIX, perRow: e.target.checked } }))}
+        />
+        <span>
+          Matrix match marked row by row: each row matched exactly earns its share of the marks (8 marks over
+          4 rows is 2 a row). Otherwise every row must be right.
         </span>
       </label>
 

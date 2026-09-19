@@ -284,3 +284,61 @@ describe("splitInlineOptions", () => {
   it("splits lower-case options", () =>
     expect(splitInlineOptions("(a) one (b) two")).toEqual(["(a) one", "(b) two"]));
 });
+
+describe("matrix match", () => {
+  const MATRIX = [
+    "Q1. [matrix] Match Column I with Column II",
+    "Column I:",
+    "(A) Uniform motion",
+    "(B) Free fall",
+    "Column II:",
+    "(P) Zero acceleration",
+    "(Q) Constant speed",
+    "(R) Increasing speed",
+    "Answer: A-P,Q; B-R",
+  ];
+
+  it("reads rows, columns and the row-by-row key", () => {
+    const { sections, errors } = paper(...MATRIX);
+    expect(errors).toEqual([]);
+    const q = sections[0].questions[0];
+    expect(q.type).toBe("MATRIX");
+    expect(q.options.map((o) => o.id)).toEqual(["A", "B"]);
+    expect(q.columns.map((c) => `${c.id}:${c.text}`)).toEqual(["P:Zero acceleration", "Q:Constant speed", "R:Increasing speed"]);
+    expect(q.key).toEqual({ type: "MATRIX", rows: { A: ["P", "Q"], B: ["R"] } });
+  });
+
+  it("does not need the Column headings", () => {
+    const { errors } = paper("Q1. [matrix] Match", "(A) a", "(B) b", "(P) p", "(Q) q", "Answer: A→Q B→P");
+    expect(errors).toEqual([]);
+  });
+
+  it("says which row the answer leaves out", () => {
+    const { errors } = paper("Q1. [matrix] Match", "(A) a", "(B) b", "(P) p", "(Q) q", "Answer: A-P");
+    expect(errors[0].message).toContain("row B");
+  });
+
+  it("leaves a list-match single-correct question alone", () => {
+    const { sections, errors } = paper(
+      "Q1. Match List-I with List-II",
+      "List-I",
+      "(P) Force",
+      "List-II",
+      "(1) Newton",
+      "(A) P-1",
+      "(B) P-2",
+      "Answer: A"
+    );
+    expect(errors).toEqual([]);
+    const q = sections[0].questions[0];
+    expect(q.type).toBe("SINGLE");
+    expect(q.stem).toContain("List-II");
+    expect(q.options.map((o) => o.text)).toEqual(["P-1", "P-2"]);
+  });
+
+  it("round-trips through questionToText", () => {
+    const q = paper(...MATRIX).sections[0].questions[0];
+    const again = parseQuestionPaper(questionToText(q)).sections[0].questions[0];
+    expect({ ...again, line: 0 }).toEqual({ ...q, line: 0 });
+  });
+});

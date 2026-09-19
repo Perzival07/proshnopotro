@@ -5,7 +5,22 @@ import { Prisma } from "@prisma/client";
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { parseQuestionPaper, type ImportError, type ImportedPaper } from "@/lib/question-import";
-import { normalizeScheme, parseOptions, sectionalDuration } from "@/lib/paper";
+import { normalizeScheme, parseMatrixOptions, parseOptions, sectionalDuration } from "@/lib/paper";
+import type { ImportedQuestion } from "@/lib/question-import";
+
+/** How a question's options are stored: a list, or both columns of a matrix. */
+function storedOptions(q: Pick<ImportedQuestion, "type" | "options" | "columns">): Prisma.InputJsonValue {
+  return (q.type === "MATRIX" ? { rows: q.options, columns: q.columns } : q.options) as unknown as Prisma.InputJsonValue;
+}
+
+/** The option ids a stored question has, for checking a change keeps them. */
+function optionShape(type: string, options: unknown): string {
+  if (type === "MATRIX") {
+    const m = parseMatrixOptions(options);
+    return `${m.rows.map((o) => o.id).join(",")}|${m.columns.map((o) => o.id).join(",")}`;
+  }
+  return parseOptions(options).map((o) => o.id).join(",");
+}
 import type { MarkingScheme } from "@/lib/marking";
 import { regradeTest } from "@/lib/grade-attempt";
 import { signQuestionImageUpload, type UploadSignature } from "@/lib/cloudinary";
@@ -88,7 +103,7 @@ async function writePaper(
         position: target.start + i,
         type: q.type,
         stem: q.stem,
-        options: q.options as unknown as Prisma.InputJsonValue,
+        options: storedOptions(q),
         answerKey: q.key as unknown as Prisma.InputJsonValue,
         solution: q.solution,
         marksCorrect: q.rule?.correct ?? null,
@@ -157,8 +172,8 @@ export async function updateQuestion(questionId: string, text: string): Promise<
   const q = all[0];
 
   if ((await startedCount(testId)) > 0) {
-    const before = parseOptions(question.options).map((o) => o.id).join(",");
-    const after = q.options.map((o) => o.id).join(",");
+    const before = optionShape(question.type, question.options);
+    const after = optionShape(q.type, storedOptions(q));
     if (q.type !== question.type || before !== after) {
       return {
         error:
@@ -172,7 +187,7 @@ export async function updateQuestion(questionId: string, text: string): Promise<
     data: {
       type: q.type,
       stem: q.stem,
-      options: q.options as unknown as Prisma.InputJsonValue,
+      options: storedOptions(q),
       answerKey: q.key as unknown as Prisma.InputJsonValue,
       solution: q.solution,
       marksCorrect: q.rule?.correct ?? null,

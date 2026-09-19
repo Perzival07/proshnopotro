@@ -1,7 +1,7 @@
 import React from "react";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import { normalizeScheme, parseAnswerKey, parseOptions } from "@/lib/paper";
+import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions } from "@/lib/paper";
 import { PaperEditor, type EditorSection } from "./PaperEditor";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,8 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       id: q.id,
       type: q.type,
       stem: q.stem,
-      options: parseOptions(q.options),
+      options: q.type === "MATRIX" ? parseMatrixOptions(q.options).rows : parseOptions(q.options),
+      columns: q.type === "MATRIX" ? parseMatrixOptions(q.options).columns : [],
       key: parseAnswerKey(q.type, q.answerKey),
       solution: q.solution,
       marksCorrect: q.marksCorrect,

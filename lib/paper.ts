@@ -76,6 +76,12 @@ export function normalizeScheme(raw: unknown): MarkingScheme {
     },
     INTEGER: readRule(r.INTEGER, base.INTEGER),
     DECIMAL: readRule(r.DECIMAL, base.DECIMAL),
+    MATRIX: {
+      ...readRule(r.MATRIX, base.MATRIX),
+      perRow: typeof (r.MATRIX as Record<string, unknown> | undefined)?.perRow === "boolean"
+        ? ((r.MATRIX as Record<string, unknown>).perRow as boolean)
+        : base.MATRIX.perRow,
+    },
   };
 }
 
@@ -95,7 +101,23 @@ export function parseAnswerKey(type: QuestionType, raw: unknown): AnswerKey | nu
         : null;
     case "DECIMAL":
       return isNum(r.min) && isNum(r.max) && r.min <= r.max ? { type, min: r.min, max: r.max } : null;
+    case "MATRIX": {
+      const rows = r.rows as Record<string, unknown> | undefined;
+      if (!rows || typeof rows !== "object" || Array.isArray(rows)) return null;
+      const entries = Object.entries(rows);
+      if (entries.length === 0) return null;
+      const ok = entries.every(
+        ([, cols]) => Array.isArray(cols) && cols.length > 0 && cols.every((c) => typeof c === "string")
+      );
+      return ok ? { type, rows: rows as Record<string, string[]> } : null;
+    }
   }
+}
+
+/** Column I and Column II of a matrix question. */
+export function parseMatrixOptions(raw: unknown): { rows: OptionRow[]; columns: OptionRow[] } {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return { rows: parseOptions(r.rows), columns: parseOptions(r.columns) };
 }
 
 export function parseOptions(raw: unknown): OptionRow[] {
@@ -144,6 +166,8 @@ export interface StudentQuestion {
   options: OptionRow[];
   passageId: string | null;
   marks: { correct: number; wrong: number };
+  /** Matrix questions: Column II. `options` then holds Column I. */
+  columns?: OptionRow[];
 }
 
 export interface StudentSection {
@@ -176,7 +200,9 @@ export function toStudentPaper(sections: SectionRow[], testScheme: MarkingScheme
         number: ++number,
         type: q.type,
         stem: q.stem,
-        options: parseOptions(q.options),
+        ...(q.type === "MATRIX"
+          ? { options: parseMatrixOptions(q.options).rows, columns: parseMatrixOptions(q.options).columns }
+          : { options: parseOptions(q.options) }),
         passageId: q.passageId,
         marks: {
           correct: q.marksCorrect ?? scheme[q.type].correct,
@@ -197,10 +223,24 @@ export type ResponseCheck = { ok: true; value: ResponseValue } | { ok: false; er
 export function checkResponse(
   type: QuestionType,
   optionIds: string[],
-  raw: unknown
+  raw: unknown,
+  columnIds: string[] = []
 ): ResponseCheck {
   if (raw === null || raw === undefined || raw === "") return { ok: true, value: null };
   if (!QUESTION_TYPES.includes(type)) return { ok: false, error: "Unknown question type." };
+
+  if (type === "MATRIX") {
+    if (typeof raw !== "object" || Array.isArray(raw)) return { ok: false, error: "Match each row to its columns." };
+    const clean: Record<string, string[]> = {};
+    for (const [row, cols] of Object.entries(raw as Record<string, unknown>)) {
+      if (!optionIds.includes(row) || !Array.isArray(cols) || !cols.every((c) => typeof c === "string" && columnIds.includes(c))) {
+        return { ok: false, error: "Match each row to the columns given." };
+      }
+      const chosen = Array.from(new Set(cols as string[])).sort();
+      if (chosen.length) clean[row] = chosen;
+    }
+    return { ok: true, value: Object.keys(clean).length ? clean : null };
+  }
 
   if (type === "SINGLE") {
     return typeof raw === "string" && optionIds.includes(raw)

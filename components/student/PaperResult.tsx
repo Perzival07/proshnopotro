@@ -1,8 +1,9 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { RichText } from "@/components/RichText";
+import { MatrixColumns } from "@/components/MatrixColumns";
 import { markPaper, type QuestionStatus, type ResponseValue } from "@/lib/marking";
-import { normalizeScheme, parseAnswerKey, parseOptions, toMarkableSections } from "@/lib/paper";
+import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { formatDate } from "@/lib/utils";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, XCircle } from "lucide-react";
 
@@ -163,7 +164,37 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
 
                   <RichText text={q.stem} className="text-sm" />
 
-                  {options.length > 0 ? (
+                  {q.type === "MATRIX" ? (
+                    <div className="space-y-2">
+                      <MatrixColumns {...parseMatrixOptions(q.options)} />
+                      <table className="w-full max-w-md text-xs">
+                        <thead>
+                          <tr className="text-left text-brand-ink/60">
+                            <th className="py-1 font-medium">Row</th>
+                            <th className="py-1 font-medium">Your answer</th>
+                            <th className="py-1 font-medium">Correct answer</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {parseMatrixOptions(q.options).rows.map((row) => {
+                            const mine =
+                              given && typeof given === "object" && !Array.isArray(given) ? given[row.id] ?? [] : [];
+                            const correct = key?.type === "MATRIX" ? key.rows[row.id] ?? [] : [];
+                            const ok = mine.length === correct.length && correct.every((c) => mine.includes(c));
+                            return (
+                              <tr key={row.id} className="border-t border-brand-border/60">
+                                <td className="py-1 font-bold text-brand-navy">{row.id}</td>
+                                <td className={`py-1 font-mono font-semibold ${mine.length === 0 ? "text-brand-ink/40" : ok ? "text-emerald-700" : "text-red-700"}`}>
+                                  {mine.length ? mine.join(", ") : "\u2014"}
+                                </td>
+                                <td className="py-1 font-mono font-semibold text-emerald-800">{correct.join(", ")}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : options.length > 0 ? (
                     <ul className="space-y-1.5">
                       {options.map((o) => {
                         const isRight = right.has(o.id);

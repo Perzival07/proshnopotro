@@ -12,27 +12,32 @@
  *   INTEGER  - a whole number typed in. The key may accept several values.
  *   DECIMAL  - a number typed in, right when it falls inside [min, max], which
  *              is how "correct to two decimal places" is marked.
+ *   MATRIX   - matrix match: each row of Column I matches one or more entries
+ *              of Column II. Marked row by row, or all or nothing.
  *
  * Paragraph and assertion-reason questions are SINGLE (or MULTIPLE) questions
  * with a shared passage or fixed options; list-match questions in the current
  * JEE Advanced pattern are SINGLE too. None of them needs its own rule.
  */
 
-export type QuestionType = "SINGLE" | "MULTIPLE" | "INTEGER" | "DECIMAL";
+export type QuestionType = "SINGLE" | "MULTIPLE" | "INTEGER" | "DECIMAL" | "MATRIX";
 
-export const QUESTION_TYPES: readonly QuestionType[] = ["SINGLE", "MULTIPLE", "INTEGER", "DECIMAL"];
+export const QUESTION_TYPES: readonly QuestionType[] = ["SINGLE", "MULTIPLE", "INTEGER", "DECIMAL", "MATRIX"];
 
 export type AnswerKey =
   | { type: "SINGLE"; options: string[] }
   | { type: "MULTIPLE"; options: string[] }
   | { type: "INTEGER"; values: number[] }
-  | { type: "DECIMAL"; min: number; max: number };
+  | { type: "DECIMAL"; min: number; max: number }
+  /** Row id (A, B, ...) -> the column ids (P, Q, ...) it matches. */
+  | { type: "MATRIX"; rows: Record<string, string[]> };
 
 /**
  * What the student entered. Option ids for the choice types; the typed text
- * for the numeric ones, kept as typed so "2.50" is shown back as "2.50".
+ * for the numeric ones, kept as typed so "2.50" is shown back as "2.50"; for
+ * a matrix, the columns picked in each row.
  */
-export type ResponseValue = string | string[] | null;
+export type ResponseValue = string | string[] | Record<string, string[]> | null;
 
 export interface MarkRule {
   correct: number;
@@ -56,6 +61,13 @@ export interface MarkingScheme {
   MULTIPLE: MarkRule & { partial: PartialMode; partialPerOption: number };
   INTEGER: MarkRule;
   DECIMAL: MarkRule;
+  /**
+   * `correct` is the whole question. With `perRow`, each row matched exactly
+   * earns its share and each row answered wrongly costs its share of `wrong`
+   * (the old JEE Advanced way: 8 marks, 2 a row); without it, all rows must
+   * be right for any marks.
+   */
+  MATRIX: MarkRule & { perRow: boolean };
 }
 
 export type SchemePreset = "JEE_MAIN" | "NEET" | "JEE_ADVANCED" | "NO_NEGATIVE";
@@ -73,6 +85,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       MULTIPLE: { correct: 4, wrong: -1, partial: "NONE", partialPerOption: 0 },
       INTEGER: { correct: 4, wrong: -1 },
       DECIMAL: { correct: 4, wrong: -1 },
+      MATRIX: { correct: 4, wrong: -1, perRow: false },
     },
   },
   NEET: {
@@ -82,6 +95,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       MULTIPLE: { correct: 4, wrong: -1, partial: "NONE", partialPerOption: 0 },
       INTEGER: { correct: 4, wrong: -1 },
       DECIMAL: { correct: 4, wrong: -1 },
+      MATRIX: { correct: 4, wrong: -1, perRow: false },
     },
   },
   JEE_ADVANCED: {
@@ -91,6 +105,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       MULTIPLE: { correct: 4, wrong: -2, partial: "PER_OPTION", partialPerOption: 1 },
       INTEGER: { correct: 4, wrong: 0 },
       DECIMAL: { correct: 4, wrong: 0 },
+      MATRIX: { correct: 8, wrong: 0, perRow: true },
     },
   },
   NO_NEGATIVE: {
@@ -100,6 +115,7 @@ export const SCHEME_PRESETS: Record<SchemePreset, { label: string; scheme: Marki
       MULTIPLE: { correct: 1, wrong: 0, partial: "NONE", partialPerOption: 0 },
       INTEGER: { correct: 1, wrong: 0 },
       DECIMAL: { correct: 1, wrong: 0 },
+      MATRIX: { correct: 4, wrong: 0, perRow: true },
     },
   },
 };
@@ -137,8 +153,14 @@ export function parseNumericAnswer(raw: string): number | null {
 export function isAttempted(value: ResponseValue | undefined): boolean {
   if (value === null || value === undefined) return false;
   if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.values(value).some((cols) => Array.isArray(cols) && cols.length > 0);
   return value.trim() !== "";
 }
+
+const sameSet = (a: string[], b: string[]) => {
+  const x = new Set(a);
+  return x.size === new Set(b).size && b.every((v) => x.has(v));
+};
 
 function ruleFor(scheme: MarkingScheme, question: MarkableQuestion): MarkRule {
   const base = scheme[question.key.type];
@@ -165,12 +187,14 @@ export function markQuestion(
 
   switch (key.type) {
     case "SINGLE": {
+      if (typeof value === "object" && !Array.isArray(value)) return wrong;
       const chosen = Array.isArray(value) ? value : [value as string];
       if (chosen.length !== 1) return wrong;
       return key.options.includes(chosen[0]) ? right : wrong;
     }
 
     case "MULTIPLE": {
+      if (typeof value === "object" && !Array.isArray(value)) return wrong;
       const chosen = new Set(Array.isArray(value) ? value : [value as string]);
       const correct = new Set(key.options);
       if (Array.from(chosen).some((option) => !correct.has(option))) return wrong;
@@ -184,17 +208,31 @@ export function markQuestion(
     }
 
     case "INTEGER": {
-      if (Array.isArray(value)) return wrong;
+      if (typeof value !== "string") return wrong;
       const n = parseNumericAnswer(value as string);
       if (n === null || !Number.isInteger(n)) return wrong;
       return key.values.includes(n) ? right : wrong;
     }
 
     case "DECIMAL": {
-      if (Array.isArray(value)) return wrong;
+      if (typeof value !== "string") return wrong;
       const n = parseNumericAnswer(value as string);
       if (n === null) return wrong;
       return n >= key.min && n <= key.max ? right : wrong;
+    }
+
+    case "MATRIX": {
+      if (!value || typeof value !== "object" || Array.isArray(value)) return wrong;
+      const given = value as Record<string, string[]>;
+      const rows = Object.keys(key.rows);
+      const matched = rows.filter((r) => sameSet(given[r] ?? [], key.rows[r])).length;
+      if (matched === rows.length) return right;
+      if (!scheme.MATRIX.perRow) return wrong;
+      const answeredWrong = rows.filter(
+        (r) => (given[r]?.length ?? 0) > 0 && !sameSet(given[r], key.rows[r])
+      ).length;
+      const marks = (rule.correct * matched + rule.wrong * answeredWrong) / rows.length;
+      return { status: matched > 0 ? "PARTIAL" : "WRONG", marks: Number(marks.toFixed(4)) };
     }
   }
 }

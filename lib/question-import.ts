@@ -19,8 +19,14 @@
  *   Paragraph:                    <- a passage shared by the questions after
  *   ...                              it, until "End paragraph" or a new section
  *
+ *   Q3. [matrix] Match the columns  <- matrix match: Column I is (A)-(D),
+ *   (A) ...                            Column II is (P)-(T), each row may
+ *   Column II:                         match more than one column
+ *   (P) ...
+ *   Answer: A-P,Q; B-R; C-S; D-T
+ *
  * A tag in square brackets after the number forces the type: [single],
- * [multiple], [integer], [decimal]. Without it, a question with options is
+ * [multiple], [integer], [decimal], [matrix]. Without it, a question with options is
  * single-correct unless its answer lists more than one option. "Marks: +3 -1"
  * gives one question its own marks.
  *
@@ -47,6 +53,8 @@ export interface ImportedQuestion {
   type: QuestionType;
   stem: string;
   options: ImportedOption[];
+  /** Matrix questions only: Column II. `options` is then Column I. */
+  columns: ImportedOption[];
   key: AnswerKey;
   solution: string | null;
   /** Index into the paper's passages, or null. */
@@ -75,7 +83,10 @@ const OPTION_IDS = ["A", "B", "C", "D", "E", "F"];
 
 const SECTION_RE = /^#\s*(.+?)\s*$/;
 const QUESTION_RE = /^Q(?:uestion)?\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
-const TYPE_TAG_RE = /^\[(single|multiple|multi|integer|decimal|numerical)\]\s*/i;
+const TYPE_TAG_RE = /^\[(single|multiple|multi|integer|decimal|numerical|matrix|matrix match)\]\s*/i;
+const COLUMN_OPTION_RE = /^\(?([P-Tp-t])[.)]\s+(.*)$/;
+const COLUMN_HEADER_RE = /^(?:Column|List)[\s-]*(I{1,2}|1|2)\b\s*[:.-]?\s*$/i;
+const COLUMN_IDS = ["P", "Q", "R", "S", "T"];
 const OPTION_RE = /^\(?([A-Fa-f])[.)]\s+(.*)$/;
 const ANSWER_RE = /^(?:Answer|Ans|Key)\s*[:.-]\s*(.*)$/i;
 const SOLUTION_RE = /^(?:Solution|Sol|Explanation)\s*[:.-]\s*(.*)$/i;
@@ -134,7 +145,7 @@ export function splitInlineOptions(line: string): string[] {
   return parts.map((p) => p.trim()).filter(Boolean);
 }
 
-type Field = "stem" | "option" | "solution" | "paragraph" | null;
+type Field = "stem" | "option" | "column" | "solution" | "paragraph" | null;
 
 interface Draft {
   line: number;
@@ -145,6 +156,9 @@ interface Draft {
   tag: QuestionType | null;
   stem: string[];
   options: ImportedOption[];
+  columns: ImportedOption[];
+  /** Reading Column II of a matrix question. */
+  inColumns: boolean;
   answer: string | null;
   answerLine: number;
   solution: string[] | null;
@@ -158,6 +172,7 @@ function tagToType(tag: string): QuestionType {
   if (t === "multiple" || t === "multi") return "MULTIPLE";
   if (t === "integer") return "INTEGER";
   if (t === "decimal" || t === "numerical") return "DECIMAL";
+  if (t.startsWith("matrix")) return "MATRIX";
   return "SINGLE";
 }
 
@@ -200,6 +215,17 @@ function parseNumericKey(raw: string, forced: QuestionType | null): AnswerKey | 
     return { type: "INTEGER", values };
   }
   return null;
+}
+
+/** "A-P,Q; B-R" / "A→PQ B→R" -> { A: ["P","Q"], B: ["R"] }; null if unreadable. */
+function parseMatrixAnswer(raw: string): Record<string, string[]> | null {
+  const rows: Record<string, string[]> = {};
+  const re = /([A-Fa-f])\s*(?:-|\u2013|\u2192|->|:|=)\s*\(?([P-Tp-t](?:\s*[,&]?\s*[P-Tp-t])*)\)?/g;
+  for (const m of Array.from(raw.matchAll(re))) {
+    const cols = Array.from(new Set(m[2].toUpperCase().replace(/[^P-T]/g, "").split(""))).sort();
+    rows[m[1].toUpperCase()] = cols;
+  }
+  return Object.keys(rows).length ? rows : null;
 }
 
 /** "+3 -1", "+4, -2", "3/-1" -> { correct: 3, wrong: -1 }. */
@@ -299,7 +325,35 @@ export function parseQuestionPaper(text: string): ImportedPaper {
     let key: AnswerKey | null = null;
     let type: QuestionType;
 
-    if (d.options.length > 0) {
+    if (d.tag === "MATRIX" || d.columns.length > 0) {
+      if (d.options.length < 2 || d.columns.length < 2) {
+        errors.push({
+          line: d.line,
+          message: `${where} is a matrix match, so it needs rows (A), (B), ... and columns (P), (Q), ...`,
+        });
+        return;
+      }
+      const rows = parseMatrixAnswer(d.answer);
+      if (!rows) {
+        errors.push({ line: d.answerLine, message: `Answer "${d.answer}" should look like "A-P,Q; B-R; C-S; D-T".` });
+        return;
+      }
+      const rowIds = new Set(d.options.map((o) => o.id));
+      const colIds = new Set(d.columns.map((c) => c.id));
+      const badRow = Object.keys(rows).find((r) => !rowIds.has(r));
+      const badCol = Object.values(rows).flat().find((c) => !colIds.has(c));
+      const missing = d.options.map((o) => o.id).filter((r) => !rows[r]);
+      if (badRow || badCol) {
+        errors.push({ line: d.answerLine, message: `Answer names ${badRow ? `row ${badRow}` : `column ${badCol}`}, which the question does not have.` });
+        return;
+      }
+      if (missing.length) {
+        errors.push({ line: d.answerLine, message: `Answer does not say what row ${missing.join(", ")} matches.` });
+        return;
+      }
+      type = "MATRIX";
+      key = { type: "MATRIX", rows };
+    } else if (d.options.length > 0) {
       if (d.tag === "INTEGER" || d.tag === "DECIMAL") {
         errors.push({ line: d.line, message: `${where} is marked [${d.tag.toLowerCase()}] but has options.` });
         return;
@@ -363,6 +417,7 @@ export function parseQuestionPaper(text: string): ImportedPaper {
       type,
       stem,
       options: d.options.map((o) => ({ id: o.id, text: o.text.trim() })),
+      columns: d.columns.map((c) => ({ id: c.id, text: c.text.trim() })),
       key,
       solution: d.solution ? joinLines(d.solution) || null : null,
       passage: d.passage,
@@ -459,6 +514,8 @@ export function parseQuestionPaper(text: string): ImportedPaper {
         tag,
         stem: rest ? [rest] : [],
         options: [],
+        columns: [],
+        inColumns: false,
         answer: null,
         answerLine: lineNo,
         solution: null,
@@ -504,7 +561,30 @@ export function parseQuestionPaper(text: string): ImportedPaper {
       return;
     }
 
-    const option = field !== "solution" && d.answer === null ? line.match(OPTION_RE) : null;
+    // Only a question tagged [matrix] has columns: in a list-match question
+    // (single correct), "List-II" and its entries are just question text.
+    const matrix = d.tag === "MATRIX" && d.answer === null && field !== "solution";
+    const columnHeader = matrix ? line.match(COLUMN_HEADER_RE) : null;
+    if (columnHeader) {
+      d.inColumns = /^(II|2)$/i.test(columnHeader[1]);
+      field = null;
+      return;
+    }
+
+    // Column II of a matrix question: its (P), (Q), ... lines, with or
+    // without a "Column II" line before them.
+    const column = matrix ? line.match(COLUMN_OPTION_RE) : null;
+    if (column) {
+      d.inColumns = true;
+      const id = column[1].toUpperCase();
+      const expected = COLUMN_IDS[d.columns.length];
+      if (id !== expected) errors.push({ line: lineNo, message: `Expected column (${expected}) here, found (${id}).` });
+      d.columns.push({ id, text: column[2] });
+      field = "column";
+      return;
+    }
+
+    const option = field !== "solution" && d.answer === null && !d.inColumns ? line.match(OPTION_RE) : null;
     if (option) {
       const id = option[1].toUpperCase();
       const expected = OPTION_IDS[d.options.length];
@@ -519,6 +599,7 @@ export function parseQuestionPaper(text: string): ImportedPaper {
     // A continuation line belongs to whatever came last.
     if (field === "stem") d.stem.push(raw);
     else if (field === "option") d.options[d.options.length - 1].text += `\n${raw}`;
+    else if (field === "column") d.columns[d.columns.length - 1].text += `\n${raw}`;
     else if (field === "solution") d.solution!.push(raw);
     else if (line) {
       errors.push({ line: lineNo, message: `"${line.slice(0, 40)}" comes after the answer. Put it before "Answer:", or start it with "Solution:".` });
@@ -547,6 +628,10 @@ function keyToAnswer(key: AnswerKey): string {
       return key.min === key.max
         ? formatNumber(key.min)
         : `${formatNumber(key.min)} to ${formatNumber(key.max)}`;
+    case "MATRIX":
+      return Object.entries(key.rows)
+        .map(([row, cols]) => `${row}-${cols.join(",")}`)
+        .join("; ");
   }
 }
 
@@ -558,7 +643,9 @@ function keyToAnswer(key: AnswerKey): string {
  * answer.
  */
 export function questionToText(
-  question: Pick<ImportedQuestion, "type" | "stem" | "options" | "key" | "solution" | "rule">,
+  question: Pick<ImportedQuestion, "type" | "stem" | "options" | "key" | "solution" | "rule"> & {
+    columns?: ImportedOption[];
+  },
   number = 1
 ): string {
   const { type, key } = question;
@@ -566,10 +653,14 @@ export function questionToText(
     (type === "MULTIPLE" && key.type === "MULTIPLE" && key.options.length === 1) ||
     (type === "SINGLE" && key.type === "SINGLE" && key.options.length > 1) ||
     (type === "DECIMAL" && key.type === "DECIMAL" && Number.isInteger(key.min) && key.min === key.max);
-  const tag = needsTag ? `[${type.toLowerCase()}] ` : "";
+  const tag = type === "MATRIX" ? "[matrix] " : needsTag ? `[${type.toLowerCase()}] ` : "";
 
   const lines = [`Q${number}. ${tag}${question.stem}`];
   for (const option of question.options) lines.push(`(${option.id}) ${option.text}`);
+  if (type === "MATRIX") {
+    lines.push("Column II:");
+    for (const column of question.columns ?? []) lines.push(`(${column.id}) ${column.text}`);
+  }
   lines.push(`Answer: ${keyToAnswer(key)}`);
   if (question.rule && (question.rule.correct !== undefined || question.rule.wrong !== undefined)) {
     const correct = question.rule.correct ?? 0;
