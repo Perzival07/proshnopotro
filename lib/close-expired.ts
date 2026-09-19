@@ -9,7 +9,7 @@ interface ClosableAssignment {
   dueAt: Date | string;
   startedAt?: Date | string | null;
   result?: unknown | null;
-  test: { durationMinutes?: number | null };
+  test: { durationMinutes?: number | null; format?: string };
 }
 
 /**
@@ -21,9 +21,9 @@ interface ClosableAssignment {
  * calls this, so the record catches up the next time they are anywhere in the
  * portal rather than waiting on a background job.
  *
- * Deliberately limited to timed tests: a plainly overdue untimed assignment is
- * closed, not submitted, and marking it otherwise would misreport it as work
- * the student handed in.
+ * Deliberately limited to timed tests and papers answered in the portal: a
+ * plainly overdue untimed assignment behind a link is closed, not submitted,
+ * and marking it otherwise would misreport it as work the student handed in.
  *
  * Returns the ids it closed so the caller can render them as submitted without
  * re-querying.
@@ -31,8 +31,16 @@ interface ClosableAssignment {
 export async function closeExpiredAttempts(
   assignments: ClosableAssignment[]
 ): Promise<Set<string>> {
+  // Timed attempts, and any paper answered in the portal: once its deadline
+  // has passed with answers saved, it is submitted as it stood. A test behind
+  // a link stays as it is -- its answers are in a Google Form the portal
+  // cannot see, so marking it submitted would misreport it.
   const expired = assignments.filter(
-    (a) => !isAssignmentSubmitted(a) && isTimed(a) && a.startedAt && isTimeUp(a)
+    (a) =>
+      !isAssignmentSubmitted(a) &&
+      (isTimed(a) || a.test.format === "QUESTIONS") &&
+      a.startedAt &&
+      isTimeUp(a)
   );
 
   if (expired.length === 0) return new Set();

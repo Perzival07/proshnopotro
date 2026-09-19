@@ -30,6 +30,7 @@ import Link from "next/link";
 import {
   UserPlus,
   Calendar,
+  Clock,
   Users,
   School,
   Mail,
@@ -86,6 +87,8 @@ export function AssignClient({ tests, students, classrooms }: AssignClientProps)
   }, []);
 
   const [dueDate, setDueDate] = useState(defaultDueDate);
+  // Optional: schedule the test to open later, for a batch or anyone.
+  const [opensAt, setOpensAt] = useState("");
   const [assignMode, setAssignMode] = useState<"TABLE" | "BULK_PASTE" | "CLASSROOM">(
     "TABLE"
   );
@@ -199,7 +202,8 @@ export function AssignClient({ tests, students, classrooms }: AssignClientProps)
         emailsToProcess,
         parsedDueDate.toISOString(),
         reassignSubmitted,
-        clearMarks
+        clearMarks,
+        opensAt ? new Date(opensAt).toISOString() : null
       );
 
       setLoading(false);
@@ -297,7 +301,34 @@ export function AssignClient({ tests, students, classrooms }: AssignClientProps)
               className="mt-1.5 h-10 text-xs"
             />
             <p className="text-[11px] text-brand-ink/50 mt-1">
-              After this deadline, the student card switches to &ldquo;Closed&rdquo;.
+              After this deadline, the student card switches to &ldquo;Closed&rdquo;. A paper answered on screen
+              is submitted for the student at this time.
+            </p>
+          </div>
+
+          <div>
+            <Label htmlFor="opens-at" className="text-xs font-semibold text-brand-navy flex items-center gap-1.5">
+              <Clock className="h-3.5 w-3.5 text-brand-blue" />
+              <span>Opens at (optional)</span>
+            </Label>
+            <div className="mt-1.5 flex items-center gap-2">
+              <Input
+                id="opens-at"
+                type="datetime-local"
+                value={opensAt}
+                max={dueDate || undefined}
+                onChange={(e) => setOpensAt(e.target.value)}
+                className="h-10 text-xs"
+              />
+              {opensAt && (
+                <button type="button" onClick={() => setOpensAt("")} className="text-[11px] font-semibold text-brand-blue hover:underline">
+                  Open right away
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] text-brand-ink/50 mt-1">
+              Schedule it: students see it on their dashboard as &ldquo;Opens &hellip;&rdquo; and cannot start it before
+              then. Together with the deadline, this opens and closes it for a whole classroom automatically.
             </p>
           </div>
         </div>

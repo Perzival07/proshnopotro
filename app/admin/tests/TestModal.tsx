@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
 import { SUBJECTS } from "@/lib/subjects";
+import { KIND_HINTS, KIND_LABELS, TEST_KINDS, type TestKind } from "@/lib/schedule";
 import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
 import { detectTestFormat, toEmbedUrl, type LinkFormat, type TestFormat } from "@/lib/test-resource";
 import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
@@ -53,6 +54,7 @@ interface TestModalProps {
     board?: string | null;
     classLevel?: string | null;
     uploadMinutes?: number;
+    kind?: "TEST" | "DPP" | "ASSIGNMENT";
   } | null;
 }
 
@@ -68,6 +70,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [calculator, setCalculator] = useState(false);
   const [board, setBoard] = useState<string>("");
   const [uploadMinutes, setUploadMinutes] = useState("2");
+  const [kind, setKind] = useState<TestKind>("TEST");
   const [classLevel, setClassLevel] = useState<string>("");
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("Physics");
@@ -100,6 +103,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setCalculator(testToEdit.calculator ?? false);
       setBoard(testToEdit.board ?? "");
       setUploadMinutes(String(testToEdit.uploadMinutes ?? 2));
+      setKind(testToEdit.kind ?? "TEST");
       setClassLevel(testToEdit.classLevel ?? "");
     } else {
       setTitle("");
@@ -118,6 +122,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setBoard("");
       setClassLevel("");
       setUploadMinutes("2");
+      setKind("TEST");
     }
     setError(null);
   }, [testToEdit, isOpen]);
@@ -141,6 +146,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       calculator: mode === "QUESTIONS" ? calculator : undefined,
       board: mode === "QUESTIONS" ? board || null : undefined,
       uploadMinutes: mode === "LINK" || answerSheets ? uploadMinutes : undefined,
+      kind,
       classLevel: mode === "QUESTIONS" ? classLevel || null : undefined,
       durationMinutes,
       proctored,
@@ -197,6 +203,26 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               required
               className="mt-1"
             />
+          </div>
+
+          <div>
+            <Label className="text-xs font-semibold text-brand-navy">Kind of work</Label>
+            <div className="mt-1.5 grid grid-cols-3 gap-2">
+              {TEST_KINDS.map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => setKind(k)}
+                  title={KIND_HINTS[k]}
+                  className={`rounded-lg border px-2 py-2 text-xs font-semibold transition-colors ${
+                    kind === k ? "border-brand-blue bg-brand-tint text-brand-navy" : "border-brand-border bg-white text-brand-ink/70 hover:border-brand-blue/50"
+                  }`}
+                >
+                  {KIND_LABELS[k]}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-[11px] text-brand-ink/55">{KIND_HINTS[kind]}. Shown on the student&apos;s card.</p>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

@@ -7,6 +7,7 @@ import { detectTestFormat, toEmbedUrl, type TestFormat } from "@/lib/test-resour
 import { SCHEME_PRESETS, type SchemePreset } from "@/lib/marking";
 import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
 import { MAX_UPLOAD_MINUTES } from "@/lib/answer-upload";
+import { TEST_KINDS } from "@/lib/schedule";
 import { parseDurationMinutes } from "@/lib/exam-timer";
 import { ANSWER_DELIVERY_TYPE, destroyNoteFile, getCloudinary } from "@/lib/cloudinary";
 import { answerFolder } from "@/lib/answer-upload";
@@ -29,6 +30,8 @@ export interface TestInput {
   answerSheets?: boolean;
   /** QUESTIONS only: show an on-screen calculator during the paper. */
   calculator?: boolean;
+  /** Test, DPP or Assignment: shown on the student's card. */
+  kind?: string;
   /** Minutes to upload answer photos after the paper closes. */
   uploadMinutes?: number | string | null;
   /** QUESTIONS only: the syllabus questions are tagged against. */
@@ -89,11 +92,12 @@ function validateTestInput(data: TestInput): { error: string } | { format: TestF
  * paper's own page, where changing it re-marks attempts.
  */
 function questionSettings(data: TestInput, format: TestFormat, creating: boolean) {
+  const kind = (TEST_KINDS as readonly string[]).includes(data.kind ?? "") ? { kind: data.kind as "TEST" | "DPP" | "ASSIGNMENT" } : {};
   const upload =
     data.uploadMinutes !== undefined && data.uploadMinutes !== null && data.uploadMinutes !== ""
       ? { uploadMinutes: Number(data.uploadMinutes) }
       : {};
-  if (format !== "QUESTIONS") return { answerSheets: data.answerSheets ?? true, ...upload };
+  if (format !== "QUESTIONS") return { answerSheets: data.answerSheets ?? true, ...upload, ...kind };
   const preset = data.schemePreset && SCHEME_PRESETS[data.schemePreset] ? data.schemePreset : "JEE_MAIN";
   return {
     resultRelease:
@@ -105,6 +109,7 @@ function questionSettings(data: TestInput, format: TestFormat, creating: boolean
     board: data.board && (BOARDS as readonly string[]).includes(data.board) ? data.board : null,
     classLevel: data.classLevel && (CLASS_LEVELS as readonly string[]).includes(data.classLevel) ? data.classLevel : null,
     ...upload,
+    ...kind,
     ...(creating ? { markingScheme: JSON.parse(JSON.stringify(SCHEME_PRESETS[preset].scheme)) } : {}),
   };
 }

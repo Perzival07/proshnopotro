@@ -7,6 +7,7 @@ import { Footer } from "@/components/Footer";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { StartTestButton } from "./StartTestButton";
 import { PaperResult } from "@/components/student/PaperResult";
+import { isNotYetOpen, KIND_LABELS } from "@/lib/schedule";
 import { MarkedSheets } from "@/components/student/MarkedSheets";
 import { formatDate } from "@/lib/utils";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
@@ -33,6 +34,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
       studentEmail: true,
       dueAt: true,
       startedAt: true,
+      opensAt: true,
       endedAt: true,
       answersUploadedAt: true,
       returnedAt: true,
@@ -50,6 +52,7 @@ export default async function TestConfirmationPage({ params }: PageProps) {
           durationMinutes: true,
           uploadMinutes: true,
           proctored: true,
+          kind: true,
           answerSheets: true,
           // formUrl is explicitly OMITTED to prevent leakage into HTML
         },
@@ -82,6 +85,28 @@ export default async function TestConfirmationPage({ params }: PageProps) {
 
   const isSubmitted = isAssignmentSubmitted(current);
   const isInactive = !current.test.active;
+
+  // A scheduled test not open yet: say when, instead of the paper.
+  if (!isSubmitted && !isInactive && isNotYetOpen(current)) {
+    return (
+      <div className="min-h-screen flex flex-col justify-between bg-brand-page">
+        <Navbar user={user} />
+        <main className="flex-1 max-w-xl w-full mx-auto px-4 sm:px-6 py-14 text-center space-y-3">
+          <p className="text-xs font-semibold uppercase tracking-wider text-brand-blue">{assignment.test.subject}</p>
+          <h1 className="font-heading text-xl font-bold text-brand-navy">{assignment.test.title}</h1>
+          <p className="rounded-xl border border-brand-border bg-white p-5 text-sm text-brand-ink/80 shadow-card">
+            This {assignment.test.kind === "DPP" ? "DPP" : KIND_LABELS[assignment.test.kind].toLowerCase()} opens on{" "}
+            <strong className="text-brand-navy">{formatDate(current.opensAt!)}</strong>. Come back then; it closes on{" "}
+            {formatDate(assignment.dueAt)}.
+          </p>
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs font-semibold text-brand-navy hover:text-brand-blue">
+            <ArrowLeft className="h-4 w-4" /> Back to All Assessments
+          </Link>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   // Covers both the tutor's deadline and, once started, this student's own
   // window -- either one ending puts the paper out of reach.
@@ -163,7 +188,9 @@ export default async function TestConfirmationPage({ params }: PageProps) {
   // Only a started attempt has a live clock; before that the countdown has
   // nothing to count and the student still sees the limit stated below.
   const endsAt =
-    !awaitingUpload && timed && assignment.startedAt ? attemptDeadline(assignment) : null;
+    !awaitingUpload && (timed || assignment.test.format === "QUESTIONS") && assignment.startedAt
+      ? attemptDeadline(assignment)
+      : null;
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-brand-page">

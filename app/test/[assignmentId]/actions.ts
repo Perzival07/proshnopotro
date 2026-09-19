@@ -18,6 +18,7 @@ import {
 } from "@/lib/answer-upload";
 import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
 import { gradeAssignment } from "@/lib/grade-attempt";
+import { isNotYetOpen } from "@/lib/schedule";
 import {
   checkResponse,
   isAttempted,
@@ -119,6 +120,12 @@ export async function resolveSecureFormUrl(
     return { error: "This test has been deactivated by the tutor." };
   }
 
+  // 3b. A scheduled test is not open before its time, whatever the page
+  //     showed: the check is here, on the server.
+  if (isNotYetOpen(assignment)) {
+    return { error: `This test opens on ${assignment.opensAt!.toLocaleString("en-IN", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Kolkata" })} (IST).` };
+  }
+
   // 4. Deadline verification -- the tutor's date and, on a timed test, the
   //    student's own window, whichever ends first. Re-opening the paper after
   //    the window closed must not hand the paper back, so this is checked
@@ -159,7 +166,8 @@ export async function resolveSecureFormUrl(
         closesAt: new Date(start + w.closesAt).toISOString(),
       }));
     }
-    if (!isTimed(assignment)) return { format, paper };
+    // Untimed or not, a paper answered on screen ends at its deadline: the
+    // countdown submits it, and the server refuses answers after it.
     const deadline = attemptDeadline({ ...assignment, startedAt });
     return {
       format,

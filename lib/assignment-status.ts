@@ -1,4 +1,5 @@
 import { isTimeUp } from "./exam-timer";
+import { isNotYetOpen } from "./schedule";
 
 /**
  * Single source of truth for "has this assignment been submitted?".
@@ -22,7 +23,7 @@ export function isPastDue(dueAt: Date | string, now: Date = new Date()): boolean
   return now.getTime() > new Date(dueAt).getTime();
 }
 
-export type CardStatus = "AVAILABLE" | "SUBMITTED" | "CLOSED";
+export type CardStatus = "AVAILABLE" | "SUBMITTED" | "CLOSED" | "UPCOMING";
 
 /**
  * The status a student's test card should show.
@@ -36,6 +37,7 @@ export function deriveCardStatus(
     status: "ASSIGNED" | "SUBMITTED";
     dueAt: Date | string;
     startedAt?: Date | string | null;
+    opensAt?: Date | string | null;
     result?: unknown | null;
     test: { active: boolean; durationMinutes?: number | null };
   },
@@ -44,5 +46,6 @@ export function deriveCardStatus(
   if (isAssignmentSubmitted(assignment)) return "SUBMITTED";
   if (!assignment.test.active) return "CLOSED";
   if (isTimeUp(assignment, now)) return "CLOSED";
+  if (isNotYetOpen(assignment, now)) return "UPCOMING";
   return "AVAILABLE";
 }

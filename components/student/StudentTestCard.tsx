@@ -5,7 +5,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { formatDateShort } from "@/lib/utils";
+import { formatDate, formatDateShort } from "@/lib/utils";
+import { KIND_LABELS, type TestKind } from "@/lib/schedule";
 import { deriveCardStatus, type CardStatus } from "@/lib/assignment-status";
 import { formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
 import { Calendar, CheckCircle2, Clock, ArrowRight, Lock, Timer, UploadCloud } from "lucide-react";
@@ -19,6 +20,8 @@ interface StudentTestCardProps {
     startedAt?: Date | null;
     /** When the tutor handed back the marked copy. */
     returnedAt?: Date | null;
+    /** When a scheduled test opens; null = open from the start. */
+    opensAt?: Date | null;
     status: "ASSIGNED" | "SUBMITTED";
     test: {
       id: string;
@@ -29,6 +32,7 @@ interface StudentTestCardProps {
       active: boolean;
       format?: TestFormat;
       durationMinutes?: number | null;
+      kind?: TestKind;
     };
     result?: {
       score: number;
@@ -53,6 +57,8 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
     reasonText = "Already submitted";
   } else if (!test.active) {
     reasonText = "Test deactivated by tutor";
+  } else if (cardStatus === "UPCOMING") {
+    reasonText = `Opens ${formatDate(assignment.opensAt!)}`;
   } else if (cardStatus === "CLOSED") {
     // Both endings close the card, and a student whose own window ran out
     // needs to be told that rather than being pointed at a deadline that has
@@ -122,6 +128,12 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
               Submitted
             </Badge>
           )}
+          {cardStatus === "UPCOMING" && (
+            <Badge variant="closed" className="gap-1 shadow-xs">
+              <Clock className="h-3 w-3" />
+              Opens soon
+            </Badge>
+          )}
           {cardStatus === "CLOSED" && (
             <Badge variant="closed" className="gap-1 shadow-xs">
               <Lock className="h-3 w-3" />
@@ -134,6 +146,11 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
       {/* Card Body */}
       <div className="flex flex-1 flex-col justify-between p-5 space-y-4">
         <div>
+          {test.kind && test.kind !== "TEST" && (
+            <span className="mb-1 inline-block rounded bg-brand-tint px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand-navy">
+              {KIND_LABELS[test.kind]}
+            </span>
+          )}
           <h3
             className={`font-heading text-lg font-semibold leading-snug line-clamp-2 ${
               isInteractive ? "text-brand-navy" : "text-brand-ink/80"

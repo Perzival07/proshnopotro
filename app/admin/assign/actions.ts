@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { EMAIL_REGEX } from "@/lib/students";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { parseNewDeadline, REOPEN_DATA } from "@/lib/reassign";
+import { scheduleError } from "@/lib/schedule";
 
 export interface AssignResult {
   success: boolean;
@@ -62,7 +63,9 @@ export async function assignTestToStudents(
   rawEmails: string[],
   dueAtIsoString: string,
   reassignSubmitted: boolean = false,
-  clearMarks: boolean = false
+  clearMarks: boolean = false,
+  /** Optional: when the test opens for these students. Blank = right away. */
+  opensAtIsoString: string | null = null
 ): Promise<AssignResult> {
   await requireAdmin();
 
@@ -81,6 +84,14 @@ export async function assignTestToStudents(
   const dueAt = new Date(dueAtIsoString);
   if (isNaN(dueAt.getTime())) {
     return { ...emptyResult(), error: "Invalid due date format." };
+  }
+
+  let opensAt: Date | null = null;
+  if (opensAtIsoString) {
+    opensAt = new Date(opensAtIsoString);
+    if (isNaN(opensAt.getTime())) return { ...emptyResult(), error: "Invalid opening time." };
+    const bad = scheduleError(opensAt, dueAt);
+    if (bad) return { ...emptyResult(), error: bad };
   }
 
   // A reassignment additionally has to land in the future. Reopening a closed
@@ -172,6 +183,7 @@ export async function assignTestToStudents(
         testId,
         studentEmail,
         dueAt,
+        opensAt,
         status: "ASSIGNED",
       })),
       skipDuplicates: true,
@@ -192,7 +204,7 @@ export async function assignTestToStudents(
       prisma.questionResponse.deleteMany({ where: { assignmentId: { in: ids } } }),
       prisma.assignment.updateMany({
         where: { id: { in: ids } },
-        data: { ...REOPEN_DATA, dueAt, assignedAt: new Date() },
+        data: { ...REOPEN_DATA, dueAt, opensAt, assignedAt: new Date() },
       }),
     ]);
     reassignedCount = ids.length;

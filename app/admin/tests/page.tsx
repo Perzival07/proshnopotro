@@ -43,6 +43,7 @@ export default async function AdminTestsPage() {
       calculator: t.calculator,
       board: t.board,
       uploadMinutes: t.uploadMinutes,
+      kind: t.kind,
       classLevel: t.classLevel,
       createdAt: t.createdAt,
       _count: t._count,

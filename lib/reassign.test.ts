@@ -35,6 +35,7 @@ describe("REOPEN_DATA", () => {
       answersUploadedAt: null,
       feedback: null,
       returnedAt: null,
+      opensAt: null,
     });
   });
 });

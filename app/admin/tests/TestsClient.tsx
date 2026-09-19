@@ -18,6 +18,7 @@ import { DeleteTestDialog } from "./DeleteTestDialog";
 import { toggleTestActive } from "./actions";
 import { formatDateShort } from "@/lib/utils";
 import { formatDurationLabel } from "@/lib/exam-timer";
+import { KIND_LABELS } from "@/lib/schedule";
 import type { TestFormat } from "@/lib/test-resource";
 import {
   Plus,
@@ -56,6 +57,7 @@ interface TestItem {
   board: string | null;
   classLevel: string | null;
   uploadMinutes: number;
+  kind: "TEST" | "DPP" | "ASSIGNMENT";
   createdAt: Date;
   _count: {
     assignments: number;
@@ -283,6 +285,11 @@ export function TestsClient({ tests }: TestsClientProps) {
                 <span className="rounded bg-brand-tint px-2 py-0.5 font-medium text-brand-navy">
                   {test.subject}
                 </span>
+                {test.kind !== "TEST" && (
+                  <span className="rounded bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-800">
+                    {KIND_LABELS[test.kind]}
+                  </span>
+                )}
                 <span className="inline-flex items-center gap-1">
                   <FormatLabel format={test.format} />
                 </span>
@@ -444,6 +451,11 @@ export function TestsClient({ tests }: TestsClientProps) {
                     <div className="flex flex-col gap-1">
                       <span className="inline-flex w-fit items-center px-2 py-0.5 rounded text-[11px] font-medium bg-brand-tint text-brand-navy">
                         {test.subject}
+                        {test.kind !== "TEST" && (
+                          <span className="ml-1.5 rounded bg-amber-100 px-1 text-[9px] font-bold uppercase text-amber-800">
+                            {KIND_LABELS[test.kind]}
+                          </span>
+                        )}
                       </span>
                       <span className="inline-flex w-fit items-center gap-1 text-[10px] font-medium text-brand-ink/60">
                         <FormatLabel format={test.format} />

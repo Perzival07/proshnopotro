@@ -34,6 +34,13 @@ enum TestFormat {
 }
 
 /// The kinds of question the portal marks itself. See lib/marking.ts.
+/// What kind of work a test is, shown on the student's card.
+enum TestKind {
+  TEST
+  DPP
+  ASSIGNMENT
+}
+
 enum QuestionType {
   SINGLE
   MULTIPLE
@@ -171,6 +178,7 @@ model Test {
   /// students' progress across it.
   seriesId          String?
   series            TestSeries?   @relation(fields: [seriesId], references: [id], onDelete: SetNull)
+  kind              TestKind      @default(TEST)
   /// Set when the tutor releases results. Only read for ON_RELEASE tests.
   resultsReleasedAt DateTime?
   createdAt       DateTime   @default(now())
@@ -192,6 +200,9 @@ model Assignment {
   studentEmail      String // Lowercase normalized email (allows pre-assignment before user signs in)
   assignedAt        DateTime         @default(now())
   dueAt             DateTime
+  /// When the test opens for this student. null = open as soon as assigned.
+  /// Before it the card reads "Opens ..." and the paper cannot be opened.
+  opensAt           DateTime?
   /// Stamped the first time the student opens the paper. The countdown for a
   /// timed test runs from here, so a reload or a second device cannot restart it.
   startedAt         DateTime?

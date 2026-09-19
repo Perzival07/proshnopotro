@@ -32,6 +32,7 @@ export const REOPEN_DATA = {
   answersUploadedAt: null,
   feedback: null,
   returnedAt: null,
+  opensAt: null,
 } as const;
 
 /**
