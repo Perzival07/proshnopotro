@@ -1,7 +1,8 @@
 "use server";
 
 import { Prisma } from "@prisma/client";
-import { requireAdmin } from "@/lib/auth-utils";
+import { requireStaff, studentScope, type SessionUser } from "@/lib/auth-utils";
+import { canAccessStudent } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { sanitizeAnnotations } from "@/lib/annotations";
 import { gradeAssignment } from "@/lib/grade-attempt";
@@ -9,6 +10,18 @@ import { maxMarksFor } from "@/lib/marking";
 import { normalizeScheme, toMarkableSections } from "@/lib/paper";
 
 type Result = { success?: true; error?: string };
+
+/**
+ * A tutor marks only the students in their classrooms; the owner marks
+ * anyone. Returns the reason when this attempt is not the caller's to mark.
+ */
+async function notYours(user: SessionUser, assignmentId: string): Promise<string | null> {
+  const scope = await studentScope(user);
+  if (scope === null) return null;
+  const a = await prisma.assignment.findUnique({ where: { id: assignmentId }, select: { studentEmail: true } });
+  if (!a || !canAccessStudent(scope, a.studentEmail)) return "That attempt is not in your classrooms.";
+  return null;
+}
 
 // No revalidatePath here, on purpose. The admin area has a loading boundary,
 // and a server action that revalidates makes the page under it remount --
@@ -18,12 +31,14 @@ type Result = { success?: true; error?: string };
 
 /** The tutor's pen, ticks and notes on one page, replacing what was there. */
 export async function saveAnnotations(imageId: string, raw: unknown): Promise<Result> {
-  await requireAdmin();
+  const user = await requireStaff();
   const image = await prisma.answerImage.findUnique({
     where: { id: imageId },
     select: { id: true, width: true, height: true, assignmentId: true },
   });
   if (!image) return { error: "That page no longer exists." };
+  const denied = await notYours(user, image.assignmentId);
+  if (denied) return { error: denied };
   const annotations = sanitizeAnnotations(raw, {
     width: image.width ?? 4000,
     height: image.height ?? 4000,
@@ -47,7 +62,9 @@ export async function saveWrittenMark(
   marks: number | null,
   feedback: string
 ): Promise<Result & { score?: number; maxScore?: number }> {
-  await requireAdmin();
+  const user = await requireStaff();
+  const denied = await notYours(user, assignmentId);
+  if (denied) return { error: denied };
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     select: { id: true, status: true, testId: true, test: { select: { markingScheme: true } } },
@@ -92,7 +109,9 @@ export async function saveTotalMarks(
   score: number,
   maxScore: number
 ): Promise<Result> {
-  await requireAdmin();
+  const user = await requireStaff();
+  const denied = await notYours(user, assignmentId);
+  if (denied) return { error: denied };
   if (!Number.isFinite(score) || !Number.isFinite(maxScore) || maxScore <= 0 || score < 0 || score > maxScore) {
     return { error: "Enter marks from 0 up to the total, and a total above 0." };
   }
@@ -112,7 +131,9 @@ export async function saveTotalMarks(
 }
 
 export async function saveOverallFeedback(assignmentId: string, feedback: string): Promise<Result> {
-  await requireAdmin();
+  const user = await requireStaff();
+  const denied = await notYours(user, assignmentId);
+  if (denied) return { error: denied };
   await prisma.assignment.update({
     where: { id: assignmentId },
     data: { feedback: feedback.trim().slice(0, 5000) || null },
@@ -126,7 +147,9 @@ export async function saveOverallFeedback(assignmentId: string, feedback: string
  * marking.
  */
 export async function setReturned(assignmentId: string, returned: boolean): Promise<Result> {
-  await requireAdmin();
+  const user = await requireStaff();
+  const denied = await notYours(user, assignmentId);
+  if (denied) return { error: denied };
   const a = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     select: { status: true },

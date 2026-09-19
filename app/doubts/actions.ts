@@ -1,6 +1,7 @@
 "use server";
 
-import { requireAdmin, requireCompleteStudent } from "@/lib/auth-utils";
+import { requireCompleteStudent, requireStaff, studentScope, type SessionUser } from "@/lib/auth-utils";
+import { canAccessStudent } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { checkDoubtBody, MAX_MESSAGES_PER_THREAD, statusAfterMessage } from "@/lib/doubts";
 import { resultsVisible } from "@/lib/results-visibility";
@@ -28,6 +29,12 @@ async function threadState(id: string): Promise<ThreadState> {
     status: d.status,
     messages: d.messages.map((m) => ({ id: m.id, fromTutor: m.fromTutor, body: m.body, at: m.createdAt.toISOString() })),
   };
+}
+
+/** A tutor answers only their own students' doubts; the owner answers anyone's. */
+async function notYourDoubt(user: SessionUser, studentEmail: string): Promise<string | null> {
+  const scope = await studentScope(user);
+  return canAccessStudent(scope, studentEmail) ? null : "That student is not in your classrooms.";
 }
 
 // No revalidation, like the marking screen: the caller updates its own state,
@@ -89,11 +96,13 @@ export async function setDoubtResolved(doubtId: string, resolved: boolean): Prom
 
 /** A tutor's reply. */
 export async function replyToDoubt(doubtId: string, raw: string): Promise<Result> {
-  const admin = await requireAdmin();
+  const admin = await requireStaff();
   const checked = checkDoubtBody(raw);
   if ("error" in checked) return { error: checked.error };
-  const d = await prisma.doubt.findUnique({ where: { id: doubtId }, select: { id: true, _count: { select: { messages: true } } } });
+  const d = await prisma.doubt.findUnique({ where: { id: doubtId }, select: { id: true, studentEmail: true, _count: { select: { messages: true } } } });
   if (!d) return { error: "That doubt no longer exists." };
+  const denied = await notYourDoubt(admin, d.studentEmail);
+  if (denied) return { error: denied };
   if (d._count.messages >= MAX_MESSAGES_PER_THREAD) return { error: "This thread is full." };
   await prisma.$transaction([
     prisma.doubtMessage.create({ data: { doubtId, authorEmail: admin.email.toLowerCase(), fromTutor: true, body: checked.body } }),
@@ -103,7 +112,11 @@ export async function replyToDoubt(doubtId: string, raw: string): Promise<Result
 }
 
 export async function setDoubtStatus(doubtId: string, status: "OPEN" | "RESOLVED"): Promise<Result> {
-  await requireAdmin();
+  const user = await requireStaff();
+  const d = await prisma.doubt.findUnique({ where: { id: doubtId }, select: { studentEmail: true } });
+  if (!d) return { error: "That doubt no longer exists." };
+  const denied = await notYourDoubt(user, d.studentEmail);
+  if (denied) return { error: denied };
   await prisma.doubt.update({ where: { id: doubtId }, data: { status } });
   return { thread: await threadState(doubtId) };
 }

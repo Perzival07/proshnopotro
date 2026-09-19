@@ -65,6 +65,7 @@ export async function loadNcertChapters(
   classLevel: string,
   subject: string
 ): Promise<Result & { chapters?: ChapterRow[] }> {
+  await requireAdmin();
   const preset = ncertPreset(classLevel, subject);
   if (!preset) return { error: `There is no NCERT list for Class ${classLevel} ${subject}. Paste the chapters instead.` };
   return addChapters(board, classLevel, subject, preset.join("\n"));

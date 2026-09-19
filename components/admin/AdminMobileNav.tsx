@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { NAV_ITEMS } from "./AdminSidebar";
+import { navFor } from "./AdminSidebar";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
@@ -17,7 +17,7 @@ import { InstallAppNavButton } from "@/components/pwa/InstallApp";
  * and this drawer takes over: a hamburger in the header, and a panel that
  * slides in over the content rather than displacing it.
  */
-export function AdminMobileNav() {
+export function AdminMobileNav({ role = "ADMIN" }: { role?: "ADMIN" | "TUTOR" }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -71,7 +71,7 @@ export function AdminMobileNav() {
                 {/* A compact lockup, not the full LogoLockup: beside the close
                     button there is not room for "classes by KOUSTAV" on one
                     line, and it wrapped mid-phrase. */}
-                <Link href="/admin/tests" className="flex min-w-0 items-center gap-2.5">
+                <Link href={role === "TUTOR" ? "/admin/marking" : "/admin/tests"} className="flex min-w-0 items-center gap-2.5">
                   <AtomMark size={30} strokeColor="#FFFFFF" dotColor="#62BEF0" className="shrink-0" />
                   <span className="min-w-0">
                     <span className="block truncate font-heading text-[15px] font-bold uppercase leading-none tracking-wide text-white">
@@ -97,7 +97,7 @@ export function AdminMobileNav() {
                   Assessment Management
                 </div>
 
-                {NAV_ITEMS.map((item) => {
+                {navFor(role).map((item) => {
                   const isActive = pathname.startsWith(item.href);
                   const Icon = item.icon;
 

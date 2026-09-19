@@ -174,7 +174,7 @@ export const authConfig: NextAuthConfig = {
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        session.user.role = (token.role as "STUDENT" | "ADMIN") || "STUDENT";
+        session.user.role = (token.role as "STUDENT" | "ADMIN" | "TUTOR") || "STUDENT";
         session.user.profileComplete = Boolean(token.profileComplete);
         session.user.phone = (token.phone as string) || null;
         session.user.className = (token.className as string) || null;

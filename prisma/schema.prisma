@@ -10,7 +10,11 @@ generator client {
 
 enum Role {
   STUDENT
+  /// The owner: everything.
   ADMIN
+  /// A tutor added by the owner: marks answer sheets and answers doubts for
+  /// the students in their classrooms, and nothing else. See lib/permissions.ts.
+  TUTOR
 }
 
 enum AssignmentStatus {
@@ -468,6 +472,7 @@ model Classroom {
 
   members ClassroomMember[]
   notes   NoteClassroom[]
+  tutors  ClassroomTutor[]
 
   @@index([active])
 }
@@ -487,6 +492,20 @@ model ClassroomMember {
   @@unique([classroomId, studentEmail])
   @@index([studentEmail])
   @@index([classroomId])
+}
+
+/// A tutor responsible for a classroom. A tutor sees and marks only the
+/// students in the classrooms they are on.
+model ClassroomTutor {
+  id          String   @id @default(cuid())
+  classroomId String
+  tutorEmail  String
+  addedAt     DateTime @default(now())
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, tutorEmail])
+  @@index([tutorEmail])
 }
 
 /// A set of notes the tutor shares: some files, a link, or both.

@@ -2,6 +2,7 @@ import React from "react";
 import { listChapters } from "./actions";
 import { SyllabusClient } from "./SyllabusClient";
 import { BOARDS, CLASS_LEVELS, ncertPreset } from "@/lib/syllabus";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,8 @@ export default async function SyllabusPage({
 }: {
   searchParams: { board?: string; class?: string; subject?: string };
 }) {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const board = (BOARDS as readonly string[]).includes(searchParams.board ?? "") ? searchParams.board! : "CBSE";
   const classLevel = (CLASS_LEVELS as readonly string[]).includes(searchParams.class ?? "") ? searchParams.class! : "12";
   const subject = searchParams.subject?.trim() || "Physics";

@@ -22,7 +22,7 @@ interface NavbarProps {
     name?: string | null;
     email?: string | null;
     image?: string | null;
-    role?: "STUDENT" | "ADMIN";
+    role?: "STUDENT" | "ADMIN" | "TUTOR";
     phone?: string | null;
     className?: string | null;
   } | null;

@@ -1,10 +1,13 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { TestsClient } from "./TestsClient";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminTestsPage() {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const tests = await prisma.test.findMany({
     // Past papers live in the question bank, not among the tests.
     where: { bank: false },

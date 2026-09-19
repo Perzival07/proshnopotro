@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { maxMarksFor, QUESTION_TYPES, type QuestionType } from "@/lib/marking";
 import { normalizeScheme, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { QuestionBrowser, type BankQuestion } from "./QuestionBrowser";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,8 @@ export default async function BankQuestionsPage({
 }: {
   searchParams: { board?: string; class?: string; subject?: string; year?: string; chapter?: string; type?: string; q?: string };
 }) {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const board = searchParams.board || "";
   const classLevel = searchParams.class || "";
   const subject = searchParams.subject || "";

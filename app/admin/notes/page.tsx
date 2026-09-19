@@ -1,10 +1,13 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { NotesClient, type ClassroomOption, type NoteRow } from "./NotesClient";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminNotesPage() {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const [notes, classrooms, students] = await Promise.all([
     prisma.note.findMany({
       include: {

@@ -6,10 +6,14 @@ import { sanitizeAnnotations } from "@/lib/annotations";
 import { markPaper, maxMarksFor, type ResponseValue } from "@/lib/marking";
 import { normalizeScheme, toMarkableSections } from "@/lib/paper";
 import { MarkingWorkspace, type MarkingQuestion } from "./MarkingWorkspace";
+import { requireStaff, studentScope } from "@/lib/auth-utils";
+import { canAccessStudent } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
 export default async function MarkAttemptPage({ params }: { params: { assignmentId: string } }) {
+  const user = await requireStaff();
+  const scope = await studentScope(user);
   const assignment = await prisma.assignment.findUnique({
     where: { id: params.assignmentId },
     include: {
@@ -28,7 +32,9 @@ export default async function MarkAttemptPage({ params }: { params: { assignment
       result: { select: { score: true, maxScore: true } },
     },
   });
-  if (!assignment) notFound();
+  // Not found rather than forbidden: a tutor learns nothing about students
+  // outside their classrooms, not even that the attempt exists.
+  if (!assignment || !canAccessStudent(scope, assignment.studentEmail)) notFound();
 
   const student = await prisma.user.findUnique({
     where: { email: assignment.studentEmail },
@@ -84,7 +90,11 @@ export default async function MarkAttemptPage({ params }: { params: { assignment
 
   // The test's other submitted attempts, for Previous / Next.
   const queue = await prisma.assignment.findMany({
-    where: { testId: assignment.testId, status: "SUBMITTED" },
+    where: {
+      testId: assignment.testId,
+      status: "SUBMITTED",
+      ...(scope === null ? {} : { studentEmail: { in: scope } }),
+    },
     select: { id: true },
     orderBy: { studentEmail: "asc" },
   });

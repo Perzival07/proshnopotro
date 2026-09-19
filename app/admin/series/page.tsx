@@ -1,10 +1,13 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { SeriesClient } from "./SeriesClient";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function SeriesPage() {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const [series, loose] = await Promise.all([
     prisma.testSeries.findMany({
       orderBy: { createdAt: "desc" },

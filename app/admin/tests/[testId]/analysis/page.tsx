@@ -6,6 +6,7 @@ import { markPaper, type QuestionStatus, type ResponseValue } from "@/lib/markin
 import { normalizeScheme, toMarkableSections } from "@/lib/paper";
 import { chapterBreakdown } from "@/lib/chapter-report";
 import { ArrowLeft } from "lucide-react";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,8 @@ const pctClass = (p: number) => (p >= 0.75 ? "bg-emerald-500" : p >= 0.4 ? "bg-a
  * first, and question by question. Written answers count once marked.
  */
 export default async function TestAnalysisPage({ params }: { params: { testId: string } }) {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const test = await prisma.test.findUnique({
     where: { id: params.testId },
     select: {

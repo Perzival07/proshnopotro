@@ -1,10 +1,13 @@
 import React, { Suspense } from "react";
 import { prisma } from "@/lib/prisma";
 import { AssignClient } from "./AssignClient";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminAssignPage() {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   // Archived batches are left out of the classroom list: assigning a test to
   // a group that has finished is never the intention, and they would only
   // crowd the picker.

@@ -1,6 +1,7 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { RosterClient, RosterAssignment } from "./RosterClient";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,8 @@ interface RosterPageProps {
 }
 
 export default async function AdminRosterPage({ searchParams }: RosterPageProps) {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const tests = await prisma.test.findMany({
     where: { bank: false },
     select: {

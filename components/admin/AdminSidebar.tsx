@@ -17,11 +17,29 @@ import {
   ListTree,
   Layers,
   MessageCircleQuestion,
+  PenLine,
+  UserCog,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
 
-export const NAV_ITEMS = [
+export interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  description: string;
+  /** Also shown to tutors. Everything else is for the owner alone. */
+  tutor?: boolean;
+}
+
+export const NAV_ITEMS: NavItem[] = [
+  {
+    name: "To Mark",
+    href: "/admin/marking",
+    icon: PenLine,
+    description: "Answer sheets waiting for marks",
+    tutor: true,
+  },
   {
     name: "Manage Tests",
     href: "/admin/tests",
@@ -75,6 +93,7 @@ export const NAV_ITEMS = [
     href: "/admin/doubts",
     icon: MessageCircleQuestion,
     description: "Answer students' questions",
+    tutor: true,
   },
   {
     name: "Test Rosters",
@@ -88,17 +107,29 @@ export const NAV_ITEMS = [
     icon: UploadCloud,
     description: "Google Forms response CSV match",
   },
+  {
+    name: "Team",
+    href: "/admin/team",
+    icon: UserCog,
+    description: "Tutors and what they can do",
+  },
 ];
 
-export function AdminSidebar() {
+/** The links a role sees. */
+export function navFor(role: "ADMIN" | "TUTOR"): NavItem[] {
+  return role === "TUTOR" ? NAV_ITEMS.filter((i) => i.tutor) : NAV_ITEMS;
+}
+
+export function AdminSidebar({ role = "ADMIN" }: { role?: "ADMIN" | "TUTOR" }) {
   const pathname = usePathname();
+  const items = navFor(role);
 
   return (
     <aside className="hidden lg:flex w-64 bg-brand-navy text-white flex-col justify-between shrink-0 h-screen sticky top-0 border-r border-white/10 shadow-lg">
       <div>
         {/* Brand Header */}
         <div className="h-16 px-5 flex items-center border-b border-white/15 bg-black/10">
-          <LogoLockup variant="white" href="/admin/tests" subtitle="Admin Portal" />
+          <LogoLockup variant="white" href={role === "TUTOR" ? "/admin/marking" : "/admin/tests"} subtitle={role === "TUTOR" ? "Tutor Portal" : "Admin Portal"} />
         </div>
 
         {/* Navigation Links */}
@@ -107,7 +138,7 @@ export function AdminSidebar() {
             Assessment Management
           </div>
 
-          {NAV_ITEMS.map((item) => {
+          {items.map((item) => {
             const isActive = pathname.startsWith(item.href);
             const Icon = item.icon;
 

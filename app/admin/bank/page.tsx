@@ -1,6 +1,7 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
 import { BankClient, type BankPaper } from "./BankClient";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
@@ -9,6 +10,8 @@ export default async function QuestionBankPage({
 }: {
   searchParams: { board?: string; class?: string; subject?: string; year?: string };
 }) {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const filters = {
     board: searchParams.board || undefined,
     classLevel: searchParams.class || undefined,

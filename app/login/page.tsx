@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import { getVerifiedSession } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
+import { homeFor } from "@/lib/permissions";
 import { LogoBadge } from "@/components/brand/LogoBadge";
 import { LoginForm } from "./LoginForm";
 import { Footer } from "@/components/Footer";
@@ -13,8 +14,8 @@ export default async function LoginPage() {
   const user = await getVerifiedSession();
 
   if (user) {
-    if (user.role === "ADMIN") {
-      redirect("/admin/tests");
+    if (user.role === "ADMIN" || user.role === "TUTOR") {
+      redirect(homeFor(user.role));
     }
     if (!user.profileComplete) {
       redirect("/onboarding");

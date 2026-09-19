@@ -1,5 +1,5 @@
 import React from "react";
-import { requireAdmin } from "@/lib/auth-utils";
+import { requireStaff } from "@/lib/auth-utils";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminMobileNav } from "@/components/admin/AdminMobileNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,29 +13,32 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const adminUser = await requireAdmin();
+  // The owner and tutors share this shell; each page then guards itself, and
+  // anything that does not say otherwise is the owner's alone.
+  const adminUser = await requireStaff();
+  const role = adminUser.role === "TUTOR" ? "TUTOR" : "ADMIN";
 
   return (
     <div className="min-h-screen flex bg-brand-page text-brand-ink">
       {/* Fixed Desktop Sidebar */}
-      <AdminSidebar />
+      <AdminSidebar role={role} />
 
       {/* Main Admin Content Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Admin Top Header */}
         <header className="h-16 border-b border-brand-border bg-white px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sticky top-0 z-30 shadow-xs">
           <div className="flex min-w-0 items-center gap-2">
-            <AdminMobileNav />
+            <AdminMobileNav role={role} />
             <Shield className="hidden sm:block h-4 w-4 shrink-0 text-brand-navy" />
             {/* The full title does not fit beside the avatar on a phone, so it
                 shortens rather than pushing the header into a horizontal
                 scroll. */}
             <span className="font-heading font-semibold text-sm text-brand-navy truncate">
-              <span className="hidden sm:inline">Tutor Administration Console</span>
+              <span className="hidden sm:inline">{role === "TUTOR" ? "Tutor Console" : "Tutor Administration Console"}</span>
               <span className="sm:hidden">Admin Console</span>
             </span>
             <Badge variant="admin" className="ml-2 hidden md:inline-flex text-[10px] uppercase py-0.5">
-              Authorized Admin
+              {role === "TUTOR" ? "Tutor" : "Authorized Admin"}
             </Badge>
           </div>
 

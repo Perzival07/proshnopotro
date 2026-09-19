@@ -4,10 +4,13 @@ import { prisma } from "@/lib/prisma";
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions } from "@/lib/paper";
 import { PaperEditor, type EditorSection } from "./PaperEditor";
 import { parseTranslation } from "@/lib/translation";
+import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function TestQuestionsPage({ params }: { params: { testId: string } }) {
+  // Owner only: the layout lets tutors in, so every page says who may see it.
+  await requireAdmin();
   const test = await prisma.test.findUnique({
     where: { id: params.testId },
     select: {

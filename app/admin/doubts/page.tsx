@@ -1,16 +1,19 @@
 import React from "react";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/auth-utils";
+import { requireStaff, studentScope } from "@/lib/auth-utils";
 import { DoubtsInbox, type InboxDoubt } from "./DoubtsInbox";
 
 export const dynamic = "force-dynamic";
 
 export default async function DoubtsInboxPage({ searchParams }: { searchParams: { status?: string } }) {
-  await requireAdmin();
+  const user = await requireStaff();
+  // A tutor sees only their classrooms' doubts.
+  const scope = await studentScope(user);
+  const mine = scope === null ? {} : { studentEmail: { in: scope } };
   const status = searchParams.status === "RESOLVED" || searchParams.status === "ANSWERED" || searchParams.status === "ALL" ? searchParams.status : "OPEN";
   const [rows, counts] = await Promise.all([
     prisma.doubt.findMany({
-      where: status === "ALL" ? {} : { status },
+      where: { ...mine, ...(status === "ALL" ? {} : { status }) },
       orderBy: { updatedAt: status === "OPEN" ? "asc" : "desc" },
       take: 100,
       include: {
@@ -18,7 +21,7 @@ export default async function DoubtsInboxPage({ searchParams }: { searchParams: 
         question: { select: { stem: true, section: { select: { test: { select: { title: true } } } } } },
       },
     }),
-    prisma.doubt.groupBy({ by: ["status"], _count: true }),
+    prisma.doubt.groupBy({ by: ["status"], where: mine, _count: true }),
   ]);
   const users = await prisma.user.findMany({
     where: { email: { in: Array.from(new Set(rows.map((r) => r.studentEmail))) } },

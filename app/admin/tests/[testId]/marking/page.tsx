@@ -3,12 +3,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
+import { requireStaff, studentScope } from "@/lib/auth-utils";
 import { ArrowLeft, CheckCircle2, Clock, Images, PenLine } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 /** Every submitted attempt at a test, and how far its marking has got. */
 export default async function MarkingListPage({ params }: { params: { testId: string } }) {
+  const user = await requireStaff();
+  const scope = await studentScope(user);
   const test = await prisma.test.findUnique({
     where: { id: params.testId },
     select: { id: true, title: true, subject: true, format: true },
@@ -17,7 +20,7 @@ export default async function MarkingListPage({ params }: { params: { testId: st
 
   const [attempts, writtenIds] = await Promise.all([
     prisma.assignment.findMany({
-      where: { testId: test.id, status: "SUBMITTED" },
+      where: { testId: test.id, status: "SUBMITTED", ...(scope === null ? {} : { studentEmail: { in: scope } }) },
       orderBy: { studentEmail: "asc" },
       select: {
         id: true,
