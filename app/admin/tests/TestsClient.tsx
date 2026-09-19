@@ -230,7 +230,9 @@ export function TestsClient({ tests }: TestsClientProps) {
 
       {/* Below md the seven-column table cannot fit without cutting columns
           off, so the same rows are stacked as cards instead. */}
-      <div className="space-y-3 md:hidden">
+      {/* Cards below 1280px: with the sidebar beside it, the table only fits
+          on wide screens, and a squeezed one hid the actions off the edge. */}
+      <div className="space-y-3 xl:hidden">
         {paginatedTests.length === 0 ? (
           <div className="rounded-xl border border-brand-border bg-white p-6 text-center text-xs text-brand-ink/60 shadow-card">
             No assessment tests found matching current criteria.
@@ -334,26 +336,16 @@ export function TestsClient({ tests }: TestsClientProps) {
                   >
                     <Edit2 className="h-4 w-4" />
                   </button>
-                  <button
-                    onClick={() => handleToggleActive(test.id, test.active)}
-                    disabled={togglingId === test.id}
-                    aria-label={test.active ? "Deactivate test" : "Activate test"}
-                    className={`inline-flex h-9 w-9 items-center justify-center rounded-md transition-colors disabled:opacity-40 ${
-                      test.active
-                        ? "text-red-600 hover:bg-red-50"
-                        : "text-green-700 hover:bg-green-50"
-                    }`}
-                  >
-                    <Power className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => setTestToDelete(test)}
-                    aria-label="Delete test"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-red-700 transition-colors hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
                 </div>
+              </div>
+
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <ToggleActiveButton
+                  active={test.active}
+                  busy={togglingId === test.id}
+                  onClick={() => handleToggleActive(test.id, test.active)}
+                />
+                <DeleteButton onClick={() => setTestToDelete(test)} />
               </div>
             </div>
           ))
@@ -362,7 +354,7 @@ export function TestsClient({ tests }: TestsClientProps) {
 
       {/* Dense Table */}
       <div className="rounded-xl border border-brand-border bg-white shadow-card overflow-hidden">
-        <div className="hidden md:block">
+        <div className="hidden xl:block">
         <Table>
           <TableHeader>
             <TableRow>
@@ -404,7 +396,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                   <ArrowUpDown className="h-3 w-3 opacity-60" />
                 </div>
               </TableHead>
-              <TableHead className="w-[190px] text-right">Actions</TableHead>
+              <TableHead className="w-[300px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -520,26 +512,12 @@ export function TestsClient({ tests }: TestsClientProps) {
                         <Edit2 className="h-3.5 w-3.5" />
                       </button>
 
-                      <button
+                      <ToggleActiveButton
+                        active={test.active}
+                        busy={togglingId === test.id}
                         onClick={() => handleToggleActive(test.id, test.active)}
-                        disabled={togglingId === test.id}
-                        title={test.active ? "Deactivate Test" : "Activate Test"}
-                        className={`p-1.5 rounded-md transition-colors disabled:opacity-40 ${
-                          test.active
-                            ? "hover:bg-red-50 text-red-600"
-                            : "hover:bg-green-50 text-green-700"
-                        }`}
-                      >
-                        <Power className="h-3.5 w-3.5" />
-                      </button>
-
-                      <button
-                        onClick={() => setTestToDelete(test)}
-                        title="Delete Test"
-                        className="p-1.5 rounded-md text-red-700 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      />
+                      <DeleteButton onClick={() => setTestToDelete(test)} />
                     </div>
                   </TableCell>
                 </TableRow>
@@ -598,6 +576,44 @@ export function TestsClient({ tests }: TestsClientProps) {
         testToEdit={testToEdit}
       />
     </div>
+  );
+}
+
+/**
+ * Turning a test off or on: labelled, so it is never mistaken for deleting.
+ * Off hides it from students and keeps everything; it can be turned back on.
+ */
+function ToggleActiveButton({ active, busy, onClick }: { active: boolean; busy: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      title={active ? "Hide from students; scores and answers are kept" : "Let assigned students open it again"}
+      className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-semibold transition-colors disabled:opacity-40 ${
+        active
+          ? "border-brand-border bg-white text-brand-ink/80 hover:bg-brand-tint"
+          : "border-green-300 bg-green-50 text-green-800 hover:bg-green-100"
+      }`}
+    >
+      <Power className="h-3.5 w-3.5" />
+      {active ? "Turn off" : "Turn on"}
+    </button>
+  );
+}
+
+/** Deleting a test for good; the dialog it opens explains what is lost. */
+function DeleteButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Delete this test permanently"
+      className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-red-200 bg-white px-2.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50"
+    >
+      <Trash2 className="h-3.5 w-3.5" />
+      Delete
+    </button>
   );
 }
 
