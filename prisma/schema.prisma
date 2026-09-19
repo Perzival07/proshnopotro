@@ -142,6 +142,12 @@ model Test {
   /// Whether students photograph and upload answer sheets after the paper.
   /// Off for a purely objective paper; on for written and subjective ones.
   answerSheets      Boolean       @default(true)
+  /// QUESTIONS tests: show an on-screen calculator (as GATE's CBT does; JEE
+  /// Main and NEET do not allow one).
+  calculator        Boolean       @default(false)
+  /// The name of the paper's second language, as students see it ("हिन्दी"),
+  /// when its questions have translations. null = one language only.
+  secondLanguage    String?
   /// Set when the tutor releases results. Only read for ON_RELEASE tests.
   resultsReleasedAt DateTime?
   createdAt       DateTime   @default(now())
@@ -235,6 +241,8 @@ model Passage {
   id      String @id @default(cuid())
   testId  String
   content String @db.Text
+  /// The passage in the test's second language.
+  translation String? @db.Text
 
   test      Test       @relation(fields: [testId], references: [id], onDelete: Cascade)
   questions Question[]
@@ -262,6 +270,10 @@ model Question {
   marksWrong   Float?
   /// Dropped from the paper: full marks to everyone who attempted it.
   bonus       Boolean      @default(false)
+  /// The question in the test's second language: { stem, options, columns,
+  /// solution }, as lib/translation.ts QuestionTranslation. Marked with the
+  /// same key.
+  translation Json?
   passageId   String?
 
   section   TestSection        @relation(fields: [sectionId], references: [id], onDelete: Cascade)

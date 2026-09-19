@@ -38,6 +38,7 @@ export default async function AdminTestsPage() {
       active: t.active,
       resultRelease: t.resultRelease,
       answerSheets: t.answerSheets,
+      calculator: t.calculator,
       createdAt: t.createdAt,
       _count: t._count,
       submittedCount,

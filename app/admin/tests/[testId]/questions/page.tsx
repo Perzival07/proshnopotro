@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions } from "@/lib/paper";
 import { PaperEditor, type EditorSection } from "./PaperEditor";
+import { parseTranslation } from "@/lib/translation";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +18,8 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       markingScheme: true,
       resultRelease: true,
       resultsReleasedAt: true,
-      passages: { select: { id: true, content: true } },
+      secondLanguage: true,
+      passages: { select: { id: true, content: true, translation: true } },
       sections: {
         orderBy: { position: "asc" },
         include: { questions: { orderBy: { position: "asc" } } },
@@ -51,6 +53,7 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
       marksWrong: q.marksWrong,
       bonus: q.bonus,
       passageId: q.passageId,
+      translation: parseTranslation(q.translation),
     })),
   }));
 
@@ -65,6 +68,7 @@ export default async function TestQuestionsPage({ params }: { params: { testId: 
         assigned: test._count.assignments,
         started,
         submitted,
+        secondLanguage: test.secondLanguage,
       }}
       scheme={normalizeScheme(test.markingScheme)}
       sections={sections}

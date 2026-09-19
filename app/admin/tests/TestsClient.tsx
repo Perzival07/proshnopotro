@@ -51,6 +51,7 @@ interface TestItem {
   active: boolean;
   resultRelease: "INSTANT" | "ON_RELEASE";
   answerSheets: boolean;
+  calculator: boolean;
   createdAt: Date;
   _count: {
     assignments: number;

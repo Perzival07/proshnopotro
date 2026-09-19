@@ -63,7 +63,9 @@ export interface SavedResponse {
 
 export interface StudentPaper {
   sections: StudentSection[];
-  passages: { id: string; content: string }[];
+  passages: { id: string; content: string; translation: string | null }[];
+  /** The name of the paper's second language, when it has one. */
+  secondLanguage?: string | null;
   responses: SavedResponse[];
   /**
    * For a paper timed per section: when each section opens and closes, on
@@ -71,6 +73,8 @@ export interface StudentPaper {
    * serverNow sent alongside.
    */
   windows?: { id: string; opensAt: string; closesAt: string }[];
+  /** Whether this paper allows the on-screen calculator. */
+  calculator?: boolean;
 }
 
 /**
@@ -141,6 +145,8 @@ export async function resolveSecureFormUrl(
     // Always stamped for a paper written here, timed or not: answers are only
     // taken once it has been opened, and the tutor's editor locks the paper's
     // shape from that moment.
+    paper.calculator = assignment.test.calculator;
+    paper.secondLanguage = assignment.test.secondLanguage;
     const startedAt = await ensureStarted(assignment, true);
     const windows = sectionWindows(
       paper.sections.map((s, position) => ({ id: s.id, position, durationMinutes: s.durationMinutes }))
@@ -204,7 +210,7 @@ async function loadStudentPaper(
 ): Promise<StudentPaper> {
   const [sections, passages, responses] = await Promise.all([
     prisma.testSection.findMany({ where: { testId }, include: { questions: true } }),
-    prisma.passage.findMany({ where: { testId }, select: { id: true, content: true } }),
+    prisma.passage.findMany({ where: { testId }, select: { id: true, content: true, translation: true } }),
     prisma.questionResponse.findMany({
       where: { assignmentId },
       select: { questionId: true, value: true, markedForReview: true },

@@ -15,6 +15,7 @@ import {
   type SchemePreset,
 } from "@/lib/marking";
 import type { OptionRow } from "@/lib/paper";
+import { matchTranslation, type QuestionTranslation } from "@/lib/translation";
 import { shrinkImage } from "@/lib/shrink-image";
 import { uploadToCloudinary } from "@/lib/cloudinary-upload";
 import {
@@ -22,6 +23,8 @@ import {
   getQuestionImageSignature,
   importQuestions,
   regradeAll,
+  removeTranslation,
+  saveTranslation,
   setQuestionBonus,
   setResultsReleased,
   updateMarkingScheme,
@@ -59,6 +62,8 @@ export interface EditorQuestion {
   marksWrong: number | null;
   bonus: boolean;
   passageId: string | null;
+  /** The question in the paper's second language, if it has one. */
+  translation: QuestionTranslation | null;
 }
 
 export interface EditorSection {
@@ -82,10 +87,11 @@ interface PaperEditorProps {
     assigned: number;
     started: number;
     submitted: number;
+    secondLanguage: string | null;
   };
   scheme: MarkingScheme;
   sections: EditorSection[];
-  passages: { id: string; content: string }[];
+  passages: { id: string; content: string; translation: string | null }[];
 }
 
 const EXAMPLE = `# Physics
@@ -540,12 +546,15 @@ function QuestionCard({
   question,
   scheme,
   locked,
+  language,
 }: {
   testId: string;
   number: number;
   question: EditorQuestion;
   scheme: MarkingScheme;
   locked: boolean;
+  /** The paper's second language, when it has one. */
+  language: string | null;
 }) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState("");
@@ -679,6 +688,32 @@ function QuestionCard({
         marks={marksFor(scheme, question)}
         bonus={question.bonus}
       />
+      {question.translation && language && (
+        <div className="mt-3 space-y-2 rounded-md border border-dashed border-brand-blue/30 bg-brand-tint/30 p-2.5 text-sm">
+          <p className="text-[11px] font-semibold text-brand-navy">{language}</p>
+          <RichText text={question.translation.stem} />
+          {question.translation.options.length > 0 && (
+            <ul className="space-y-1">
+              {question.translation.options.map((o) => (
+                <li key={o.id} className="flex gap-2">
+                  <span className="text-xs font-bold text-brand-navy">({o.id})</span>
+                  <RichText tall text={o.text} className="min-w-0 flex-1" />
+                </li>
+              ))}
+            </ul>
+          )}
+          {question.translation.columns.length > 0 && (
+            <ul className="space-y-1">
+              {question.translation.columns.map((o) => (
+                <li key={o.id} className="flex gap-2">
+                  <span className="text-xs font-bold text-brand-navy">({o.id})</span>
+                  <RichText tall text={o.text} className="min-w-0 flex-1" />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
       <div className="mt-3 flex flex-wrap items-center gap-1 border-t border-brand-border/60 pt-2">
         <Button type="button" variant="ghost" size="sm" className="h-7 gap-1 text-xs" onClick={startEditing}>
           <Edit2 className="h-3.5 w-3.5" /> Edit
@@ -837,7 +872,13 @@ function SectionHeader({
   );
 }
 
-function PassageBlock({ passage }: { passage: { id: string; content: string } }) {
+function PassageBlock({
+  passage,
+  language,
+}: {
+  passage: { id: string; content: string; translation: string | null };
+  language: string | null;
+}) {
   const [editing, setEditing] = useState(false);
   const [text, setText] = useState(passage.content);
   const [busy, setBusy] = useState(false);
@@ -890,7 +931,15 @@ function PassageBlock({ passage }: { passage: { id: string; content: string } })
           </div>
         </div>
       ) : (
-        <RichText text={passage.content} className="text-sm" />
+        <>
+          <RichText text={passage.content} className="text-sm" />
+          {passage.translation && language && (
+            <div className="mt-2 border-t border-dashed border-brand-blue/30 pt-2 text-sm">
+              <p className="mb-1 text-[11px] font-semibold text-brand-navy">{language}</p>
+              <RichText text={passage.translation} />
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1133,6 +1182,148 @@ function ResultsCard({ test }: { test: PaperEditorProps["test"] }) {
   );
 }
 
+/**
+ * The paper in a second language (Hindi, as NTA papers have), pasted or
+ * imported from Word in the same format and in the same order. Checked
+ * against the paper as the tutor types; answers are not needed, since marking
+ * always uses the paper's own key.
+ */
+function TranslationPanel({
+  testId,
+  language,
+  sections,
+}: {
+  testId: string;
+  language: string | null;
+  sections: EditorSection[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(language ?? "\u0939\u093f\u0928\u094d\u0926\u0940");
+  const [text, setText] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ tone: "error" | "ok"; text: string } | null>(null);
+  const [serverProblems, setServerProblems] = useState<string[]>([]);
+
+  const questions = useMemo(() => sections.flatMap((s) => s.questions), [sections]);
+  const translated = questions.filter((q) => q.translation).length;
+  const deferred = useDeferredValue(text);
+  const check = useMemo(() => {
+    if (!deferred.trim()) return null;
+    return matchTranslation(
+      questions.map((q) => ({
+        id: q.id,
+        optionIds: q.options.map((o) => o.id),
+        columnIds: q.columns.map((o) => o.id),
+        passageId: q.passageId,
+      })),
+      parseQuestionPaper(deferred, { answersOptional: true })
+    );
+  }, [deferred, questions]);
+
+  const save = async () => {
+    setBusy(true);
+    setMessage(null);
+    setServerProblems([]);
+    try {
+      const res = await saveTranslation(testId, text, name);
+      if (res.error) {
+        setMessage({ tone: "error", text: res.error });
+        setServerProblems(res.problems ?? []);
+      } else {
+        setText("");
+        setOpen(false);
+      }
+    } catch {
+      setMessage({ tone: "error", text: "Could not reach the server." });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!window.confirm(`Remove the ${language} version of every question?`)) return;
+    setBusy(true);
+    try {
+      const res = await removeTranslation(testId);
+      if (res.error) setMessage({ tone: "error", text: res.error });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const problems = serverProblems.length ? serverProblems : check?.errors ?? [];
+
+  return (
+    <div className="space-y-3 text-xs">
+      <p className="text-brand-ink/80">
+        {language
+          ? `${translated} of ${questions.length} questions have a ${language} version. Students can read the paper in either language, or both side by side.`
+          : "Add the paper in a second language, such as Hindi, so students can read it in either language or both side by side, as on NTA papers."}
+      </p>
+
+      {!open ? (
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" size="sm" onClick={() => setOpen(true)} className="h-8 bg-brand-navy text-xs text-white">
+            {language ? "Replace translation" : "Add a translation"}
+          </Button>
+          {language && (
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={remove} className="h-8 text-xs text-red-700">
+              Remove
+            </Button>
+          )}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <label className="block text-[11px] font-semibold text-brand-navy">
+            Language name, as students see it
+            <Input value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-8 text-xs" />
+          </label>
+          <p className="text-brand-ink/60">
+            Paste the whole paper in that language, every question in the same order with the same options.
+            Answers are not needed. Hindi keywords work too: प्रश्न, हल, अनुच्छेद.
+          </p>
+          <textarea
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            rows={8}
+            spellCheck={false}
+            placeholder={"1. ...\n(A) ...\n(B) ..."}
+            className="w-full rounded-md border border-brand-border p-2 font-mono text-xs focus-ring"
+          />
+          <WordImportButton testId={testId} onText={(t) => setText(t)} />
+          {check && problems.length === 0 && (
+            <p className="font-semibold text-emerald-700">
+              All {check.questions.size} questions line up with the paper.
+            </p>
+          )}
+          {problems.length > 0 && (
+            <ul className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-red-200 bg-red-50 p-2 text-red-800">
+              {problems.map((p, i) => (
+                <li key={i}>{p}</li>
+              ))}
+            </ul>
+          )}
+          {message && <Banner tone={message.tone}>{message.text}</Banner>}
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={busy || !check || check.errors.length > 0}
+              onClick={save}
+              className="h-8 bg-brand-navy text-xs text-white"
+            >
+              {busy ? "Saving\u2026" : "Save translation"}
+            </Button>
+            <Button type="button" size="sm" variant="outline" className="h-8 text-xs" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="rounded-xl border border-brand-border bg-white p-4 shadow-xs">
@@ -1209,13 +1400,14 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
                   passage && (i === 0 || section.questions[i - 1].passageId !== question.passageId);
                 return (
                   <React.Fragment key={question.id}>
-                    {firstOfPassage && passage && <PassageBlock passage={passage} />}
+                    {firstOfPassage && passage && <PassageBlock passage={passage} language={test.secondLanguage} />}
                     <QuestionCard
                       testId={test.id}
                       number={number}
                       question={question}
                       scheme={section.scheme ?? scheme}
                       locked={locked}
+                      language={test.secondLanguage}
                     />
                   </React.Fragment>
                 );
@@ -1231,6 +1423,11 @@ export function PaperEditor({ test, scheme, sections, passages }: PaperEditorPro
           <Card title="Results">
             <ResultsCard test={test} />
           </Card>
+          {questionCount > 0 && (
+            <Card title="Second language">
+              <TranslationPanel testId={test.id} language={test.secondLanguage} sections={sections} />
+            </Card>
+          )}
         </aside>
       </div>
     </div>

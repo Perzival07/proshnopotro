@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { parseQuestionPaper, type ImportError, type ImportedPaper } from "@/lib/question-import";
 import { normalizeScheme, parseMatrixOptions, parseOptions, sectionalDuration } from "@/lib/paper";
 import type { ImportedQuestion } from "@/lib/question-import";
+import { matchTranslation } from "@/lib/translation";
 
 /** How a question's options are stored: a list, or both columns of a matrix. */
 function storedOptions(q: Pick<ImportedQuestion, "type" | "options" | "columns">): Prisma.InputJsonValue {
@@ -373,5 +374,69 @@ export async function updatePassage(passageId: string, content: string): Promise
     select: { testId: true },
   });
   refresh(passage.testId);
+  return { success: true };
+}
+
+/**
+ * Adds (or replaces) the paper's second language: the whole paper written
+ * again in, say, Hindi, in the same order and with the same options. Allowed
+ * after students have started -- it changes nothing about what is marked.
+ */
+export async function saveTranslation(
+  testId: string,
+  text: string,
+  language: string
+): Promise<Result & { problems?: string[]; translated?: number }> {
+  await requireAdmin();
+  const loaded = await loadQuestionTest(testId);
+  if ("error" in loaded) return { error: loaded.error };
+  const name = language.trim() || "हिन्दी";
+  if (name.length > 40) return { error: "Keep the language's name short, like हिन्दी or Hindi." };
+
+  const sections = await prisma.testSection.findMany({
+    where: { testId },
+    orderBy: { position: "asc" },
+    include: { questions: { orderBy: { position: "asc" } } },
+  });
+  const original = sections.flatMap((s) =>
+    s.questions.map((q) => {
+      const matrix = q.type === "MATRIX" ? parseMatrixOptions(q.options) : null;
+      return {
+        id: q.id,
+        optionIds: (matrix ? matrix.rows : parseOptions(q.options)).map((o) => o.id),
+        columnIds: matrix ? matrix.columns.map((o) => o.id) : [],
+        passageId: q.passageId,
+      };
+    })
+  );
+  if (original.length === 0) return { error: "Add the paper's questions first, then its translation." };
+
+  const matched = matchTranslation(original, parseQuestionPaper(text, { answersOptional: true }));
+  if (matched.errors.length) {
+    return { error: "The translation does not line up with the paper yet. Nothing was saved.", problems: matched.errors };
+  }
+
+  await prisma.$transaction([
+    ...Array.from(matched.questions).map(([id, t]) =>
+      prisma.question.update({ where: { id }, data: { translation: t as unknown as Prisma.InputJsonValue } })
+    ),
+    ...Array.from(matched.passages).map(([id, content]) =>
+      prisma.passage.update({ where: { id }, data: { translation: content } })
+    ),
+    prisma.test.update({ where: { id: testId }, data: { secondLanguage: name } }),
+  ]);
+
+  refresh(testId);
+  return { success: true, translated: matched.questions.size };
+}
+
+export async function removeTranslation(testId: string): Promise<Result> {
+  await requireAdmin();
+  await prisma.$transaction([
+    prisma.question.updateMany({ where: { section: { testId } }, data: { translation: Prisma.DbNull } }),
+    prisma.passage.updateMany({ where: { testId }, data: { translation: null } }),
+    prisma.test.update({ where: { id: testId }, data: { secondLanguage: null } }),
+  ]);
+  refresh(testId);
   return { success: true };
 }

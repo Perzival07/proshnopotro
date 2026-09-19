@@ -82,17 +82,19 @@ export interface ImportedPaper {
 const OPTION_IDS = ["A", "B", "C", "D", "E", "F"];
 
 const SECTION_RE = /^#\s*(.+?)\s*$/;
-const QUESTION_RE = /^Q(?:uestion)?\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
+// Hindi papers use प्रश्न (question), उत्तर (answer), हल (solution) and
+// अनुच्छेद (paragraph); both spellings are read everywhere.
+const QUESTION_RE = /^(?:Q(?:uestion)?|प्रश्न)\s*\.?\s*(\d+)\s*[.):]\s*(.*)$/i;
 const TYPE_TAG_RE = /^\[(single|multiple|multi|integer|decimal|numerical|matrix|matrix match)\]\s*/i;
 const COLUMN_OPTION_RE = /^\(?([P-Tp-t])[.)]\s+(.*)$/;
 const COLUMN_HEADER_RE = /^(?:Column|List)[\s-]*(I{1,2}|1|2)\b\s*[:.-]?\s*$/i;
 const COLUMN_IDS = ["P", "Q", "R", "S", "T"];
 const OPTION_RE = /^\(?([A-Fa-f])[.)]\s+(.*)$/;
-const ANSWER_RE = /^(?:Answer|Ans|Key)\s*[:.-]\s*(.*)$/i;
-const SOLUTION_RE = /^(?:Solution|Sol|Explanation)\s*[:.-]\s*(.*)$/i;
+const ANSWER_RE = /^(?:Answer|Ans|Key|उत्तर)\s*[:.-]\s*(.*)$/i;
+const SOLUTION_RE = /^(?:Solution|Sol|Explanation|हल)\s*[:.-]\s*(.*)$/i;
 const MARKS_RE = /^Marks\s*[:.-]\s*(.*)$/i;
-const PARAGRAPH_RE = /^(?:Paragraph|Passage|Comprehension)\s*[:.-]?\s*(.*)$/i;
-const END_PARAGRAPH_RE = /^End\s+(?:paragraph|passage|comprehension)\s*$/i;
+const PARAGRAPH_RE = /^(?:Paragraph|Passage|Comprehension|अनुच्छेद)\s*[:.-]?\s*(.*)$/i;
+const END_PARAGRAPH_RE = /^(?:End\s+(?:paragraph|passage|comprehension)|अनुच्छेद\s+समाप्त)\s*$/i;
 const ATTEMPT_RE = /\|\s*attempt\s+(?:any\s+)?(\d+)\s*$/i;
 const PLAIN_QUESTION_RE = /^(\d{1,3})\s*[.)]\s+(\S.*)$/;
 const ANSWER_KEY_RE = /^(?:answer\s*keys?|answers)\s*[:.\-\u2013]?\s*(.*)$/i;
@@ -241,7 +243,16 @@ function joinLines(lines: string[]): string {
   return lines.join("\n").replace(/^\n+|\n+$/g, "");
 }
 
-export function parseQuestionPaper(text: string): ImportedPaper {
+export interface ParseOptions {
+  /**
+   * For a paper in a second language: its answers come from the first
+   * language's paper, so a question without one is kept instead of refused.
+   * Such a question's type and key are placeholders and must not be used.
+   */
+  answersOptional?: boolean;
+}
+
+export function parseQuestionPaper(text: string, options: ParseOptions = {}): ImportedPaper {
   const rawLines = text.replace(/\r\n?/g, "\n").split("\n");
 
   // An answer key at the end is read first, and its lines are left out of
@@ -310,6 +321,20 @@ export function parseQuestionPaper(text: string): ImportedPaper {
     if ((d.answer === null || !d.answer.trim()) && answerKey.has(d.number)) {
       d.answer = answerKey.get(d.number)!;
       d.answerLine = keyLine;
+    }
+    if ((d.answer === null || !d.answer.trim()) && options.answersOptional) {
+      ensureSection().questions.push({
+        line: d.line,
+        type: d.tag === "MATRIX" || d.columns.length ? "MATRIX" : d.options.length ? "SINGLE" : "INTEGER",
+        stem,
+        options: d.options.map((o) => ({ id: o.id, text: o.text.trim() })),
+        columns: d.columns.map((c) => ({ id: c.id, text: c.text.trim() })),
+        key: { type: "SINGLE", options: [] },
+        solution: d.solution ? joinLines(d.solution) || null : null,
+        passage: d.passage,
+        rule: null,
+      });
+      return;
     }
     if (d.answer === null || !d.answer.trim()) {
       errors.push({

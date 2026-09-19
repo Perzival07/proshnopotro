@@ -125,7 +125,11 @@ export default async function TestConfirmationPage({ params }: PageProps) {
     <div className="min-h-screen flex flex-col justify-between bg-brand-page">
       <Navbar user={user} />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      {/* A paper answered on screen gets the width of a CBT screen: question,
+          both languages side by side, and the palette beside them. */}
+      <main
+        className={`flex-1 ${assignment.test.format === "QUESTIONS" ? "max-w-6xl" : "max-w-3xl"} w-full mx-auto px-4 sm:px-6 lg:px-8 py-10`}
+      >
         {/* Back Link */}
         <Link
           href="/"

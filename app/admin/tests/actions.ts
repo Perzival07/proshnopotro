@@ -25,6 +25,8 @@ export interface TestInput {
   resultRelease?: "INSTANT" | "ON_RELEASE";
   /** Whether students upload photos of answer sheets after the paper. */
   answerSheets?: boolean;
+  /** QUESTIONS only: show an on-screen calculator during the paper. */
+  calculator?: boolean;
   /** Minutes the student gets once they open the paper. Blank/null = untimed. */
   durationMinutes?: number | string | null;
   proctored?: boolean;
@@ -79,6 +81,7 @@ function questionSettings(data: TestInput, format: TestFormat, creating: boolean
   return {
     resultRelease: data.resultRelease === "INSTANT" ? ("INSTANT" as const) : ("ON_RELEASE" as const),
     answerSheets: data.answerSheets ?? false,
+    calculator: data.calculator ?? false,
     ...(creating ? { markingScheme: JSON.parse(JSON.stringify(SCHEME_PRESETS[preset].scheme)) } : {}),
   };
 }

@@ -6,6 +6,7 @@
  * writes anything, so each rule can be tested on its own.
  */
 
+import { parseTranslation, type QuestionTranslation } from "./translation";
 import {
   isAttempted,
   QUESTION_TYPES,
@@ -36,6 +37,8 @@ export interface QuestionRow {
   marksWrong: number | null;
   bonus: boolean;
   passageId: string | null;
+  /** The question in the test's second language, as stored. */
+  translation?: unknown;
 }
 
 export interface SectionRow {
@@ -168,6 +171,8 @@ export interface StudentQuestion {
   marks: { correct: number; wrong: number };
   /** Matrix questions: Column II. `options` then holds Column I. */
   columns?: OptionRow[];
+  /** The question in the paper's second language, when it has one. */
+  translation?: QuestionTranslation | null;
 }
 
 export interface StudentSection {
@@ -208,6 +213,11 @@ export function toStudentPaper(sections: SectionRow[], testScheme: MarkingScheme
           correct: q.marksCorrect ?? scheme[q.type].correct,
           wrong: q.marksWrong ?? scheme[q.type].wrong,
         },
+        // The translation's solution is left out: solutions are for results.
+        translation: (() => {
+          const t = parseTranslation(q.translation);
+          return t ? { ...t, solution: null } : null;
+        })(),
       })),
     };
   });

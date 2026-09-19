@@ -11,6 +11,7 @@ import React, {
 } from "react";
 import { RichText } from "@/components/RichText";
 import { MatrixColumns } from "@/components/MatrixColumns";
+import { Calculator } from "@/components/student/Calculator";
 import { Button } from "@/components/ui/button";
 import {
   saveQuestionResponse,
@@ -21,12 +22,11 @@ import type { StudentQuestion, StudentSection } from "@/lib/paper";
 import { formatRemaining } from "@/lib/exam-timer";
 import {
   AlertCircle,
-  Bookmark,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   CloudOff,
-  Eraser,
+  Calculator as CalculatorIcon,
   LayoutGrid,
 } from "lucide-react";
 
@@ -83,7 +83,12 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
       ),
     [paper.sections]
   );
-  const passages = useMemo(() => new Map(paper.passages.map((p) => [p.id, p.content])), [paper.passages]);
+  const passages = useMemo(() => new Map(paper.passages.map((p) => [p.id, p])), [paper.passages]);
+
+  // The paper's second language, when its questions have one. Students read
+  // either language, or both side by side, as on NTA papers.
+  const second = paper.secondLanguage && flat.some((f) => f.question.translation) ? paper.secondLanguage : null;
+  const [language, setLanguage] = useState<"first" | "second" | "both">("first");
 
   const [answers, setAnswers] = useState<Record<string, ResponseValue>>(() =>
     Object.fromEntries(paper.responses.map((r) => [r.questionId, r.value]))
@@ -116,6 +121,7 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   const [saveState, setSaveState] = useState<Record<string, SaveState>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const [showPalette, setShowPalette] = useState(false);
+  const [showCalculator, setShowCalculator] = useState(false);
 
   const answersRef = useRef(answers);
   answersRef.current = answers;
@@ -305,13 +311,54 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
     setAnswer(Object.keys(grid).length ? grid : null);
   };
 
-  const toggleReview = () => {
-    const next = !marked;
+  const setMarked = (next: boolean) => {
+    if (next === marked && !typingTimers.current.has(question.id)) return;
     setReview((r) => ({ ...r, [question.id]: next }));
     queueSave(question.id, answersRef.current[question.id] ?? null, next);
   };
 
-  const passage = question.passageId ? passages.get(question.passageId) : null;
+  // The next question the student may open, in paper order, or -1.
+  const nextIndex = current < flat.length - 1 && canVisit(flat[current + 1].section.id) ? current + 1 : -1;
+  const moveOn = () => {
+    if (nextIndex === -1) {
+      setNotice(
+        current === flat.length - 1
+          ? "That was the last question. Check the palette for any you skipped, then press Submit."
+          : "That was the last question in this section."
+      );
+      return;
+    }
+    goTo(nextIndex);
+  };
+
+  // NTA's buttons. Answers here are saved the moment they are given, so
+  // "Save" only confirms: it clears a review mark and moves on.
+  const saveAndNext = () => {
+    setMarked(false);
+    moveOn();
+  };
+  const markAndNext = () => {
+    setMarked(true);
+    moveOn();
+  };
+
+  const passageRow = question.passageId ? passages.get(question.passageId) : null;
+  const passage = passageRow?.content ?? null;
+  const t = second ? question.translation ?? null : null;
+  const showFirst = language !== "second" || !t;
+  const showSecond = language !== "first" && !!t;
+  const both = showFirst && showSecond;
+
+  /** Text in the language(s) chosen: one column, or two side by side. */
+  const bilingual = (first: React.ReactNode, translated: React.ReactNode, className = "") =>
+    both ? (
+      <div className={`grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 ${className}`}>
+        <div className="min-w-0">{first}</div>
+        <div className="min-w-0 sm:border-l sm:border-brand-border sm:pl-5">{translated}</div>
+      </div>
+    ) : (
+      <div className={className}>{showSecond ? translated : first}</div>
+    );
   const status = saveState[question.id];
   const anyError = Object.values(saveState).includes("error");
 
@@ -352,6 +399,42 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
           </div>
         )}
 
+        {(paper.calculator || second) && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {second && (
+              <div role="group" aria-label="Language" className="flex overflow-hidden rounded-md border border-brand-border text-xs font-semibold">
+                {([
+                  ["first", "English"],
+                  ["second", second],
+                  ["both", "Both"],
+                ] as const).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={language === value}
+                    onClick={() => setLanguage(value)}
+                    className={`px-3 py-1.5 ${language === value ? "bg-brand-navy text-white" : "bg-white text-brand-ink/80 hover:bg-brand-tint"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+            {paper.calculator && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCalculator((s) => !s)}
+                className={`h-8 gap-1.5 text-xs ${showCalculator ? "border-brand-navy bg-brand-tint" : ""}`}
+              >
+                <CalculatorIcon className="h-3.5 w-3.5" /> Calculator
+              </Button>
+            )}
+          </div>
+        )}
+        {showCalculator && <Calculator onClose={() => setShowCalculator(false)} />}
+
         {activeWindow && (
           <div className="flex items-center justify-between rounded-lg border border-brand-blue/30 bg-brand-tint/60 px-3 py-2 text-xs text-brand-navy">
             <span className="font-semibold">
@@ -373,6 +456,11 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
             <span className="font-heading text-base font-bold text-brand-navy">Question {question.number}</span>
             <span className="text-[11px] text-brand-ink/60">{TYPE_HINT[question.type]}</span>
             <span className="font-mono text-[11px] text-brand-ink/60">{formatMarks(question.marks.correct, question.marks.wrong)}</span>
+            {marked && (
+              <span className="rounded bg-violet-100 px-1.5 py-0.5 text-[10px] font-semibold text-violet-800">
+                Marked for review
+              </span>
+            )}
             <span className="ml-auto text-[11px]">
               {status === "saving" && <span className="text-brand-ink/50">Saving&hellip;</span>}
               {status === "saved" && (
@@ -398,16 +486,20 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
           {passage && (
             <div className="mb-4 max-h-72 overflow-y-auto rounded-lg border border-brand-blue/20 bg-brand-tint/40 p-3 text-sm">
               <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-brand-navy">Read the passage</p>
-              <RichText text={passage} />
+              {bilingual(<RichText text={passage} />, <RichText text={passageRow?.translation ?? passage} />)}
             </div>
           )}
 
-          <RichText text={question.stem} className="text-[15px] text-brand-ink" />
+          {bilingual(
+            <RichText text={question.stem} className="text-[15px] text-brand-ink" />,
+            <RichText text={t?.stem ?? question.stem} className="text-[15px] text-brand-ink" />
+          )}
 
           <div className="mt-4">
             {question.type === "MATRIX" ? (
               <div className="space-y-3">
-                <MatrixColumns rows={question.options} columns={question.columns ?? []} />
+                {showFirst && <MatrixColumns rows={question.options} columns={question.columns ?? []} />}
+                {showSecond && t && <MatrixColumns rows={t.options} columns={t.columns} />}
                 <div className="overflow-x-auto">
                   <table className="border-separate border-spacing-1.5 text-sm">
                     <thead>
@@ -481,7 +573,11 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
                       >
                         {option.id}
                       </span>
-                      <RichText tall text={option.text} className="min-w-0 flex-1" />
+                      {bilingual(
+                        <RichText tall text={option.text} />,
+                        <RichText tall text={t?.options.find((o) => o.id === option.id)?.text ?? option.text} />,
+                        "min-w-0 flex-1"
+                      )}
                     </button>
                   );
                 })}
@@ -531,46 +627,57 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
             </p>
           )}
 
-          <div className="mt-5 flex flex-wrap items-center gap-2 border-t border-brand-border/60 pt-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={current === 0 || !canVisit(flat[current - 1]?.section.id ?? "")}
-              onClick={() => goTo(current - 1)}
-              className="h-9 gap-1"
-            >
-              <ChevronLeft className="h-4 w-4" /> Previous
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!isAttempted(value) || sectionClosed}
-              onClick={() => setAnswer(null)}
-              className="h-9 gap-1"
-            >
-              <Eraser className="h-4 w-4" /> Clear
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={toggleReview}
-              className={`h-9 gap-1 ${marked ? "border-violet-400 bg-violet-50 text-violet-800" : ""}`}
-            >
-              <Bookmark className={`h-4 w-4 ${marked ? "fill-violet-500 text-violet-600" : ""}`} />
-              {marked ? "Marked for review" : "Mark for review"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              disabled={current === flat.length - 1 || !canVisit(flat[current + 1]?.section.id ?? "")}
-              onClick={() => goTo(current + 1)}
-              className="ml-auto h-9 gap-1 bg-brand-navy text-white hover:bg-brand-navy/90"
-            >
-              Next <ChevronRight className="h-4 w-4" />
-            </Button>
+          <div className="mt-5 space-y-2 border-t border-brand-border/60 pt-3">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                onClick={saveAndNext}
+                className="h-9 bg-[#1ea55b] font-semibold uppercase tracking-wide text-white hover:bg-[#188a4b]"
+              >
+                Save &amp; Next
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                onClick={markAndNext}
+                className="h-9 bg-[#7b3fbf] font-semibold uppercase tracking-wide text-white hover:bg-[#6a33a8]"
+              >
+                Mark for Review &amp; Next
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={!isAttempted(value) || sectionClosed}
+                onClick={() => setAnswer(null)}
+                className="h-9 font-semibold uppercase tracking-wide"
+              >
+                Clear Response
+              </Button>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={current === 0 || !canVisit(flat[current - 1]?.section.id ?? "")}
+                onClick={() => goTo(current - 1)}
+                className="h-9 gap-1 font-semibold uppercase tracking-wide"
+              >
+                <ChevronLeft className="h-4 w-4" /> Back
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={nextIndex === -1}
+                onClick={() => goTo(nextIndex)}
+                className="h-9 gap-1 font-semibold uppercase tracking-wide"
+              >
+                Next <ChevronRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -602,6 +709,47 @@ export const ExamPaper = forwardRef<ExamPaperHandle, ExamPaperProps>(function Ex
   );
 });
 
+type PaletteState = "notVisited" | "notAnswered" | "answered" | "marked" | "answeredMarked";
+
+/**
+ * The NTA palette's five states, drawn in its shapes: answered points up,
+ * not answered points down, marked for review is a circle, and answered and
+ * marked is a circle with a green tick.
+ */
+function PaletteMark({
+  state,
+  children,
+  className = "",
+}: {
+  state: PaletteState;
+  children?: React.ReactNode;
+  className?: string;
+}) {
+  const shape: Record<PaletteState, { className: string; clip?: string }> = {
+    notVisited: { className: "rounded-md border border-slate-300 bg-slate-100 text-slate-700" },
+    notAnswered: { className: "bg-[#e4572e] text-white", clip: "polygon(0 0, 100% 0, 100% 72%, 50% 100%, 0 72%)" },
+    answered: { className: "bg-[#1ea55b] text-white", clip: "polygon(50% 0, 100% 28%, 100% 100%, 0 100%, 0 28%)" },
+    marked: { className: "rounded-full bg-[#7b3fbf] text-white" },
+    answeredMarked: { className: "rounded-full bg-[#7b3fbf] text-white" },
+  };
+  const s = shape[state];
+  return (
+    <span className={`relative inline-flex items-center justify-center font-semibold ${className}`}>
+      <span
+        className={`flex h-full w-full items-center justify-center ${s.className}`}
+        style={s.clip ? { clipPath: s.clip } : undefined}
+      >
+        {children}
+      </span>
+      {state === "answeredMarked" && (
+        <span className="absolute -bottom-0.5 -right-0.5 flex h-3 w-3 items-center justify-center rounded-full border border-white bg-[#1ea55b]">
+          <CheckCircle2 className="h-2.5 w-2.5 text-white" />
+        </span>
+      )}
+    </span>
+  );
+}
+
 function Palette({
   sections,
   flat,
@@ -622,41 +770,39 @@ function Palette({
   canVisit: (sectionId: string) => boolean;
 }) {
   const indexOf = new Map(flat.map((f, i) => [f.question.id, i]));
-  const counts = { answered: 0, notAnswered: 0, review: 0, notVisited: 0 };
-  for (const { question } of flat) {
-    const a = isAttempted(answers[question.id]);
-    if (review[question.id]) counts.review++;
-    else if (a) counts.answered++;
-    else if (visited.has(question.id)) counts.notAnswered++;
-    else counts.notVisited++;
-  }
+  const stateOf = (id: string): PaletteState => {
+    const answered = isAttempted(answers[id]);
+    if (review[id]) return answered ? "answeredMarked" : "marked";
+    if (answered) return "answered";
+    return visited.has(id) ? "notAnswered" : "notVisited";
+  };
+  const counts: Record<PaletteState, number> = { notVisited: 0, notAnswered: 0, answered: 0, marked: 0, answeredMarked: 0 };
+  for (const { question } of flat) counts[stateOf(question.id)]++;
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-1.5 text-[10px] text-brand-ink/70">
-        <Legend className="border-emerald-600 bg-emerald-500 text-white" label={`Answered (${counts.answered})`} />
-        <Legend className="border-red-300 bg-red-50 text-red-700" label={`Not answered (${counts.notAnswered})`} />
-        <Legend className="border-violet-600 bg-violet-500 text-white" label={`For review (${counts.review})`} />
-        <Legend className="border-brand-border bg-white text-brand-ink" label={`Not visited (${counts.notVisited})`} />
+      <div className="grid grid-cols-2 gap-x-2 gap-y-2 text-[10px] leading-tight text-brand-ink/80">
+        <Legend state="answered" count={counts.answered} label="Answered" />
+        <Legend state="notAnswered" count={counts.notAnswered} label="Not Answered" />
+        <Legend state="notVisited" count={counts.notVisited} label="Not Visited" />
+        <Legend state="marked" count={counts.marked} label="Marked for Review" />
+        <div className="col-span-2">
+          <Legend
+            state="answeredMarked"
+            count={counts.answeredMarked}
+            label="Answered & Marked for Review (will be considered for evaluation)"
+          />
+        </div>
       </div>
 
       {sections.map((section) => (
         <div key={section.id}>
           {sections.length > 1 && (
-            <p className="mb-1.5 text-[11px] font-semibold text-brand-navy">{section.title}</p>
+            <p className="mb-1.5 rounded bg-brand-tint px-2 py-1 text-[11px] font-semibold text-brand-navy">{section.title}</p>
           )}
-          <div className="grid grid-cols-6 gap-1.5">
+          <div className="grid grid-cols-5 gap-2">
             {section.questions.map((q) => {
               const index = indexOf.get(q.id)!;
-              const answered = isAttempted(answers[q.id]);
-              const marked = review[q.id];
-              const style = marked
-                ? "border-violet-600 bg-violet-500 text-white"
-                : answered
-                  ? "border-emerald-600 bg-emerald-500 text-white"
-                  : visited.has(q.id)
-                    ? "border-red-300 bg-red-50 text-red-700"
-                    : "border-brand-border bg-white text-brand-ink";
               return (
                 <button
                   key={q.id}
@@ -665,31 +811,29 @@ function Palette({
                   onClick={() => onPick(index)}
                   aria-label={`Question ${q.number}`}
                   aria-current={index === current ? "true" : undefined}
-                  className={`relative h-8 rounded-md border text-xs font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${style} ${
-                    index === current ? "ring-2 ring-brand-blue ring-offset-1" : ""
+                  className={`rounded-md p-0.5 disabled:cursor-not-allowed disabled:opacity-40 ${
+                    index === current ? "ring-2 ring-brand-blue" : ""
                   }`}
                 >
-                  {q.number}
-                  {marked && answered && (
-                    <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
-                  )}
+                  <PaletteMark state={stateOf(q.id)} className="h-9 w-full text-xs">
+                    {q.number}
+                  </PaletteMark>
                 </button>
               );
             })}
           </div>
         </div>
       ))}
-      <p className="text-[10px] leading-snug text-brand-ink/55">
-        Answers marked for review are still marked. Your answers save as you go.
-      </p>
     </div>
   );
 }
 
-function Legend({ className, label }: { className: string; label: string }) {
+function Legend({ state, count, label }: { state: PaletteState; count: number; label: string }) {
   return (
     <span className="flex items-center gap-1.5">
-      <span className={`h-3.5 w-3.5 shrink-0 rounded border ${className}`} />
+      <PaletteMark state={state} className="h-6 w-7 shrink-0 text-[10px]">
+        {count}
+      </PaletteMark>
       {label}
     </span>
   );

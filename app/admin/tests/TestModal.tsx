@@ -47,6 +47,7 @@ interface TestModalProps {
     active: boolean;
     resultRelease?: "INSTANT" | "ON_RELEASE";
     answerSheets?: boolean;
+    calculator?: boolean;
   } | null;
 }
 
@@ -59,6 +60,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [schemePreset, setSchemePreset] = useState<SchemePreset>("JEE_MAIN");
   const [resultRelease, setResultRelease] = useState<"INSTANT" | "ON_RELEASE">("ON_RELEASE");
   const [answerSheets, setAnswerSheets] = useState(false);
+  const [calculator, setCalculator] = useState(false);
   const [title, setTitle] = useState("");
   const [subject, setSubject] = useState("Physics");
   const [description, setDescription] = useState("");
@@ -87,6 +89,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setMode(testToEdit.format === "QUESTIONS" ? "QUESTIONS" : "LINK");
       setResultRelease(testToEdit.resultRelease ?? "ON_RELEASE");
       setAnswerSheets(testToEdit.answerSheets ?? false);
+      setCalculator(testToEdit.calculator ?? false);
     } else {
       setTitle("");
       setSubject("Physics");
@@ -100,6 +103,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setSchemePreset("JEE_MAIN");
       setResultRelease("ON_RELEASE");
       setAnswerSheets(false);
+      setCalculator(false);
     }
     setError(null);
   }, [testToEdit, isOpen]);
@@ -120,6 +124,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       schemePreset,
       resultRelease,
       answerSheets: mode === "QUESTIONS" ? answerSheets : undefined,
+      calculator: mode === "QUESTIONS" ? calculator : undefined,
       durationMinutes,
       proctored,
       active,
@@ -375,6 +380,22 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                   <span className="block text-[11px] text-brand-ink/55">
                     For papers with a subjective part, like ISI or CMI proofs. Students
                     photograph their sheets after the objective questions.
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="calculator"
+                  checked={calculator}
+                  onCheckedChange={(checked) => setCalculator(Boolean(checked))}
+                  className="mt-0.5"
+                />
+                <label htmlFor="calculator" className="cursor-pointer leading-tight">
+                  <span className="text-xs font-medium text-brand-ink">Allow an on-screen calculator</span>
+                  <span className="block text-[11px] text-brand-ink/55">
+                    A scientific calculator, as on GATE&apos;s computer-based test. Leave it off for
+                    JEE Main and NEET, which do not allow one.
                   </span>
                 </label>
               </div>

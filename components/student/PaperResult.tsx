@@ -5,6 +5,7 @@ import { MatrixColumns } from "@/components/MatrixColumns";
 import { markPaper, type QuestionStatus, type ResponseValue } from "@/lib/marking";
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { formatDate } from "@/lib/utils";
+import { parseTranslation } from "@/lib/translation";
 import { CheckCircle2, CircleDashed, CircleSlash, Clock, MinusCircle, XCircle } from "lucide-react";
 
 const STATUS: Record<QuestionStatus, { label: string; className: string; Icon: typeof CheckCircle2 }> = {
@@ -44,6 +45,7 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
           markingScheme: true,
           resultRelease: true,
           resultsReleasedAt: true,
+          secondLanguage: true,
           sections: { orderBy: { position: "asc" }, include: { questions: { orderBy: { position: "asc" } } } },
           passages: { select: { id: true, content: true } },
         },
@@ -163,6 +165,37 @@ export async function PaperResult({ assignmentId }: { assignmentId: string }) {
                   </div>
 
                   <RichText text={q.stem} className="text-sm" />
+                  {(() => {
+                    const tr = test.secondLanguage ? parseTranslation(q.translation) : null;
+                    if (!tr) return null;
+                    const list = [...tr.options, ...tr.columns];
+                    return (
+                      <details className="rounded-md border border-dashed border-brand-blue/30 bg-brand-tint/30 px-3 py-2 text-sm">
+                        <summary className="cursor-pointer text-xs font-semibold text-brand-navy">
+                          Read in {test.secondLanguage}
+                        </summary>
+                        <div className="mt-2 space-y-2">
+                          <RichText text={tr.stem} />
+                          {list.length > 0 && (
+                            <ul className="space-y-1">
+                              {list.map((o) => (
+                                <li key={o.id} className="flex gap-2">
+                                  <span className="text-xs font-bold text-brand-navy">({o.id})</span>
+                                  <RichText tall text={o.text} className="min-w-0 flex-1" />
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                          {tr.solution && (
+                            <div className="border-t border-brand-border/60 pt-2">
+                              <p className="text-[11px] font-semibold text-brand-navy">Solution</p>
+                              <RichText text={tr.solution} />
+                            </div>
+                          )}
+                        </div>
+                      </details>
+                    );
+                  })()}
 
                   {q.type === "MATRIX" ? (
                     <div className="space-y-2">
