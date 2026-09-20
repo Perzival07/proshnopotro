@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { formatDate } from "@/lib/utils";
 import { requireStaff, studentScope } from "@/lib/auth-utils";
+import { BulkDeletePhotos } from "./BulkDeletePhotos";
 import { ArrowLeft, CheckCircle2, Clock, Images, PenLine } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default async function MarkingListPage({ params }: { params: { testId: st
         endedAt: true,
         returnedAt: true,
         result: { select: { score: true, maxScore: true } },
+        answersUploadedAt: true,
         _count: { select: { answerImages: true } },
         responses: { where: { manualMarks: { not: null } }, select: { questionId: true } },
       },
@@ -52,6 +54,9 @@ export default async function MarkingListPage({ params }: { params: { testId: st
     return { ...a, name: names.get(a.studentEmail) ?? null, marked: marked.size };
   });
   const returned = rows.filter((r) => r.returnedAt).length;
+  // Returned copies whose photos are still stored: what a bulk delete removes.
+  const cleanable = rows.filter((r) => r.returnedAt && r.answersUploadedAt && r._count.answerImages > 0);
+  const cleanablePhotos = cleanable.reduce((n, r) => n + r._count.answerImages, 0);
 
   return (
     <div className="mx-auto max-w-5xl space-y-5 px-4 py-6 sm:px-6 lg:px-8">
@@ -65,6 +70,8 @@ export default async function MarkingListPage({ params }: { params: { testId: st
           {units.size > 0 && ` · ${units.size} written ${units.size === 1 ? "question" : "questions"} to mark in each`}
         </p>
       </div>
+
+      <BulkDeletePhotos testId={test.id} copies={cleanable.length} photos={cleanablePhotos} />
 
       {rows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-brand-border bg-white p-10 text-center text-xs text-brand-ink/60">

@@ -225,6 +225,9 @@ model Assignment {
   answersUploadedAt DateTime?
   /// The tutor's overall comment on this attempt.
   feedback          String?   @db.Text
+  /// When a tutor deleted this attempt's answer photos to free storage.
+  /// Marks, comments and feedback stay; only the pictures go.
+  photosDeletedAt   DateTime?
   /// When the tutor handed the marked copy back. Until then the student sees
   /// written answers as awaiting marking, however far the marking has got.
   returnedAt        DateTime?

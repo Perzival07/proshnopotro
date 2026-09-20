@@ -17,6 +17,7 @@ export type StaffRole = "ADMIN" | "TUTOR";
 
 export const TUTOR_CAN = [
   "See the answer sheets of students in their classrooms, and mark them: draw on the pages, give marks, comment and return the copy.",
+  "Delete those students' answer photos once they are done with them, to free storage.",
   "Answer doubts from students in their classrooms.",
 ] as const;
 

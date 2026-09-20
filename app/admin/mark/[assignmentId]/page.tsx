@@ -111,6 +111,8 @@ export default async function MarkAttemptPage({ params }: { params: { assignment
         endedAt: assignment.endedAt?.toISOString() ?? null,
         feedback: assignment.feedback ?? "",
         returnedAt: assignment.returnedAt?.toISOString() ?? null,
+        photosDeletedAt: assignment.photosDeletedAt?.toISOString() ?? null,
+        uploadClosed: assignment.answersUploadedAt !== null,
         result: assignment.result,
       }}
       test={{ id: assignment.test.id, title: assignment.test.title, subject: assignment.test.subject }}

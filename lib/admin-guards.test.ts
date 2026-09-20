@@ -36,6 +36,8 @@ const TUTOR_ACTIONS = new Set([
   "app/admin/mark/actions.ts:saveTotalMarks",
   "app/admin/mark/actions.ts:saveOverallFeedback",
   "app/admin/mark/actions.ts:setReturned",
+  "app/admin/mark/actions.ts:deleteAnswerPhotos",
+  "app/admin/mark/actions.ts:deleteReturnedPhotos",
   "app/doubts/actions.ts:replyToDoubt",
   "app/doubts/actions.ts:setDoubtStatus",
 ]);

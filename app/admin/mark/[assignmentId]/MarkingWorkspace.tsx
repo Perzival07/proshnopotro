@@ -15,7 +15,7 @@ import {
   type AnnotationColor,
 } from "@/lib/annotations";
 import type { QuestionStatus, QuestionType } from "@/lib/marking";
-import { saveAnnotations, saveOverallFeedback, saveTotalMarks, saveWrittenMark, setReturned } from "../actions";
+import { deleteAnswerPhotos, saveAnnotations, saveOverallFeedback, saveTotalMarks, saveWrittenMark, setReturned } from "../actions";
 import {
   ArrowLeft,
   Check,
@@ -69,6 +69,9 @@ interface Props {
     endedAt: string | null;
     feedback: string;
     returnedAt: string | null;
+    photosDeletedAt: string | null;
+    /** The student's upload is over (done or skipped): photos can be deleted. */
+    uploadClosed: boolean;
     result: { score: number; maxScore: number } | null;
   };
   test: { id: string; title: string; subject: string };
@@ -324,6 +327,32 @@ export function MarkingWorkspace({ assignment, test, pages, questions, queue }: 
   const [feedback, setFeedback] = useState(assignment.feedback);
   const [feedbackState, setFeedbackState] = useState<"idle" | "saving" | "saved">("idle");
   const [returnedAt, setReturnedAt] = useState(assignment.returnedAt);
+  // Deleting the photos to free storage: asked twice, once inline.
+  const [photosGone, setPhotosGone] = useState(assignment.photosDeletedAt !== null && pages.length === 0);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const deletePhotos = async () => {
+    setDeleteBusy(true);
+    setDeleteError(null);
+    try {
+      const res = await deleteAnswerPhotos(assignment.id);
+      if (res.error) setDeleteError(res.error);
+      else {
+        // Nothing is left to save on the pages that are gone.
+        pendingMarks.current.clear();
+        timers.current.forEach((t) => window.clearTimeout(t));
+        timers.current.clear();
+        setPhotosGone(true);
+        setConfirmingDelete(false);
+      }
+    } catch {
+      setDeleteError("Could not reach the server. Nothing was deleted.");
+    } finally {
+      setDeleteBusy(false);
+    }
+  };
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [linkScore, setLinkScore] = useState(assignment.result ? String(assignment.result.score) : "");
@@ -501,7 +530,11 @@ export function MarkingWorkspace({ assignment, test, pages, questions, queue }: 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         {/* Pages */}
         <div className="min-w-0 space-y-2">
-          {pages.length === 0 ? (
+          {photosGone ? (
+            <div className="rounded-lg border border-dashed border-brand-border bg-white p-10 text-center text-xs text-brand-ink/70">
+              The answer photos were deleted to free storage. The marks, comments and feedback are kept.
+            </div>
+          ) : pages.length === 0 ? (
             <div className="rounded-lg border border-dashed border-brand-border bg-white p-10 text-center text-xs text-brand-ink/60">
               No answer photos were uploaded for this attempt.
             </div>
@@ -698,6 +731,43 @@ export function MarkingWorkspace({ assignment, test, pages, questions, queue }: 
             )}
           </p>
           {message && <p className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">{message}</p>}
+
+          {pages.length > 0 && !photosGone && (
+            <div className="space-y-2 rounded-lg border border-red-200 bg-white p-3 text-xs">
+              <p className="font-semibold text-red-800">Free up storage</p>
+              {!assignment.uploadClosed ? (
+                <p className="text-brand-ink/70">The student&apos;s upload is still open. You can delete the photos once it has closed.</p>
+              ) : !confirmingDelete ? (
+                <>
+                  <p className="text-brand-ink/70">
+                    Delete this student&apos;s {pages.length} answer {pages.length === 1 ? "photo" : "photos"} when you no longer need them.
+                    Marks, comments and feedback stay.
+                  </p>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setConfirmingDelete(true)} className="h-8 gap-1.5 border-red-300 text-xs text-red-700 hover:bg-red-50">
+                    <Trash2 className="h-3.5 w-3.5" /> Delete answer photos
+                  </Button>
+                </>
+              ) : (
+                <div className="space-y-2 rounded-md border border-red-300 bg-red-50 p-2.5 text-red-900">
+                  <p className="font-semibold">Delete {pages.length} {pages.length === 1 ? "photo" : "photos"} for good?</p>
+                  <ul className="list-disc space-y-0.5 pl-4">
+                    <li>The photos and everything you drew on them are removed and cannot be brought back.</li>
+                    {!returnedAt && <li className="font-semibold">You have not returned this copy yet, so the student will never see their marked pages.</li>}
+                    {returnedAt && <li>The student will no longer see their marked pages; they keep their marks and your comments.</li>}
+                  </ul>
+                  <div className="flex gap-2">
+                    <Button type="button" size="sm" disabled={deleteBusy} onClick={deletePhotos} className="h-8 bg-red-600 text-xs font-semibold text-white hover:bg-red-700">
+                      {deleteBusy ? "Deleting\u2026" : "Yes, delete them"}
+                    </Button>
+                    <Button type="button" size="sm" variant="outline" disabled={deleteBusy} onClick={() => setConfirmingDelete(false)} className="h-8 text-xs">
+                      Keep them
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {deleteError && <p className="text-red-700">{deleteError}</p>}
+            </div>
+          )}
         </aside>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { v2 as cloudinary } from "cloudinary";
+import { classifyDeletion, inBatches } from "./photo-cleanup";
 
 /**
  * Server-side Cloudinary access. The API secret never leaves the server: the
@@ -184,4 +185,32 @@ export async function destroyNoteFile(file: StoredNoteFile): Promise<boolean> {
     console.error("Failed to remove a note file from Cloudinary:", err);
     return false;
   }
+}
+
+/**
+ * Removes answer photos from Cloudinary and says which are gone. When
+ * Cloudinary is not configured there are no real files to remove (nothing
+ * could have been uploaded), so every id counts as gone.
+ */
+export async function destroyAnswerImages(publicIds: string[]): Promise<{ gone: string[]; failed: string[] }> {
+  const c = getCloudinary();
+  if (!c) return { gone: publicIds, failed: [] };
+  const gone: string[] = [];
+  const failed: string[] = [];
+  for (const batch of inBatches(publicIds)) {
+    try {
+      const res = await c.cloudinary.api.delete_resources(batch, {
+        type: ANSWER_DELIVERY_TYPE,
+        resource_type: "image",
+        invalidate: true,
+      });
+      const r = classifyDeletion(batch, res?.deleted);
+      gone.push(...r.gone);
+      failed.push(...r.failed);
+    } catch (err) {
+      console.error("Failed to delete answer photos from Cloudinary:", err);
+      failed.push(...batch);
+    }
+  }
+  return { gone, failed };
 }

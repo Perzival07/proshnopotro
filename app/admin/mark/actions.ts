@@ -3,6 +3,7 @@
 import { Prisma } from "@prisma/client";
 import { requireStaff, studentScope, type SessionUser } from "@/lib/auth-utils";
 import { canAccessStudent } from "@/lib/permissions";
+import { destroyAnswerImages } from "@/lib/cloudinary";
 import { prisma } from "@/lib/prisma";
 import { sanitizeAnnotations } from "@/lib/annotations";
 import { gradeAssignment } from "@/lib/grade-attempt";
@@ -161,4 +162,80 @@ export async function setReturned(assignmentId: string, returned: boolean): Prom
     data: { returnedAt: returned ? new Date() : null },
   });
   return { success: true };
+}
+
+/**
+ * Deletes an attempt's answer photos to free storage: the files from
+ * Cloudinary first, then their rows, and only those confirmed gone, so a
+ * failure leaves the attempt as it was and can simply be tried again. Marks,
+ * comments and feedback stay; only the pictures (and the marks drawn on them)
+ * go. Refused while the student's upload is still open, or they could upload
+ * again into a copy that has just been cleared.
+ */
+async function removePhotos(assignmentIds: string[]): Promise<{ removed: number; failed: number }> {
+  const images = await prisma.answerImage.findMany({
+    where: { assignmentId: { in: assignmentIds } },
+    select: { id: true, publicId: true, assignmentId: true },
+  });
+  if (images.length === 0) return { removed: 0, failed: 0 };
+
+  const { gone, failed } = await destroyAnswerImages(images.map((i) => i.publicId));
+  const goneSet = new Set(gone);
+  const rows = images.filter((i) => goneSet.has(i.publicId));
+  if (rows.length > 0) {
+    await prisma.$transaction([
+      prisma.answerImage.deleteMany({ where: { id: { in: rows.map((r) => r.id) } } }),
+      // Stamp the attempts that now have none left.
+      prisma.assignment.updateMany({
+        where: { id: { in: Array.from(new Set(rows.map((r) => r.assignmentId))) }, answerImages: { none: {} } },
+        data: { photosDeletedAt: new Date() },
+      }),
+    ]);
+  }
+  return { removed: rows.length, failed: failed.length };
+}
+
+export async function deleteAnswerPhotos(assignmentId: string): Promise<Result & { removed?: number }> {
+  const user = await requireStaff();
+  const denied = await notYours(user, assignmentId);
+  if (denied) return { error: denied };
+  const a = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    select: { status: true, answersUploadedAt: true },
+  });
+  if (!a || a.status !== "SUBMITTED") return { error: "The student has not submitted this attempt yet." };
+  if (!a.answersUploadedAt) return { error: "The student's upload is still open. Wait until it has closed." };
+
+  const res = await removePhotos([assignmentId]);
+  if (res.failed > 0) {
+    return { error: `${res.failed} ${res.failed === 1 ? "photo" : "photos"} could not be removed from storage. Nothing else was changed for ${res.failed === 1 ? "it" : "them"}; try again in a moment.`, removed: res.removed };
+  }
+  return { success: true, removed: res.removed };
+}
+
+/**
+ * Deletes the photos of every copy of a test that has been returned to the
+ * student: the ones the tutor is finished with. The caller's own students
+ * only, and never a copy still waiting to be marked or returned.
+ */
+export async function deleteReturnedPhotos(testId: string): Promise<Result & { removed?: number; copies?: number }> {
+  const user = await requireStaff();
+  const scope = await studentScope(user);
+  const attempts = await prisma.assignment.findMany({
+    where: {
+      testId,
+      status: "SUBMITTED",
+      returnedAt: { not: null },
+      answersUploadedAt: { not: null },
+      answerImages: { some: {} },
+      ...(scope === null ? {} : { studentEmail: { in: scope } }),
+    },
+    select: { id: true },
+  });
+  if (attempts.length === 0) return { success: true, removed: 0, copies: 0 };
+  const res = await removePhotos(attempts.map((a) => a.id));
+  if (res.failed > 0) {
+    return { error: `${res.failed} ${res.failed === 1 ? "photo" : "photos"} could not be removed from storage; the rest were. Try again for the remainder.`, removed: res.removed, copies: attempts.length };
+  }
+  return { success: true, removed: res.removed, copies: attempts.length };
 }

@@ -10,11 +10,19 @@ import { AnnotationLayer } from "@/components/AnnotationLayer";
  * signed link made for this page view.
  */
 export async function MarkedSheets({ assignmentId }: { assignmentId: string }) {
-  const images = await prisma.answerImage.findMany({
-    where: { assignmentId },
-    orderBy: { position: "asc" },
-  });
-  if (images.length === 0) return null;
+  const [images, attempt] = await Promise.all([
+    prisma.answerImage.findMany({ where: { assignmentId }, orderBy: { position: "asc" } }),
+    prisma.assignment.findUnique({ where: { id: assignmentId }, select: { photosDeletedAt: true } }),
+  ]);
+  if (images.length === 0) {
+    // The tutor cleared the photos to save space: say so, so their absence is
+    // not mistaken for a fault. The marks and comments are all still here.
+    return attempt?.photosDeletedAt ? (
+      <p className="rounded-lg border border-brand-border bg-white p-3 text-xs text-brand-ink/70">
+        Your tutor has removed your answer photos to save space. Your marks, comments and feedback are kept.
+      </p>
+    ) : null;
+  }
 
   return (
     <section className="space-y-3">
