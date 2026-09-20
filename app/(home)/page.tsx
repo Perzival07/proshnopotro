@@ -14,6 +14,7 @@ import { countVisibleNotes, getStudentClassrooms } from "@/lib/note-access";
 import { BookOpen, MessageCircleQuestion, NotebookText, Users } from "lucide-react";
 import Link from "next/link";
 import { InstallAppCard } from "@/components/pwa/InstallApp";
+import { LiveRefresh } from "@/components/student/LiveRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -140,6 +141,7 @@ export default async function StudentDashboardPage() {
           </div>
         </div>
 
+        <LiveRefresh />
         <InstallAppCard className="mb-6 max-w-xl" />
 
         {unreadDoubts > 0 && (
