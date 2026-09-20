@@ -214,3 +214,22 @@ export async function destroyAnswerImages(publicIds: string[]): Promise<{ gone: 
   }
   return { gone, failed };
 }
+
+/**
+ * Empties an assignment's answer folder in Cloudinary. Used when an attempt
+ * is reopened: its AnswerImage rows go, and without this the files would stay
+ * in storage with nothing pointing at them. Best effort: a storage hiccup
+ * must not stop a reopen, so failure is logged, not thrown.
+ */
+export async function destroyAnswerFolder(assignmentId: string): Promise<void> {
+  const c = getCloudinary();
+  if (!c) return;
+  try {
+    await c.cloudinary.api.delete_resources_by_prefix(`proshnopotro/answers/${assignmentId}/`, {
+      type: ANSWER_DELIVERY_TYPE,
+      invalidate: true,
+    });
+  } catch (err) {
+    console.error(`Failed to clear answer photos for ${assignmentId}:`, err);
+  }
+}

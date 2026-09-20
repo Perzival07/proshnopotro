@@ -7,6 +7,7 @@ import { EMAIL_REGEX } from "@/lib/students";
 import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { parseNewDeadline, REOPEN_DATA } from "@/lib/reassign";
 import { scheduleError } from "@/lib/schedule";
+import { destroyAnswerFolder } from "@/lib/cloudinary";
 
 export interface AssignResult {
   success: boolean;
@@ -207,6 +208,7 @@ export async function assignTestToStudents(
         data: { ...REOPEN_DATA, dueAt, opensAt, assignedAt: new Date() },
       }),
     ]);
+    await Promise.all(ids.map((id) => destroyAnswerFolder(id)));
     reassignedCount = ids.length;
   }
 

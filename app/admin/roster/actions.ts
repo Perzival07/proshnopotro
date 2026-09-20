@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { canReassign, parseNewDeadline, REOPEN_DATA } from "@/lib/reassign";
-import { signedAnswerUrl } from "@/lib/cloudinary";
+import { destroyAnswerFolder, signedAnswerUrl } from "@/lib/cloudinary";
 
 /**
  * Every write here changes the same four surfaces: the roster it was made
@@ -130,6 +130,7 @@ export async function toggleAssignmentStatus(
           }),
         ]);
 
+        await destroyAnswerFolder(assignmentId);
         revalidateAdminSurfaces();
 
         return { success: true, clearedMarks: true };
@@ -143,6 +144,7 @@ export async function toggleAssignmentStatus(
         prisma.questionResponse.deleteMany({ where: { assignmentId } }),
         prisma.assignment.update({ where: { id: assignmentId }, data: REOPEN_DATA }),
       ]);
+      await destroyAnswerFolder(assignmentId);
     } else {
       await prisma.assignment.update({
         where: { id: assignmentId },
@@ -249,6 +251,7 @@ export async function reassignAssignment(
       prisma.assignment.update({ where: { id: assignmentId }, data: reopen }),
     ]);
 
+    await destroyAnswerFolder(assignmentId);
     revalidateAdminSurfaces();
 
     return { success: true, clearedMarks: Boolean(existing.result) };
