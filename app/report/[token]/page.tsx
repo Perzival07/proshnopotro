@@ -16,7 +16,8 @@ export const metadata: Metadata = { title: "Progress report", robots: { index: f
  * link's secret is the permission, and the student can replace or switch it
  * off at any time.
  */
-export default async function ParentReportPage({ params }: { params: { token: string } }) {
+export default async function ParentReportPage({ params: paramsPromise }: { params: Promise<{ token: string }> }) {
+  const params = await paramsPromise;
   if (!/^[\w-]{20,40}$/.test(params.token)) notFound();
   const student = await prisma.user.findUnique({
     where: { parentToken: params.token },

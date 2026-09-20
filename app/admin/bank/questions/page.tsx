@@ -11,10 +11,11 @@ export const dynamic = "force-dynamic";
 const LIMIT = 100;
 
 export default async function BankQuestionsPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { board?: string; class?: string; subject?: string; year?: string; chapter?: string; type?: string; q?: string };
+  searchParams: Promise<{ board?: string; class?: string; subject?: string; year?: string; chapter?: string; type?: string; q?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   // Owner only: the layout lets tutors in, so every page says who may see it.
   await requireAdmin();
   const board = searchParams.board || "";

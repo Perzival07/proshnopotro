@@ -18,12 +18,13 @@ import { AlertTriangle, ArrowLeft, Calendar, Shield, Timer } from "lucide-react"
 import Link from "next/link";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     assignmentId: string;
-  };
+  }>;
 }
 
-export default async function TestConfirmationPage({ params }: PageProps) {
+export default async function TestConfirmationPage({ params: paramsPromise }: PageProps) {
+  const params = await paramsPromise;
   const user = await requireCompleteStudent();
 
   // Query test metadata WITHOUT selecting formUrl into HTML

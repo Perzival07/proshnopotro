@@ -10,7 +10,8 @@ import { ArrowLeft, CheckCircle2, Clock, Images, PenLine } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 /** Every submitted attempt at a test, and how far its marking has got. */
-export default async function MarkingListPage({ params }: { params: { testId: string } }) {
+export default async function MarkingListPage({ params: paramsPromise }: { params: Promise<{ testId: string }> }) {
+  const params = await paramsPromise;
   const user = await requireStaff();
   const scope = await studentScope(user);
   const test = await prisma.test.findUnique({

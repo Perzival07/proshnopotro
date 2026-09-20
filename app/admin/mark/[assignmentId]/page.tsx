@@ -11,7 +11,8 @@ import { canAccessStudent } from "@/lib/permissions";
 
 export const dynamic = "force-dynamic";
 
-export default async function MarkAttemptPage({ params }: { params: { assignmentId: string } }) {
+export default async function MarkAttemptPage({ params: paramsPromise }: { params: Promise<{ assignmentId: string }> }) {
+  const params = await paramsPromise;
   const user = await requireStaff();
   const scope = await studentScope(user);
   const assignment = await prisma.assignment.findUnique({

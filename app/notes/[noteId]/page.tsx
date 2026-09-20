@@ -20,10 +20,11 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function StudentNotePage({
-  params,
+  params: paramsPromise,
 }: {
-  params: { noteId: string };
+  params: Promise<{ noteId: string }>;
 }) {
+  const params = await paramsPromise;
   const user = await requireCompleteStudent();
 
   // A note that is still a draft, still scheduled, or shared with somebody

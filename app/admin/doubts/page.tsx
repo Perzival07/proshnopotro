@@ -5,7 +5,8 @@ import { DoubtsInbox, type InboxDoubt } from "./DoubtsInbox";
 
 export const dynamic = "force-dynamic";
 
-export default async function DoubtsInboxPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function DoubtsInboxPage({ searchParams: searchParamsPromise }: { searchParams: Promise<{ status?: string }> }) {
+  const searchParams = await searchParamsPromise;
   const user = await requireStaff();
   // A tutor sees only their classrooms' doubts.
   const scope = await studentScope(user);

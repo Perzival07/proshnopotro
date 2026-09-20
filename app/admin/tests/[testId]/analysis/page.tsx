@@ -17,7 +17,8 @@ const pctClass = (p: number) => (p >= 0.75 ? "bg-emerald-500" : p >= 0.4 ? "bg-a
  * How a class did on a paper written in the portal: by chapter, weakest
  * first, and question by question. Written answers count once marked.
  */
-export default async function TestAnalysisPage({ params }: { params: { testId: string } }) {
+export default async function TestAnalysisPage({ params: paramsPromise }: { params: Promise<{ testId: string }> }) {
+  const params = await paramsPromise;
   // Owner only: the layout lets tutors in, so every page says who may see it.
   await requireAdmin();
   const test = await prisma.test.findUnique({

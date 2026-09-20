@@ -6,12 +6,13 @@ import { requireAdmin } from "@/lib/auth-utils";
 export const dynamic = "force-dynamic";
 
 interface RosterPageProps {
-  searchParams: {
+  searchParams: Promise<{
     testId?: string;
-  };
+  }>;
 }
 
-export default async function AdminRosterPage({ searchParams }: RosterPageProps) {
+export default async function AdminRosterPage({ searchParams: searchParamsPromise }: RosterPageProps) {
+  const searchParams = await searchParamsPromise;
   // Owner only: the layout lets tutors in, so every page says who may see it.
   await requireAdmin();
   const tests = await prisma.test.findMany({

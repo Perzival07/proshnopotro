@@ -9,8 +9,9 @@ import { closeAnswerUpload } from "../actions";
  */
 export async function POST(
   request: Request,
-  { params }: { params: { assignmentId: string } }
+  { params: paramsPromise }: { params: Promise<{ assignmentId: string }> }
 ) {
+  const params = await paramsPromise;
   // Only this site's own pages may close an upload.
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) {

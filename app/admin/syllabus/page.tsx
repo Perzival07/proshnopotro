@@ -7,10 +7,11 @@ import { requireAdmin } from "@/lib/auth-utils";
 export const dynamic = "force-dynamic";
 
 export default async function SyllabusPage({
-  searchParams,
+  searchParams: searchParamsPromise,
 }: {
-  searchParams: { board?: string; class?: string; subject?: string };
+  searchParams: Promise<{ board?: string; class?: string; subject?: string }>;
 }) {
+  const searchParams = await searchParamsPromise;
   // Owner only: the layout lets tutors in, so every page says who may see it.
   await requireAdmin();
   const board = (BOARDS as readonly string[]).includes(searchParams.board ?? "") ? searchParams.board! : "CBSE";

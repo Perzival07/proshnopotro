@@ -8,7 +8,8 @@ import { requireAdmin } from "@/lib/auth-utils";
 
 export const dynamic = "force-dynamic";
 
-export default async function TestQuestionsPage({ params }: { params: { testId: string } }) {
+export default async function TestQuestionsPage({ params: paramsPromise }: { params: Promise<{ testId: string }> }) {
+  const params = await paramsPromise;
   // Owner only: the layout lets tutors in, so every page says who may see it.
   await requireAdmin();
   const test = await prisma.test.findUnique({
