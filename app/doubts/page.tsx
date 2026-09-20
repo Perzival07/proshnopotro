@@ -60,6 +60,9 @@ export default async function MyDoubtsPage() {
                       >
                         {statusLabel(d.status, "student")}
                       </span>
+                      {d.studentUnread && (
+                        <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">New reply</span>
+                      )}
                       <span className="ml-auto text-[11px] text-brand-ink/50">{formatDate(d.updatedAt)}</span>
                     </div>
                     <p className="mt-0.5 line-clamp-1 text-xs text-brand-ink/60">{d.question.stem.replace(/\s+/g, " ")}</p>

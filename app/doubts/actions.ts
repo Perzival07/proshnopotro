@@ -77,9 +77,25 @@ export async function askDoubt(assignmentId: string, questionId: string, raw: st
 
   await prisma.$transaction([
     prisma.doubtMessage.create({ data: { doubtId: doubt.id, authorEmail: email, fromTutor: false, body: checked.body } }),
-    prisma.doubt.update({ where: { id: doubt.id }, data: { status: statusAfterMessage(false), updatedAt: new Date() } }),
+    prisma.doubt.update({ where: { id: doubt.id }, data: { status: statusAfterMessage(false), updatedAt: new Date(), studentUnread: false } }),
   ]);
   return { thread: await threadState(doubt.id) };
+}
+
+/** The student has opened a thread with a new reply in it. */
+export async function markDoubtSeen(doubtId: string): Promise<{ success?: true }> {
+  const user = await requireCompleteStudent();
+  await prisma.doubt.updateMany({
+    where: { id: doubtId, studentEmail: user.email.toLowerCase(), studentUnread: true },
+    data: { studentUnread: false },
+  });
+  return { success: true };
+}
+
+/** How many doubts have a reply the student has not seen: for the nav badge. */
+export async function getUnreadDoubtCount(): Promise<number> {
+  const user = await requireCompleteStudent();
+  return prisma.doubt.count({ where: { studentEmail: user.email.toLowerCase(), studentUnread: true } });
 }
 
 /** A student marks their own thread resolved (or reopens it). */
@@ -106,7 +122,7 @@ export async function replyToDoubt(doubtId: string, raw: string): Promise<Result
   if (d._count.messages >= MAX_MESSAGES_PER_THREAD) return { error: "This thread is full." };
   await prisma.$transaction([
     prisma.doubtMessage.create({ data: { doubtId, authorEmail: admin.email.toLowerCase(), fromTutor: true, body: checked.body } }),
-    prisma.doubt.update({ where: { id: doubtId }, data: { status: statusAfterMessage(true), updatedAt: new Date() } }),
+    prisma.doubt.update({ where: { id: doubtId }, data: { status: statusAfterMessage(true), updatedAt: new Date(), studentUnread: true } }),
   ]);
   return { thread: await threadState(doubtId) };
 }

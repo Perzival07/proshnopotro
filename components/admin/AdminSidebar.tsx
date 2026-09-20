@@ -120,7 +120,14 @@ export function navFor(role: "ADMIN" | "TUTOR"): NavItem[] {
   return role === "TUTOR" ? NAV_ITEMS.filter((i) => i.tutor) : NAV_ITEMS;
 }
 
-export function AdminSidebar({ role = "ADMIN" }: { role?: "ADMIN" | "TUTOR" }) {
+export function AdminSidebar({
+  role = "ADMIN",
+  badges,
+}: {
+  role?: "ADMIN" | "TUTOR";
+  /** A count to show beside a link, by its href. */
+  badges?: Record<string, number>;
+}) {
   const pathname = usePathname();
   const items = navFor(role);
 
@@ -157,7 +164,15 @@ export function AdminSidebar({ role = "ADMIN" }: { role?: "ADMIN" | "TUTOR" }) {
                   <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-[#87CEEB]")} />
                   <span className="text-[13px]">{item.name}</span>
                 </div>
-                {isActive && <ChevronRight className="h-3.5 w-3.5 opacity-80" />}
+                {(badges?.[item.href] ?? 0) > 0 && (
+                  <span
+                    aria-label={`${badges![item.href]} waiting`}
+                    className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-4 text-white"
+                  >
+                    {badges![item.href]}
+                  </span>
+                )}
+                {isActive && !(badges?.[item.href]) && <ChevronRight className="h-3.5 w-3.5 opacity-80" />}
               </Link>
             );
           })}

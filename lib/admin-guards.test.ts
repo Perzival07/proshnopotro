@@ -41,7 +41,12 @@ const TUTOR_ACTIONS = new Set([
 ]);
 
 /** Actions for a signed-in student, guarded as such. */
-const STUDENT_ACTIONS = new Set(["app/doubts/actions.ts:askDoubt", "app/doubts/actions.ts:setDoubtResolved"]);
+const STUDENT_ACTIONS = new Set([
+  "app/doubts/actions.ts:askDoubt",
+  "app/doubts/actions.ts:setDoubtResolved",
+  "app/doubts/actions.ts:markDoubtSeen",
+  "app/doubts/actions.ts:getUnreadDoubtCount",
+]);
 
 const GUARD = /\b(requireAdmin|requireStaff|requireCompleteStudent)\(/;
 

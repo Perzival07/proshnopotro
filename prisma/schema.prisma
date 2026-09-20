@@ -372,13 +372,16 @@ model Doubt {
   createdAt    DateTime    @default(now())
   /// The last message, for ordering the inbox.
   updatedAt    DateTime    @default(now())
+  /// A tutor has replied and the student has not looked yet. Set by the
+  /// reply, cleared when the student opens the thread or writes again.
+  studentUnread Boolean    @default(false)
 
   question Question       @relation(fields: [questionId], references: [id], onDelete: Cascade)
   messages DoubtMessage[]
 
   @@unique([questionId, studentEmail])
   @@index([status, updatedAt])
-  @@index([studentEmail])
+  @@index([studentEmail, studentUnread])
 }
 
 model DoubtMessage {

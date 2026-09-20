@@ -1,5 +1,6 @@
 import React from "react";
-import { requireStaff } from "@/lib/auth-utils";
+import { requireStaff, studentScope } from "@/lib/auth-utils";
+import { prisma } from "@/lib/prisma";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { AdminMobileNav } from "@/components/admin/AdminMobileNav";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -18,17 +19,24 @@ export default async function AdminLayout({
   const adminUser = await requireStaff();
   const role = adminUser.role === "TUTOR" ? "TUTOR" : "ADMIN";
 
+  // Doubts waiting for a reply: everyone's for the owner, their own
+  // classrooms' for a tutor. Shown as a count on the Doubts link.
+  const scope = await studentScope(adminUser);
+  const openDoubts = await prisma.doubt.count({
+    where: { status: "OPEN", ...(scope === null ? {} : { studentEmail: { in: scope } }) },
+  });
+
   return (
     <div className="min-h-screen flex bg-brand-page text-brand-ink">
       {/* Fixed Desktop Sidebar */}
-      <AdminSidebar role={role} />
+      <AdminSidebar role={role} badges={{ "/admin/doubts": openDoubts }} />
 
       {/* Main Admin Content Container */}
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Admin Top Header */}
         <header className="h-16 border-b border-brand-border bg-white px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-3 sticky top-0 z-30 shadow-xs">
           <div className="flex min-w-0 items-center gap-2">
-            <AdminMobileNav role={role} />
+            <AdminMobileNav role={role} badges={{ "/admin/doubts": openDoubts }} />
             <Shield className="hidden sm:block h-4 w-4 shrink-0 text-brand-navy" />
             {/* The full title does not fit beside the avatar on a phone, so it
                 shortens rather than pushing the header into a horizontal

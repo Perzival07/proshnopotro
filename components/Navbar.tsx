@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoLockup } from "@/components/brand/LogoLockup";
@@ -16,6 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { LogOut, ShieldCheck, BookOpen, Layers, NotebookText, Users, TrendingUp, MessageCircleQuestion } from "lucide-react";
 import { signOut } from "next-auth/react";
+import { getUnreadDoubtCount } from "@/app/doubts/actions";
 
 interface NavbarProps {
   user?: {
@@ -31,6 +32,21 @@ interface NavbarProps {
 export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
   const isAdmin = user?.role === "ADMIN";
+
+  // Doubts with a tutor's reply the student has not seen. Asked for on each
+  // page a student opens, and again when a thread is opened, so the badge
+  // drops at once. Only students have a Doubts page to be told about.
+  const isStudent = user?.role === "STUDENT";
+  const [unread, setUnread] = useState(0);
+  const refreshUnread = useCallback(() => {
+    if (!isStudent) return;
+    getUnreadDoubtCount().then(setUnread).catch(() => undefined);
+  }, [isStudent]);
+  useEffect(() => {
+    refreshUnread();
+    window.addEventListener("doubts-seen", refreshUnread);
+    return () => window.removeEventListener("doubts-seen", refreshUnread);
+  }, [pathname, refreshUnread]);
   const initials =
     (user?.name || user?.email || "U")
       .split(" ")
@@ -90,6 +106,14 @@ export function Navbar({ user }: NavbarProps) {
                 }`}
               >
                 Doubts
+                {unread > 0 && (
+                  <span
+                    aria-label={`${unread} new ${unread === 1 ? "reply" : "replies"}`}
+                    className="ml-1.5 inline-flex min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-4 text-white"
+                  >
+                    {unread}
+                  </span>
+                )}
               </Link>
             </div>
           )}
@@ -183,6 +207,9 @@ export function Navbar({ user }: NavbarProps) {
                   <Link href="/doubts" className="flex items-center gap-2 text-xs">
                     <MessageCircleQuestion className="h-4 w-4 text-brand-navy" />
                     <span>Doubts</span>
+                    {unread > 0 && (
+                      <span className="ml-auto rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">{unread}</span>
+                    )}
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />

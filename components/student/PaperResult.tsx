@@ -116,6 +116,7 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
     ).map((d) => [
       d.questionId,
       {
+        unread: d.studentUnread,
         id: d.id,
         status: d.status,
         messages: d.messages.map((m) => ({ id: m.id, fromTutor: m.fromTutor, body: m.body, at: m.createdAt.toISOString() })),
@@ -477,7 +478,12 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
                       <RichText text={q.solution} className="mt-2" />
                     </details>
                   )}
-                  <DoubtThread assignmentId={assignmentId} questionId={q.id} initial={doubts.get(q.id) ?? null} />
+                  <DoubtThread
+                    assignmentId={assignmentId}
+                    questionId={q.id}
+                    initial={doubts.get(q.id) ?? null}
+                    unread={doubts.get(q.id)?.unread ?? false}
+                  />
                   {q.videoUrl && videoEmbed(q.videoUrl) && (
                     <details className="rounded-md border border-brand-border bg-brand-page px-3 py-2 text-sm">
                       <summary className="cursor-pointer text-xs font-semibold text-brand-navy">Video explanation</summary>

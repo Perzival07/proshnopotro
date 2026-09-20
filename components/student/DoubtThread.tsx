@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { askDoubt, setDoubtResolved, type ThreadState } from "@/app/doubts/actions";
+import { askDoubt, markDoubtSeen, setDoubtResolved, type ThreadState } from "@/app/doubts/actions";
 import { statusLabel } from "@/lib/doubts";
 import { MessageCircleQuestion, CheckCircle2 } from "lucide-react";
 
@@ -15,12 +15,21 @@ export function DoubtThread({
   assignmentId,
   questionId,
   initial,
+  unread = false,
 }: {
   assignmentId: string;
   questionId: string;
   initial: ThreadState | null;
+  /** A tutor's reply here the student has not seen. */
+  unread?: boolean;
 }) {
   const [thread, setThread] = useState(initial);
+  // Opening the result is looking at the reply: clear the notification, and
+  // tell the nav so its badge drops without waiting for the next page.
+  useEffect(() => {
+    if (!unread || !initial) return;
+    void markDoubtSeen(initial.id).then(() => window.dispatchEvent(new Event("doubts-seen")));
+  }, [unread, initial]);
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -71,6 +80,7 @@ export function DoubtThread({
       <div className="flex items-center justify-between gap-2">
         <p className="flex items-center gap-1.5 font-semibold text-brand-navy">
           <MessageCircleQuestion className="h-3.5 w-3.5" /> Your doubt
+          {unread && <span className="rounded-full bg-red-500 px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">New reply</span>}
         </p>
         {thread && (
           <span

@@ -11,7 +11,7 @@ import { attemptDeadline } from "@/lib/exam-timer";
 import { uploadState } from "@/lib/answer-upload";
 import { resultsVisible } from "@/lib/results-visibility";
 import { countVisibleNotes, getStudentClassrooms } from "@/lib/note-access";
-import { BookOpen, NotebookText, Users } from "lucide-react";
+import { BookOpen, MessageCircleQuestion, NotebookText, Users } from "lucide-react";
 import Link from "next/link";
 import { InstallAppCard } from "@/components/pwa/InstallApp";
 
@@ -41,9 +41,10 @@ export default async function StudentDashboardPage() {
   });
 
   // The batches this student is in, and what is waiting for them there.
-  const [classrooms, noteCount] = await Promise.all([
+  const [classrooms, noteCount, unreadDoubts] = await Promise.all([
     getStudentClassrooms(user.email),
     countVisibleNotes(user.email),
+    prisma.doubt.count({ where: { studentEmail: user.email.toLowerCase(), studentUnread: true } }),
   ]);
 
   // Any timed attempt whose window ran out while the student was away is
@@ -140,6 +141,25 @@ export default async function StudentDashboardPage() {
         </div>
 
         <InstallAppCard className="mb-6 max-w-xl" />
+
+        {unreadDoubts > 0 && (
+          <Link
+            href="/doubts"
+            className="mb-6 flex max-w-xl items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-950 shadow-card transition-colors hover:bg-sky-100"
+          >
+            <MessageCircleQuestion className="h-5 w-5 shrink-0 text-sky-700" />
+            <span className="flex-1">
+              {unreadDoubts === 1 ? (
+                <>Your tutor replied to your doubt.</>
+              ) : (
+                <>
+                  Your tutor replied to <strong>{unreadDoubts}</strong> of your doubts.
+                </>
+              )}
+            </span>
+            <span className="text-xs font-semibold text-sky-800">Read &rarr;</span>
+          </Link>
+        )}
 
         {/* Tests Grid */}
         {cards.length === 0 ? (

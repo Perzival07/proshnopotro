@@ -17,7 +17,13 @@ import { InstallAppNavButton } from "@/components/pwa/InstallApp";
  * and this drawer takes over: a hamburger in the header, and a panel that
  * slides in over the content rather than displacing it.
  */
-export function AdminMobileNav({ role = "ADMIN" }: { role?: "ADMIN" | "TUTOR" }) {
+export function AdminMobileNav({
+  role = "ADMIN",
+  badges,
+}: {
+  role?: "ADMIN" | "TUTOR";
+  badges?: Record<string, number>;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -118,7 +124,12 @@ export function AdminMobileNav({ role = "ADMIN" }: { role?: "ADMIN" | "TUTOR" })
                           isActive ? "text-white" : "text-[#87CEEB]"
                         )}
                       />
-                      <span className="min-w-0 truncate">{item.name}</span>
+                      <span className="min-w-0 flex-1 truncate">{item.name}</span>
+                      {(badges?.[item.href] ?? 0) > 0 && (
+                        <span className="rounded-full bg-red-500 px-1.5 text-[10px] font-bold leading-4 text-white">
+                          {badges![item.href]}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}
