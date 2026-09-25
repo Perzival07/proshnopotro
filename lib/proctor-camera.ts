@@ -8,25 +8,28 @@
  * nothing to do honestly.
  *
  * Nothing is captured. There is no MediaRecorder, no canvas snapshot, no
- * upload, and no frame ever leaves the browser -- the stream is attached to a
- * <video> element for the student's own eyes and released the moment the
- * attempt ends. Anything else would mean storing pictures of children, which
- * this portal deliberately does not do.
+ * upload, and no frame ever leaves the browser -- the stream is attached to
+ * <video> elements for the student's own eyes and for the on-device face and
+ * phone check (`components/student/ProctorDetection.tsx`), which keeps only a
+ * count of what it flagged, and is released the moment the attempt ends.
+ * Anything else would mean storing pictures of children, which this portal
+ * deliberately does not do.
  */
 
 /**
  * A small self-view, front camera, no microphone.
  *
- * The resolution is requested low on purpose: the picture only has to be big
- * enough for the student to recognise themselves, and a 1080p stream would
- * flatten a phone battery over a two-hour paper for no gain. `ideal` rather
- * than `exact` so a webcam that cannot do this size still opens.
+ * VGA is the floor for the face and phone check: at 320x240 a phone held at
+ * arm's length is a handful of pixels and the object model never sees it. It
+ * is still far below 1080p, which would flatten a phone battery over a
+ * two-hour paper for no gain. `ideal` rather than `exact` so a webcam that
+ * cannot do this size still opens.
  */
 export const CAMERA_CONSTRAINTS: MediaStreamConstraints = {
   video: {
     facingMode: "user",
-    width: { ideal: 320 },
-    height: { ideal: 240 },
+    width: { ideal: 640 },
+    height: { ideal: 480 },
     frameRate: { ideal: 15, max: 24 },
   },
   audio: false,
@@ -108,4 +111,5 @@ export function stopStream(stream: { getTracks(): { stop(): void }[] } | null): 
 export const PROCTOR_NOTICE = {
   camera: "Camera on",
   screen: "Screen activity recorded",
+  detection: "Face & phone check on",
 } as const;

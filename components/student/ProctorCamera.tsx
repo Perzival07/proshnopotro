@@ -9,6 +9,12 @@ import {
   stopStream,
   type CameraStatus,
 } from "@/lib/proctor-camera";
+import {
+  useFaceSnapshot,
+  type DetectionStatus,
+  type FaceStore,
+} from "@/components/student/ProctorDetection";
+import { coverRect } from "@/lib/proctor-detect";
 import { Video, VideoOff } from "lucide-react";
 
 /**
@@ -87,6 +93,10 @@ interface ProctorCameraBadgeProps {
   stream: MediaStream | null;
   status: CameraStatus;
   error: string | null;
+  /** State of the on-device face and phone check, if one is running. */
+  detection?: DetectionStatus;
+  /** Where the face boxes come from; nothing is drawn without it. */
+  faces?: FaceStore;
   onRetry: () => void;
 }
 
@@ -102,6 +112,8 @@ export function ProctorCameraBadge({
   stream,
   status,
   error,
+  detection = "idle",
+  faces,
   onRetry,
 }: ProctorCameraBadgeProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -118,9 +130,13 @@ export function ProctorCameraBadge({
   }, [stream]);
 
   const live = status === "on";
+  const snapshot = useFaceSnapshot(faces);
+  const checking = live && detection === "ready";
+  // One face is as it should be; none or several is what the tutor is told about.
+  const boxColor = snapshot.boxes.length === 1 ? "border-emerald-400" : "border-red-500";
 
   return (
-    <div className="fixed bottom-3 right-3 z-[55] w-28 overflow-hidden rounded-xl border border-brand-border bg-white shadow-lg sm:w-44">
+    <div className="fixed bottom-3 right-3 z-[55] w-40 overflow-hidden rounded-xl border border-brand-border bg-white shadow-lg sm:w-64">
       <div className="relative aspect-[4/3] bg-brand-navy">
         {live ? (
           <video
@@ -141,6 +157,34 @@ export function ProctorCameraBadge({
           </div>
         )}
 
+        {/* Mirrored with the picture beneath it, so a box always sits on its
+            face without any left/right arithmetic. */}
+        {checking && (
+          <div className="pointer-events-none absolute inset-0 -scale-x-100" aria-hidden="true">
+            {snapshot.boxes.map((box, i) => {
+              const r = coverRect(box, snapshot.frameAspect, 4 / 3);
+              return (
+                <div
+                  key={i}
+                  className={`absolute rounded-md border-2 transition-all duration-300 ease-out ${boxColor}`}
+                  style={{
+                    left: `${r.left}%`,
+                    top: `${r.top}%`,
+                    width: `${r.width}%`,
+                    height: `${r.height}%`,
+                  }}
+                />
+              );
+            })}
+          </div>
+        )}
+
+        {checking && snapshot.boxes.length !== 1 && (
+          <span className="absolute inset-x-1.5 bottom-1.5 rounded bg-red-600/90 px-1.5 py-0.5 text-center text-[10px] font-semibold text-white">
+            {snapshot.boxes.length === 0 ? "No face detected" : `${snapshot.boxes.length} faces detected`}
+          </span>
+        )}
+
         {live && (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-black/55 px-1.5 py-0.5">
             <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-500" />
@@ -159,6 +203,11 @@ export function ProctorCameraBadge({
         <p className="text-[9px] leading-tight text-brand-ink/60">
           {PROCTOR_NOTICE.screen}
         </p>
+        {live && detection !== "idle" && detection !== "unavailable" && (
+          <p className="text-[9px] leading-tight text-brand-ink/60">
+            {detection === "ready" ? PROCTOR_NOTICE.detection : "Starting face & phone check\u2026"}
+          </p>
+        )}
       </div>
 
       {!live && (

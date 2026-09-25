@@ -294,7 +294,8 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                     </p>
                     <p className="text-xs leading-relaxed font-medium">
                       This assessment is camera-proctored. You will be asked to allow
-                      the camera every time you open the paper; it stays on until you finish,
+                      the camera every time you open the paper, and a quick face check
+                      must pass before it opens. The camera stays on until you finish,
                       and you will see yourself in the corner of the screen. No video is
                       saved or sent anywhere &mdash; the camera is there so you can see
                       that the assessment is being supervised.

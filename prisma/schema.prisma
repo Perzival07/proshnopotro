@@ -216,6 +216,11 @@ model Assignment {
   /// How many times this student left the exam tab. Counted on the server so
   /// a reload cannot wipe the tally.
   tabSwitches       Int              @default(0)
+  /// Camera flags, counted on the server like tabSwitches. Detection runs in
+  /// the student's browser; only these tallies are ever stored, never a frame.
+  noFaceFlags       Int              @default(0)
+  multiFaceFlags    Int              @default(0)
+  phoneFlags        Int              @default(0)
   /// When the attempt closed -- by the student, the timer or the tab guard.
   /// The one-time answer upload window runs from here.
   endedAt           DateTime?

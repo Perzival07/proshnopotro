@@ -32,6 +32,7 @@ interface NavbarProps {
 export function Navbar({ user }: NavbarProps) {
   const pathname = usePathname();
   const isAdmin = user?.role === "ADMIN";
+  const isTutor = user?.role === "TUTOR";
 
   // Doubts with a tutor's reply the student has not seen. Asked for on each
   // page a student opens, and again when a thread is opened, so the badge
@@ -65,7 +66,32 @@ export function Navbar({ user }: NavbarProps) {
           
           {/* A student's two places: their tests and their notes. Hidden on
               phones, where the same links sit in the avatar menu. */}
-          {!isAdmin && user && (
+          {isTutor && (
+            <div className="hidden md:flex items-center gap-2 pl-4 border-l border-white/20">
+              <Link
+                href="/admin/marking"
+                className={`text-xs uppercase font-heading tracking-wider px-2.5 py-1 rounded transition-colors ${
+                  pathname.startsWith("/admin/marking")
+                    ? "bg-white/20 text-white font-semibold"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                To Mark
+              </Link>
+              <Link
+                href="/admin/doubts"
+                className={`text-xs uppercase font-heading tracking-wider px-2.5 py-1 rounded transition-colors ${
+                  pathname.startsWith("/admin/doubts")
+                    ? "bg-white/20 text-white font-semibold"
+                    : "text-white/80 hover:text-white hover:bg-white/10"
+                }`}
+              >
+                Doubts
+              </Link>
+            </div>
+          )}
+
+          {!isAdmin && !isTutor && user && (
             <div className="hidden md:flex items-center gap-2 pl-4 border-l border-white/20">
               <Link
                 href="/"
@@ -185,6 +211,23 @@ export function Navbar({ user }: NavbarProps) {
 
                 {/* On a phone this menu is the only navigation a student has,
                     so both of their pages have to be reachable from it. */}
+                {isTutor ? (
+                  <>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/marking" className="flex items-center gap-2 text-xs">
+                        <BookOpen className="h-4 w-4 text-brand-navy" />
+                        <span>To Mark</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/admin/doubts" className="flex items-center gap-2 text-xs">
+                        <MessageCircleQuestion className="h-4 w-4 text-brand-navy" />
+                        <span>Doubts</span>
+                      </Link>
+                    </DropdownMenuItem>
+                  </>
+                ) : (
+                  <>
                 <DropdownMenuItem asChild>
                   <Link href="/" className="flex items-center gap-2 text-xs">
                     <BookOpen className="h-4 w-4 text-brand-navy" />
@@ -212,6 +255,8 @@ export function Navbar({ user }: NavbarProps) {
                     )}
                   </Link>
                 </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator />
 
                 {isAdmin && (

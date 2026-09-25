@@ -14,6 +14,11 @@ import {
   ProctorCameraBadge,
   useProctorCamera,
 } from "@/components/student/ProctorCamera";
+import { FaceScan } from "@/components/student/FaceScan";
+import {
+  ProctorFlagBanner,
+  useProctorDetection,
+} from "@/components/student/ProctorDetection";
 import { AtomMark } from "@/components/brand/AtomMark";
 import {
   ExternalLink,
@@ -113,6 +118,10 @@ export function StartTestButton({
   // browser does. The browser remembers an earlier "Allow" and stays silent,
   // so without this step a returning student would never be asked at all.
   const [askingCamera, setAskingCamera] = useState(false);
+  // Then a face scan, every time, before the paper is asked for: the attempt's
+  // clock starts when the paper resolves, so the check has to come first. The
+  // paper opens only once one clear face has been steady in view.
+  const [scanning, setScanning] = useState(false);
   // Set when the tab guard, rather than the clock, ended the attempt -- the
   // closing panel has to say which, since the student can tell the difference.
   const [guardMessage, setGuardMessage] = useState<string | null>(null);
@@ -130,6 +139,16 @@ export function StartTestButton({
     if (typeof document !== "undefined") void exitFullscreen(document);
   }, []);
 
+  // Reads the same stream, on this device only, for a missing face, a second
+  // face or a phone. The first flag of a kind warns; the second ends the
+  // attempt. No frame is kept -- only the counts.
+  const detection = useProctorDetection(
+    assignmentId,
+    camera.stream,
+    cameraActive && camera.status === "on",
+    handleGuardSubmitted
+  );
+
   // A Google Doc or a Drive PDF: read on screen, answered on paper.
   const isDoc = isWrittenPaper(testFormat);
   const isQuestions = testFormat === "QUESTIONS";
@@ -143,15 +162,33 @@ export function StartTestButton({
     void handleOpen();
   };
 
+  // "Allow camera" turns the camera on and hands over to the face scan; the
+  // paper is not requested until the scan passes.
+  const handleAllowCamera = async () => {
+    setAskingCamera(false);
+    setScanning(true);
+    await camera.start();
+  };
+
+  const handleScanPassed = () => {
+    setScanning(false);
+    void handleOpen();
+  };
+
+  const handleScanCancel = () => {
+    setScanning(false);
+    camera.stop();
+  };
+
   const handleOpen = async () => {
     setAskingCamera(false);
     setLoading(true);
     setError(null);
 
-    // Asked for here, on the student's own click, rather than in an effect
-    // once the paper is up: a permission prompt that appears out of nowhere
-    // over a question paper is one a student dismisses without reading. A
-    // refusal does not block the attempt -- it leaves the badge saying so.
+    // Already on for a proctored paper, from the face scan that had to pass
+    // to get here; this only covers the camera having dropped since. The
+    // permission prompt was raised on the student's own click, not in an
+    // effect over the paper, where it would be dismissed unread.
     if (proctored) {
       await camera.start();
     }
@@ -241,6 +278,8 @@ export function StartTestButton({
       stream={camera.stream}
       status={camera.status}
       error={camera.error}
+      detection={detection.status}
+      faces={detection.faces}
       onRetry={() => void camera.start()}
     />
   ) : null;
@@ -278,6 +317,10 @@ export function StartTestButton({
         />
       )}
 
+      {proctored && cameraActive && (
+        <ProctorFlagBanner flag={detection.flag} onDismiss={detection.dismiss} />
+      )}
+
       {/* Native full screen paints only the paper's own element, so while
           the paper is full screen the badge moves inside it (see below). */}
       {!expanded && cameraBadge}
@@ -302,9 +345,15 @@ export function StartTestButton({
                   Allow your camera
                 </h2>
                 <p className="text-xs leading-relaxed text-brand-ink/80">
-                  This test is camera-proctored. Your camera turns on when the paper
-                  opens and stays on until you finish; you will see yourself in the
-                  corner of the screen. No video is saved or sent anywhere.
+                  This test is camera-proctored. Your camera turns on now for a quick
+                  face check &mdash; the paper opens, and your time starts, only once
+                  it sees you. The camera then stays on until you finish; you will see
+                  yourself in the corner of the screen. The camera also watches for a phone, for more than
+                  one person in view (3 minutes), and for your face being out of view
+                  (5 minutes). The first time any of these happens you get a warning; the
+                  second time, your test is submitted automatically, and your tutor is
+                  told either way. This check runs on your device &mdash; no video is
+                  saved or sent anywhere.
                 </p>
                 <p className="text-xs leading-relaxed text-brand-ink/80">
                   If your browser asks, choose <strong>Allow this time</strong>.
@@ -318,7 +367,7 @@ export function StartTestButton({
               </Button>
               <Button
                 type="button"
-                onClick={() => void handleOpen()}
+                onClick={() => void handleAllowCamera()}
                 className="bg-brand-navy font-semibold text-white hover:bg-brand-navy/90"
               >
                 Allow camera
@@ -326,6 +375,17 @@ export function StartTestButton({
             </div>
           </div>
         </div>
+      )}
+
+      {scanning && (
+        <FaceScan
+          stream={camera.stream}
+          cameraStatus={camera.status}
+          cameraError={camera.error}
+          onRetryCamera={() => void camera.start()}
+          onPassed={handleScanPassed}
+          onCancel={handleScanCancel}
+        />
       )}
 
       {error && (

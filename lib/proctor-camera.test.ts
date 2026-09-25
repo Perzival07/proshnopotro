@@ -15,8 +15,8 @@ describe("CAMERA_CONSTRAINTS", () => {
 
   it("requests the small size as ideal, so an odd webcam still opens", () => {
     const video = CAMERA_CONSTRAINTS.video as MediaTrackConstraints;
-    expect(video.width).toEqual({ ideal: 320 });
-    expect(video.height).toEqual({ ideal: 240 });
+    expect(video.width).toEqual({ ideal: 640 });
+    expect(video.height).toEqual({ ideal: 480 });
   });
 });
 

@@ -39,11 +39,13 @@ import {
   EyeOff,
   RotateCcw,
   Images,
+  ScanFace,
 } from "lucide-react";
 import { EnterMarksModal, StudentGradeTarget } from "@/components/admin/EnterMarksModal";
 import { ReassignModal, ReassignTarget } from "@/components/admin/ReassignModal";
 import { AnswerSheetsModal, AnswerSheetsTarget } from "@/components/admin/AnswerSheetsModal";
 import { toggleAssignmentStatus } from "./actions";
+import { detectionLabel, type DetectionKind } from "@/lib/proctor-detect";
 
 interface TestOption {
   id: string;
@@ -60,6 +62,9 @@ export interface RosterAssignment {
   status: "ASSIGNED" | "SUBMITTED";
   autoSubmitted: boolean;
   tabSwitches: number;
+  noFaceFlags: number;
+  multiFaceFlags: number;
+  phoneFlags: number;
   /** When the student's answer photos were uploaded, if they have been. */
   answersUploadedAt: Date | null;
   answerPageCount: number;
@@ -82,6 +87,27 @@ interface RosterClientProps {
   tests: TestOption[];
   selectedTestId: string;
   assignments: RosterAssignment[];
+}
+
+/** The camera's flags for one attempt, one line each, only those that fired. */
+function CameraFlags({ a, className }: { a: RosterAssignment; className: string }) {
+  const flags: [DetectionKind, number][] = [
+    ["NO_FACE", a.noFaceFlags],
+    ["MULTIPLE_FACES", a.multiFaceFlags],
+    ["PHONE", a.phoneFlags],
+  ];
+  return (
+    <>
+      {flags
+        .filter(([, count]) => count > 0)
+        .map(([kind, count]) => (
+          <span key={kind} className={className} title={`Camera flagged: ${detectionLabel(kind)} ${count} time(s)`}>
+            <ScanFace className="h-3 w-3" />
+            {detectionLabel(kind)} {count}&times;
+          </span>
+        ))}
+    </>
+  );
 }
 
 export function RosterClient({
@@ -489,6 +515,7 @@ export function RosterClient({
                       Left tab {a.tabSwitches}&times;
                     </span>
                   )}
+                  <CameraFlags a={a} className="inline-flex items-center gap-1 text-[10px] font-medium text-red-700" />
                 </div>
 
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-brand-border/60 pt-3">
@@ -731,6 +758,7 @@ export function RosterClient({
                           Left tab {a.tabSwitches}×
                         </span>
                       )}
+                      <CameraFlags a={a} className="mt-1 flex items-center justify-center gap-1 text-[10px] font-medium text-red-700" />
                     </TableCell>
 
                     {/* Score */}

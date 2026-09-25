@@ -19,6 +19,14 @@ const nextConfig = {
           { key: "Content-Type", value: "application/javascript; charset=utf-8" },
         ],
       },
+      // The face/phone models and the WebAssembly runtime are ~18 MB and never
+      // change in place. By default files in public/ are revalidated on every
+      // visit; cached for a year they cost Vercel bandwidth once per device
+      // instead of once per exam. To ship a new model, give it a new file name.
+      {
+        source: "/proctor/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
     ];
   },
   images: {

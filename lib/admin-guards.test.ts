@@ -29,6 +29,13 @@ const TUTOR_PAGES = new Set([
   "app/admin/doubts/page.tsx",
 ]);
 
+/**
+ * Pages that only send each role to its own home. They read no data, so they
+ * take no requireAdmin/requireStaff -- a tutor landing on /admin has to be
+ * redirected, not turned away.
+ */
+const REDIRECT_PAGES = new Set(["app/admin/page.tsx"]);
+
 /** Server actions tutors may call: [file, function]. */
 const TUTOR_ACTIONS = new Set([
   "app/admin/mark/actions.ts:saveAnnotations",
@@ -60,7 +67,12 @@ describe("admin pages", () => {
   for (const page of pages) {
     const name = rel(page);
     const src = readFileSync(page, "utf8");
-    if (TUTOR_PAGES.has(name)) {
+    if (REDIRECT_PAGES.has(name)) {
+      it(`${name} only redirects to the caller's own home`, () => {
+        expect(src).toMatch(/homeFor\(/);
+        expect(src).not.toMatch(/\bprisma\b/);
+      });
+    } else if (TUTOR_PAGES.has(name)) {
       it(`${name} is for tutors too, and says so`, () => {
         expect(src).toMatch(/requireStaff\(/);
         expect(src).not.toMatch(/requireAdmin\(/);

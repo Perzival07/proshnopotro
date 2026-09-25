@@ -143,6 +143,11 @@ export async function deleteStudent(id: string) {
       // the address, and signing in again with Google would hand the tests
       // straight back. Removing a student has to mean removing their work too.
       await tx.assignment.deleteMany({ where: { studentEmail: email } });
+      // Same story for these: they hold the email with no foreign key to the
+      // user. DoubtMessage rows go with their Doubt (onDelete: Cascade).
+      await tx.classroomMember.deleteMany({ where: { studentEmail: email } });
+      await tx.noteStudent.deleteMany({ where: { studentEmail: email } });
+      await tx.doubt.deleteMany({ where: { studentEmail: email } });
       await tx.user.delete({ where: { id } });
     });
 

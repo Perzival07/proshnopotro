@@ -8,6 +8,11 @@ import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { attemptDeadline, isTimed, isTimeUp, remainingMs } from "@/lib/exam-timer";
 import { isProctored, registerSwitch, warningMessage } from "@/lib/proctoring";
 import {
+  DETECTION_COLUMN,
+  isDetectionKind,
+  registerFlag,
+} from "@/lib/proctor-detect";
+import {
   answerFolder,
   canSaveUpload,
   isInAnswerFolder,
@@ -557,6 +562,70 @@ export async function recordTabSwitch(
     remaining: outcome.remaining,
     submitted: false,
     message: warningMessage(outcome),
+  };
+}
+
+export interface ProctorFlagResult {
+  count?: number;
+  submitted?: boolean;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Records that the exam camera flagged something -- no face, several faces, or
+ * a phone -- and ends the attempt on the second flag of the same kind, exactly
+ * as `recordTabSwitch` does. The first is a warning.
+ *
+ * The client only reports once a condition has held for minutes (or seconds,
+ * for a phone), but the count and the decision live here: a tally kept in the
+ * page would reset on reload. The increment is atomic for the same reason as
+ * in `recordTabSwitch`.
+ */
+export async function recordProctorFlag(
+  assignmentId: string,
+  kind: string
+): Promise<ProctorFlagResult> {
+  if (!isDetectionKind(kind)) return { error: "Unknown flag." };
+
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) return { error: "Authentication required." };
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      test: { select: { proctored: true } },
+      result: true,
+    },
+  });
+
+  if (!assignment) return { error: "Assignment not found." };
+  if (assignment.studentEmail.toLowerCase() !== sessionUser.email.trim().toLowerCase()) {
+    return { error: "Unauthorized." };
+  }
+
+  if (!isProctored(assignment)) return {};
+  if (isAssignmentSubmitted(assignment)) return { submitted: true };
+
+  const column = DETECTION_COLUMN[kind];
+  const updated = await prisma.assignment.update({
+    where: { id: assignmentId },
+    data: { [column]: { increment: 1 } },
+    select: { noFaceFlags: true, multiFaceFlags: true, phoneFlags: true },
+  });
+
+  const outcome = registerFlag(kind, updated[column] - 1);
+
+  if (outcome.shouldSubmit) {
+    await closeOutAssignment(assignmentId, true);
+  }
+
+  revalidatePath("/admin/roster");
+
+  return {
+    count: outcome.count,
+    submitted: outcome.shouldSubmit,
+    message: outcome.message,
   };
 }
 
