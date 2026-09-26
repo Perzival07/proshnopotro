@@ -6,6 +6,7 @@ import { markPaper, maxMarksFor, type QuestionStatus, type ResponseValue } from 
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { formatDate } from "@/lib/utils";
 import { parseTranslation } from "@/lib/translation";
+import { shuffleSections } from "@/lib/shuffle";
 import { MarkedSheets } from "@/components/student/MarkedSheets";
 import { chapterBreakdown } from "@/lib/chapter-report";
 import { resultsVisible } from "@/lib/results-visibility";
@@ -64,6 +65,7 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
         select: {
           id: true,
           markingScheme: true,
+          shuffle: true,
           resultRelease: true,
           resultsReleasedAt: true,
           secondLanguage: true,
@@ -104,6 +106,9 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
   const answers: Record<string, ResponseValue> = {};
   for (const r of assignment.responses) answers[r.questionId] = r.value as ResponseValue;
   const marked = markPaper(markable, answers, scheme);
+  // What the student is shown, in the order they sat it. Marking above stays in
+  // the tutor's order; it is keyed by id, so the two never need to line up.
+  const shown = test.shuffle ? shuffleSections(test.sections, assignmentId) : test.sections;
   const passages = new Map(test.passages.map((p) => [p.id, p.content]));
 
   // The student's doubt threads on this paper's questions.
@@ -304,7 +309,7 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
         </div>
       )}
 
-      {test.sections.map((section, si) => (
+      {shown.map((section, si) => (
         <section key={section.id} className="space-y-3">
           <h2 className="font-heading text-base font-bold text-brand-navy">{section.title}</h2>
           {section.questions.map((q, qi) => {

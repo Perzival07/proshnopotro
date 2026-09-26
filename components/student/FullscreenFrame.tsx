@@ -6,6 +6,7 @@ import {
   exitFullscreen,
   isNativeFullscreen,
 } from "@/lib/fullscreen";
+import { watermarkBackground } from "@/lib/watermark";
 import { Maximize2, Minimize2, X } from "lucide-react";
 
 /**
@@ -79,6 +80,11 @@ interface FullscreenFrameProps {
   overlay?: React.ReactNode;
   sandbox?: string;
   allow?: string;
+  /**
+   * A line tiled faintly over the paper (the student's name), so a screenshot
+   * or a photo of the screen can be traced to whoever took it.
+   */
+  watermark?: string;
 }
 
 export function FullscreenFrame({
@@ -93,6 +99,7 @@ export function FullscreenFrame({
   overlay,
   sandbox,
   allow,
+  watermark,
   children,
 }: FullscreenFrameProps) {
   const { ref, expanded, expand, collapse } = fullscreen;
@@ -148,24 +155,36 @@ export function FullscreenFrame({
         <div className="border-b border-brand-border bg-brand-page px-3 py-2">{toolbar}</div>
       )}
 
-      {children ? (
-        <div
-          aria-label={title}
-          className={expanded ? "flex-1 overflow-y-auto bg-brand-page p-3 sm:p-4" : "bg-brand-page p-3 sm:p-4"}
-        >
-          {children}
-        </div>
-      ) : (
-        <iframe
-          src={src}
-          title={title}
-          className={expanded ? "w-full flex-1 border-0" : `w-full border-0 ${collapsedClassName}`}
-          loading="lazy"
-          referrerPolicy="no-referrer"
-          sandbox={sandbox}
-          allow={allow}
-        />
-      )}
+      {/* The wrapper is what the watermark is laid over: it does not scroll,
+          so the mark stays put over the visible part of a long paper. */}
+      <div className={expanded ? "relative flex min-h-0 flex-1 flex-col" : "relative"}>
+        {children ? (
+          <div
+            aria-label={title}
+            className={expanded ? "flex-1 overflow-y-auto bg-brand-page p-3 sm:p-4" : "bg-brand-page p-3 sm:p-4"}
+          >
+            {children}
+          </div>
+        ) : (
+          <iframe
+            src={src}
+            title={title}
+            className={expanded ? "w-full flex-1 border-0" : `w-full border-0 ${collapsedClassName}`}
+            loading="lazy"
+            referrerPolicy="no-referrer"
+            sandbox={sandbox}
+            allow={allow}
+          />
+        )}
+
+        {watermark && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 z-10 select-none"
+            style={{ backgroundImage: watermarkBackground(watermark) }}
+          />
+        )}
+      </div>
 
       {expanded && overlay}
     </div>

@@ -47,3 +47,44 @@ export function isTextEntry(target: EventTarget | null): boolean {
   const tag = el.tagName;
   return tag === "INPUT" || tag === "TEXTAREA" || el.isContentEditable === true;
 }
+
+/**
+ * Whether this key press is a real screenshot shortcut, as opposed to a
+ * modifier chord that merely could be the start of one. This is the stricter
+ * test, used to count a strike; `isCaptureKey` is the broad one that only
+ * blanks the paper. Digits and S are matched by `code`, because with Shift
+ * held `key` is "#", "$", "%" on a US layout and something else elsewhere.
+ */
+export function isScreenshotShortcut(e: KeyLike): boolean {
+  if (e.key === "PrintScreen" || e.code === "PrintScreen") return true;
+  if (!(e.metaKey && e.shiftKey)) return false;
+  return e.code === "Digit3" || e.code === "Digit4" || e.code === "Digit5" || e.code === "KeyS";
+}
+
+/**
+ * Screenshot attempts allowed before the attempt is submitted. The first is a
+ * warning, the second ends it -- the same bargain as the tab and camera guards.
+ */
+export const MAX_CAPTURE_ATTEMPTS = 2;
+
+export interface CaptureOutcome {
+  /** The tally after this attempt. */
+  count: number;
+  /** Whether this one ends the attempt. */
+  shouldSubmit: boolean;
+  /** What the student is told. */
+  message: string;
+}
+
+/** Applies one screenshot attempt to a running tally. */
+export function registerCapture(previousCount: number): CaptureOutcome {
+  const count = Math.max(0, previousCount) + 1;
+  const shouldSubmit = count >= MAX_CAPTURE_ATTEMPTS;
+  return {
+    count,
+    shouldSubmit,
+    message: shouldSubmit
+      ? "You tried to take a screenshot again, so your test has been submitted automatically."
+      : "Screenshots are not allowed during the assessment. This is your warning — if you try again, your test will be submitted automatically.",
+  };
+}

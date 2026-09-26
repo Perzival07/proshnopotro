@@ -169,6 +169,7 @@ export async function makeTestFromBankPaper(bankId: string): Promise<Result> {
             ? WRITTEN_UPLOAD_MINUTES
             : undefined,
           calculator: source.calculator,
+          shuffle: source.shuffle,
           secondLanguage: source.secondLanguage,
           board: source.board,
           classLevel: source.classLevel,

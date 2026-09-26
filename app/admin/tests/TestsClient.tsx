@@ -54,6 +54,7 @@ interface TestItem {
   resultRelease: "INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE";
   answerSheets: boolean;
   calculator: boolean;
+  shuffle: boolean;
   board: string | null;
   classLevel: string | null;
   uploadMinutes: number;

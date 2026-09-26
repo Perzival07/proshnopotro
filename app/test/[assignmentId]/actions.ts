@@ -6,7 +6,8 @@ import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { revalidatePath } from "next/cache";
 import { toEmbedUrl, type TestFormat } from "@/lib/test-resource";
 import { attemptDeadline, isTimed, isTimeUp, remainingMs } from "@/lib/exam-timer";
-import { isProctored, registerSwitch, warningMessage } from "@/lib/proctoring";
+import { isDepartureReason, isProctored, registerSwitch, warningMessage, type DepartureReason } from "@/lib/proctoring";
+import { registerCapture } from "@/lib/content-guard";
 import {
   DETECTION_COLUMN,
   isDetectionKind,
@@ -24,6 +25,7 @@ import {
 import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
 import { gradeAssignment } from "@/lib/grade-attempt";
 import { isNotYetOpen } from "@/lib/schedule";
+import { shuffleSections } from "@/lib/shuffle";
 import {
   checkResponse,
   isAttempted,
@@ -150,7 +152,12 @@ export async function resolveSecureFormUrl(
   const format = assignment.test.format as TestFormat;
 
   if (format === "QUESTIONS") {
-    const paper = await loadStudentPaper(assignment.id, assignment.test.id, assignment.test.markingScheme);
+    const paper = await loadStudentPaper(
+      assignment.id,
+      assignment.test.id,
+      assignment.test.markingScheme,
+      assignment.test.shuffle
+    );
     if (paper.sections.every((s) => s.questions.length === 0)) {
       return { error: "This paper has no questions yet. Please tell your tutor." };
     }
@@ -219,7 +226,8 @@ export async function resolveSecureFormUrl(
 async function loadStudentPaper(
   assignmentId: string,
   testId: string,
-  markingScheme: Prisma.JsonValue
+  markingScheme: Prisma.JsonValue,
+  shuffle = false
 ): Promise<StudentPaper> {
   const [sections, passages, responses] = await Promise.all([
     prisma.testSection.findMany({ where: { testId }, include: { questions: true } }),
@@ -229,7 +237,10 @@ async function loadStudentPaper(
       select: { questionId: true, value: true, markedForReview: true },
     }),
   ]);
-  const paper = toStudentPaper(sections, normalizeScheme(markingScheme));
+  // A shuffled paper is reordered before numbering, so Q1 is the first question
+  // this student sees; the order is seeded by the assignment, so it is the same
+  // on every reload and on their result page.
+  const paper = toStudentPaper(shuffle ? shuffleSections(sections, assignmentId) : sections, normalizeScheme(markingScheme));
   // Only passages the paper actually uses are sent.
   const used = new Set(paper.flatMap((s) => s.questions.map((q) => q.passageId)).filter(Boolean));
   return {
@@ -509,8 +520,10 @@ export interface TabSwitchResult {
  * student a free departure.
  */
 export async function recordTabSwitch(
-  assignmentId: string
+  assignmentId: string,
+  reason: DepartureReason = "TAB"
 ): Promise<TabSwitchResult> {
+  if (!isDepartureReason(reason)) return { error: "Unknown reason." };
   const sessionUser = await getVerifiedSession();
   if (!sessionUser?.email) {
     return { error: "Authentication required." };
@@ -551,7 +564,7 @@ export async function recordTabSwitch(
       count: outcome.count,
       remaining: 0,
       submitted: true,
-      message: warningMessage(outcome),
+      message: warningMessage(outcome, reason),
     };
   }
 
@@ -561,7 +574,7 @@ export async function recordTabSwitch(
     count: outcome.count,
     remaining: outcome.remaining,
     submitted: false,
-    message: warningMessage(outcome),
+    message: warningMessage(outcome, reason),
   };
 }
 
@@ -615,6 +628,55 @@ export async function recordProctorFlag(
   });
 
   const outcome = registerFlag(kind, updated[column] - 1);
+
+  if (outcome.shouldSubmit) {
+    await closeOutAssignment(assignmentId, true);
+  }
+
+  revalidatePath("/admin/roster");
+
+  return {
+    count: outcome.count,
+    submitted: outcome.shouldSubmit,
+    message: outcome.message,
+  };
+}
+
+/**
+ * Records a screenshot attempt (PrintScreen, or the OS screenshot chord) and
+ * ends the attempt on the second, as `recordProctorFlag` does. The page cannot
+ * stop the screenshot itself; this is what makes trying cost something. The
+ * increment is atomic for the same reason as in `recordTabSwitch`.
+ */
+export async function recordCaptureAttempt(
+  assignmentId: string
+): Promise<ProctorFlagResult> {
+  const sessionUser = await getVerifiedSession();
+  if (!sessionUser?.email) return { error: "Authentication required." };
+
+  const assignment = await prisma.assignment.findUnique({
+    where: { id: assignmentId },
+    include: {
+      test: { select: { proctored: true } },
+      result: true,
+    },
+  });
+
+  if (!assignment) return { error: "Assignment not found." };
+  if (assignment.studentEmail.toLowerCase() !== sessionUser.email.trim().toLowerCase()) {
+    return { error: "Unauthorized." };
+  }
+
+  if (!isProctored(assignment)) return {};
+  if (isAssignmentSubmitted(assignment)) return { submitted: true };
+
+  const updated = await prisma.assignment.update({
+    where: { id: assignmentId },
+    data: { captureAttempts: { increment: 1 } },
+    select: { captureAttempts: true },
+  });
+
+  const outcome = registerCapture(updated.captureAttempts - 1);
 
   if (outcome.shouldSubmit) {
     await closeOutAssignment(assignmentId, true);

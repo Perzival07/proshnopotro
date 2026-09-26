@@ -15,7 +15,8 @@ import { isAssignmentSubmitted } from "./assignment-status";
  * All of them have to move together. A leftover `startedAt` is an expired window,
  * so a timed test would auto-submit itself the moment the student opened it
  * and the reassignment would appear to do nothing; a leftover `tabSwitches`
- * tally would start the retake already on its final warning; a leftover
+ * tally (or camera or screenshot flag) would start the retake already on its
+ * final warning; a leftover
  * `autoSubmitted` would label the fresh attempt as one the timer ended; and a
  * leftover upload stamp would refuse the retake's answer photos.
  *
@@ -28,6 +29,10 @@ export const REOPEN_DATA = {
   startedAt: null,
   autoSubmitted: false,
   tabSwitches: 0,
+  noFaceFlags: 0,
+  multiFaceFlags: 0,
+  phoneFlags: 0,
+  captureAttempts: 0,
   endedAt: null,
   answersUploadedAt: null,
   feedback: null,

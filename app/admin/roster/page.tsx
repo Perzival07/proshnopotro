@@ -2,6 +2,9 @@ import React from "react";
 import { prisma } from "@/lib/prisma";
 import { RosterClient, RosterAssignment } from "./RosterClient";
 import { requireAdmin } from "@/lib/auth-utils";
+import { assessTiming } from "@/lib/answer-timing";
+import { isAttempted } from "@/lib/paper";
+import type { ResponseValue } from "@/lib/marking";
 
 export const dynamic = "force-dynamic";
 
@@ -46,6 +49,19 @@ export default async function AdminRosterPage({ searchParams: searchParamsPromis
       orderBy: { assignedAt: "desc" },
     });
 
+    // Per-question time on screen, for the "answered too fast" hint. Only a
+    // paper written in the portal records it; others simply never flag.
+    const responseRows = await prisma.questionResponse.findMany({
+      where: { assignment: { testId: selectedTestId } },
+      select: { assignmentId: true, value: true, timeSpentMs: true },
+    });
+    const byAssignment = new Map<string, { answered: boolean; timeSpentMs: number }[]>();
+    for (const r of responseRows) {
+      const list = byAssignment.get(r.assignmentId) ?? [];
+      list.push({ answered: isAttempted((r.value ?? null) as ResponseValue), timeSpentMs: r.timeSpentMs });
+      byAssignment.set(r.assignmentId, list);
+    }
+
     const emails = rawAssignments.map((a) => a.studentEmail.toLowerCase());
     const users = await prisma.user.findMany({
       where: { email: { in: emails } },
@@ -73,6 +89,8 @@ export default async function AdminRosterPage({ searchParams: searchParamsPromis
       noFaceFlags: a.noFaceFlags,
       multiFaceFlags: a.multiFaceFlags,
       phoneFlags: a.phoneFlags,
+      captureAttempts: a.captureAttempts,
+      answeredTooFast: assessTiming(byAssignment.get(a.id) ?? []).flagged,
       answersUploadedAt: a.answersUploadedAt,
       answerPageCount: a._count.answerImages,
       user: userMap.get(a.studentEmail.toLowerCase()) || null,

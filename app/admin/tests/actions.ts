@@ -30,6 +30,8 @@ export interface TestInput {
   answerSheets?: boolean;
   /** QUESTIONS only: show an on-screen calculator during the paper. */
   calculator?: boolean;
+  /** QUESTIONS only: each student sees the questions in an order of their own. */
+  shuffle?: boolean;
   /** Test, DPP or Assignment: shown on the student's card. */
   kind?: string;
   /** Minutes to upload answer photos after the paper closes. */
@@ -106,6 +108,7 @@ function questionSettings(data: TestInput, format: TestFormat, creating: boolean
         : ("ON_RELEASE" as const),
     answerSheets: data.answerSheets ?? false,
     calculator: data.calculator ?? false,
+    shuffle: data.shuffle ?? false,
     board: data.board && (BOARDS as readonly string[]).includes(data.board) ? data.board : null,
     classLevel: data.classLevel && (CLASS_LEVELS as readonly string[]).includes(data.classLevel) ? data.classLevel : null,
     ...upload,

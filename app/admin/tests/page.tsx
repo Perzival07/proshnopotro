@@ -44,6 +44,7 @@ export default async function AdminTestsPage() {
       resultRelease: t.resultRelease,
       answerSheets: t.answerSheets,
       calculator: t.calculator,
+      shuffle: t.shuffle,
       board: t.board,
       uploadMinutes: t.uploadMinutes,
       kind: t.kind,

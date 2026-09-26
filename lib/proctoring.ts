@@ -36,13 +36,21 @@ export function registerSwitch(previousCount: number): SwitchOutcome {
   };
 }
 
+/** Ways of leaving the assessment. Both spend the same pool of departures. */
+export type DepartureReason = "TAB" | "FULLSCREEN";
+
+export function isDepartureReason(value: unknown): value is DepartureReason {
+  return value === "TAB" || value === "FULLSCREEN";
+}
+
 /** What the student is shown when they come back. */
-export function warningMessage(outcome: SwitchOutcome): string {
+export function warningMessage(outcome: SwitchOutcome, reason: DepartureReason = "TAB"): string {
   if (outcome.shouldSubmit) {
     return "You left the assessment once too often. Your test has been submitted automatically.";
   }
   const left = outcome.remaining;
-  return `You left the assessment tab. This is your ${
+  const what = reason === "FULLSCREEN" ? "exited full screen" : "left the assessment tab";
+  return `You ${what}. This is your ${
     left === 1 ? "only warning" : `warning ${outcome.count} of ${MAX_TAB_SWITCHES}`
   } -- leaving ${
     left === 1 ? "again" : `${left} more times`

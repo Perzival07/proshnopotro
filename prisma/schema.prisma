@@ -166,6 +166,9 @@ model Test {
   /// QUESTIONS tests: show an on-screen calculator (as GATE's CBT does; JEE
   /// Main and NEET do not allow one).
   calculator        Boolean       @default(false)
+  /// QUESTIONS tests: each student sees the questions (and choices) in their
+  /// own order, so a shared answer key does not line up. Marking is by id.
+  shuffle           Boolean       @default(false)
   /// The name of the paper's second language, as students see it ("हिन्दी"),
   /// when its questions have translations. null = one language only.
   secondLanguage    String?
@@ -221,6 +224,9 @@ model Assignment {
   noFaceFlags       Int              @default(0)
   multiFaceFlags    Int              @default(0)
   phoneFlags        Int              @default(0)
+  /// Screenshot / PrintScreen key presses seen during the attempt. Counted on
+  /// the server; the second one ends the attempt, like the other flags.
+  captureAttempts   Int              @default(0)
   /// When the attempt closed -- by the student, the timer or the tab guard.
   /// The one-time answer upload window runs from here.
   endedAt           DateTime?

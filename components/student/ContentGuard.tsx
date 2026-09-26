@@ -7,12 +7,24 @@ import {
   CAPTURE_COVER_MS,
   isCaptureKey,
   isPrintOrSaveShortcut,
+  isScreenshotShortcut,
 } from "@/lib/content-guard";
 import { ShieldAlert } from "lucide-react";
 
 interface ContentGuardProps {
   /** Only guard while the paper is actually open and unfinished. */
   active: boolean;
+  /**
+   * A screenshot key or chord was pressed. The parent decides what it costs;
+   * reports are debounced there, so this may fire for both halves of a chord.
+   */
+  onCaptureAttempt: () => void;
+  /**
+   * Cover the paper whenever the window loses focus. Only safe for a paper
+   * written in the portal: clicking into an embedded Google Form also blurs
+   * this window, and covering the paper then would black out every answer.
+   */
+  coverOnBlur?: boolean;
 }
 
 /**
@@ -28,11 +40,17 @@ interface ContentGuardProps {
  * at all, and keys pressed while focus is inside a cross-origin frame (a Google
  * Form) never reach this page.
  *
- * Answers stay typeable; nothing can be pasted in or copied out.
+ * Answers stay typeable; nothing can be pasted in or copied out. A real
+ * screenshot shortcut is also reported, so trying it costs a strike.
  */
-export function ContentGuard({ active }: ContentGuardProps) {
+export function ContentGuard({ active, onCaptureAttempt, coverOnBlur = false }: ContentGuardProps) {
   const [covered, setCovered] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Held in a ref so a new callback from the parent does not tear down and
+  // re-add every listener below.
+  const captureRef = useRef(onCaptureAttempt);
+  captureRef.current = onCaptureAttempt;
 
   const cover = useCallback(() => {
     setCovered(true);
@@ -50,6 +68,7 @@ export function ContentGuard({ active }: ContentGuardProps) {
 
     const onKeyDown = (e: KeyboardEvent) => {
       if (isCaptureKey(e)) cover();
+      if (isScreenshotShortcut(e)) captureRef.current();
       if (isPrintOrSaveShortcut(e)) {
         e.preventDefault();
         cover();
@@ -59,6 +78,8 @@ export function ContentGuard({ active }: ContentGuardProps) {
     const onKeyUp = (e: KeyboardEvent) => {
       if (!isCaptureKey(e)) return;
       cover();
+      // Windows often sends PrintScreen as a key-up only.
+      if (isScreenshotShortcut(e)) captureRef.current();
       // PrintScreen puts the image on the clipboard; replace it.
       void navigator.clipboard?.writeText(" ").catch(() => {});
     };
@@ -68,6 +89,12 @@ export function ContentGuard({ active }: ContentGuardProps) {
       if (document.visibilityState === "hidden") setCovered(true);
       else cover();
     };
+
+    const onBlur = () => setCovered(true);
+    if (coverOnBlur) {
+      window.addEventListener("blur", onBlur);
+      window.addEventListener("focus", cover);
+    }
 
     document.addEventListener("copy", refuse);
     document.addEventListener("cut", refuse);
@@ -81,6 +108,8 @@ export function ContentGuard({ active }: ContentGuardProps) {
 
     return () => {
       html.classList.remove("exam-locked");
+      window.removeEventListener("blur", onBlur);
+      window.removeEventListener("focus", cover);
       document.removeEventListener("copy", refuse);
       document.removeEventListener("cut", refuse);
       document.removeEventListener("paste", refuse);
@@ -93,7 +122,7 @@ export function ContentGuard({ active }: ContentGuardProps) {
       if (timer.current) clearTimeout(timer.current);
       setCovered(false);
     };
-  }, [active, cover]);
+  }, [active, cover, coverOnBlur]);
 
   if (!active || !covered) return null;
 

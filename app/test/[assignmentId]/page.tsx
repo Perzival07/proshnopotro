@@ -293,6 +293,14 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                       timer keeps running throughout.
                     </p>
                     <p className="text-xs leading-relaxed font-medium">
+                      The paper opens in full screen, with your name across it. Leaving
+                      full screen counts as leaving the assessment. Copying, pasting,
+                      printing and screenshots are switched off, and trying to take a
+                      screenshot is recorded &mdash; the second time, your assessment is
+                      submitted automatically. Your tutor can see all of this, and how
+                      quickly each question was answered.
+                    </p>
+                    <p className="text-xs leading-relaxed font-medium">
                       This assessment is camera-proctored. You will be asked to allow
                       the camera every time you open the paper, and a quick face check
                       must pass before it opens. The camera stays on until you finish,
@@ -330,6 +338,7 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                 testTitle={assignment.test.title}
                 testFormat={assignment.test.format}
                 studentName={user.name}
+                studentEmail={user.email}
                 initialEndsAt={endsAt?.toISOString() ?? null}
                 initialServerNow={endsAt ? new Date().toISOString() : null}
                 proctored={assignment.test.proctored}

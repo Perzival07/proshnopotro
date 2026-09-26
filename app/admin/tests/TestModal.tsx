@@ -51,6 +51,7 @@ interface TestModalProps {
     resultRelease?: "INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE";
     answerSheets?: boolean;
     calculator?: boolean;
+    shuffle?: boolean;
     board?: string | null;
     classLevel?: string | null;
     uploadMinutes?: number;
@@ -68,6 +69,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
   const [resultRelease, setResultRelease] = useState<"INSTANT" | "ON_RELEASE" | "AFTER_DEADLINE">("ON_RELEASE");
   const [answerSheets, setAnswerSheets] = useState(false);
   const [calculator, setCalculator] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
   const [board, setBoard] = useState<string>("");
   const [uploadMinutes, setUploadMinutes] = useState("2");
   const [kind, setKind] = useState<TestKind>("TEST");
@@ -101,6 +103,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       setResultRelease(testToEdit.resultRelease ?? "ON_RELEASE");
       setAnswerSheets(testToEdit.answerSheets ?? false);
       setCalculator(testToEdit.calculator ?? false);
+      setShuffle(testToEdit.shuffle ?? false);
       setBoard(testToEdit.board ?? "");
       setUploadMinutes(String(testToEdit.uploadMinutes ?? 2));
       setKind(testToEdit.kind ?? "TEST");
@@ -144,6 +147,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
       resultRelease,
       answerSheets: mode === "QUESTIONS" ? answerSheets : undefined,
       calculator: mode === "QUESTIONS" ? calculator : undefined,
+      shuffle: mode === "QUESTIONS" ? shuffle : undefined,
       board: mode === "QUESTIONS" ? board || null : undefined,
       uploadMinutes: mode === "LINK" || answerSheets ? uploadMinutes : undefined,
       kind,
@@ -472,6 +476,24 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                   </span>
                 </label>
               </div>
+
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="shuffle"
+                  checked={shuffle}
+                  onCheckedChange={(checked) => setShuffle(Boolean(checked))}
+                  className="mt-0.5"
+                />
+                <label htmlFor="shuffle" className="cursor-pointer leading-tight">
+                  <span className="text-xs font-medium text-brand-ink">Shuffle questions for each student</span>
+                  <span className="block text-[11px] text-brand-ink/55">
+                    Every student sees the questions, and the choices of each multiple-choice question, in
+                    an order of their own, so a shared answer key does not line up. Questions under one
+                    passage or in one internal choice stay together, and choices such as &ldquo;All of
+                    the above&rdquo; are left as written.
+                  </span>
+                </label>
+              </div>
             </div>
           )}
 
@@ -538,10 +560,19 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               </span>
               <span className="block text-[11px] text-brand-ink/55">
                 Warn them when they switch to another tab, window or app, and submit
-                the assessment automatically on the second time.
+                the assessment automatically on the second time. Also turns on full
+                screen, the camera, and the copy and screenshot block.
               </span>
             </label>
           </div>
+
+          {proctored && mode === "LINK" && (
+            <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
+              A linked paper (Google Form, Doc or PDF) is shown in a frame the portal cannot
+              see into, so copying inside it and screenshot keys pressed there are not blocked.
+              Write the paper in the portal (&ldquo;Questions&rdquo;) for the full protection.
+            </p>
+          )}
 
           <div className="flex items-center space-x-2 pt-2">
             <Checkbox

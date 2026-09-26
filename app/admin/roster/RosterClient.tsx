@@ -40,6 +40,8 @@ import {
   RotateCcw,
   Images,
   ScanFace,
+  Camera,
+  Zap,
 } from "lucide-react";
 import { EnterMarksModal, StudentGradeTarget } from "@/components/admin/EnterMarksModal";
 import { ReassignModal, ReassignTarget } from "@/components/admin/ReassignModal";
@@ -65,6 +67,9 @@ export interface RosterAssignment {
   noFaceFlags: number;
   multiFaceFlags: number;
   phoneFlags: number;
+  captureAttempts: number;
+  /** Most answers were given within seconds of the question appearing. */
+  answeredTooFast: boolean;
   /** When the student's answer photos were uploaded, if they have been. */
   answersUploadedAt: Date | null;
   answerPageCount: number;
@@ -89,7 +94,7 @@ interface RosterClientProps {
   assignments: RosterAssignment[];
 }
 
-/** The camera's flags for one attempt, one line each, only those that fired. */
+/** The exam guards' flags for one attempt, one line each, only those that fired. */
 function CameraFlags({ a, className }: { a: RosterAssignment; className: string }) {
   const flags: [DetectionKind, number][] = [
     ["NO_FACE", a.noFaceFlags],
@@ -106,6 +111,21 @@ function CameraFlags({ a, className }: { a: RosterAssignment; className: string 
             {detectionLabel(kind)} {count}&times;
           </span>
         ))}
+      {a.captureAttempts > 0 && (
+        <span className={className} title={`Tried to take a screenshot ${a.captureAttempts} time(s)`}>
+          <Camera className="h-3 w-3" />
+          Screenshot {a.captureAttempts}&times;
+        </span>
+      )}
+      {a.answeredTooFast && (
+        <span
+          className={className}
+          title="Most answers were given within a few seconds of the question appearing -- worth a look, not proof."
+        >
+          <Zap className="h-3 w-3" />
+          Answered very fast
+        </span>
+      )}
     </>
   );
 }

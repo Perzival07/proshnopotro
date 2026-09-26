@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { resolveSecureFormUrl, markStudentSubmission, type StudentPaper } from "./actions";
 import { ExamPaper, type ExamPaperHandle } from "@/components/student/ExamPaper";
@@ -9,6 +9,9 @@ import { isWrittenPaper, type TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { TabGuard } from "@/components/student/TabGuard";
 import { ContentGuard } from "@/components/student/ContentGuard";
+import { FullscreenGate } from "@/components/student/FullscreenGate";
+import { ViolationWarning, useViolationReporter } from "@/components/student/ViolationGuard";
+import { watermarkText } from "@/lib/watermark";
 import { AnswerUploadPanel } from "@/components/student/AnswerUploadPanel";
 import { FullscreenFrame, useFullscreen } from "@/components/student/FullscreenFrame";
 import {
@@ -35,6 +38,7 @@ interface StartTestButtonProps {
   testTitle: string;
   testFormat: TestFormat;
   studentName?: string | null;
+  studentEmail?: string | null;
   /**
    * Set only when this student already started a timed attempt, so a reload
    * shows the clock still running rather than a fresh, untouched page.
@@ -71,6 +75,7 @@ export function StartTestButton({
   testTitle,
   testFormat,
   studentName,
+  studentEmail,
   initialEndsAt,
   initialServerNow,
   proctored = false,
@@ -139,6 +144,27 @@ export function StartTestButton({
     setTimeUp(true);
     if (typeof document !== "undefined") void exitFullscreen(document);
   }, []);
+
+  // Every guard (tab, full screen, screenshot) reports here, so one act that
+  // trips two of them is one strike, not two.
+  const violations = useViolationReporter(assignmentId, handleGuardSubmitted);
+  const reportViolation = violations.report;
+
+  // A proctored paper is sat full screen. Leaving it counts as leaving the
+  // assessment -- unless the student is finishing (Submit, the clock, a guard
+  // ending the attempt), where the paper collapsing is the point, not a breach.
+  const fullscreenRequired = proctored && opened && !timeUp && !submitting && !confirmingFinish;
+  const fullscreenRequiredRef = useRef(fullscreenRequired);
+  fullscreenRequiredRef.current = fullscreenRequired;
+  const wasExpanded = useRef(false);
+  useEffect(() => {
+    if (wasExpanded.current && !expanded && fullscreenRequiredRef.current) {
+      void reportViolation("FULLSCREEN");
+    }
+    wasExpanded.current = expanded;
+  }, [expanded, reportViolation]);
+
+  const watermark = watermarkText(studentName, studentEmail) || undefined;
 
   // Reads the same stream, on this device only, for a missing face, a second
   // face or a phone. The first flag of a kind warns; the second ends the
@@ -311,14 +337,20 @@ export function StartTestButton({
       {/* Watching starts only once the paper is actually in front of them, and
           stops the moment the attempt is over. */}
       {proctored && (
-        <TabGuard
-          assignmentId={assignmentId}
-          active={opened && !timeUp && !submitting}
-          onSubmitted={handleGuardSubmitted}
+        <TabGuard active={opened && !timeUp && !submitting} report={reportViolation} />
+      )}
+
+      {proctored && (
+        <ContentGuard
+          active={opened && !timeUp}
+          onCaptureAttempt={() => void reportViolation("CAPTURE")}
+          coverOnBlur={!!paper}
         />
       )}
 
-      {proctored && <ContentGuard active={opened && !timeUp} />}
+      {proctored && <ViolationWarning warning={violations.warning} onDismiss={violations.dismiss} />}
+
+      <FullscreenGate show={fullscreenRequired && !expanded} onEnter={fullscreen.expand} />
 
       {proctored && cameraActive && (
         <ProctorFlagBanner flag={detection.flag} onDismiss={detection.dismiss} />
@@ -497,6 +529,7 @@ export function StartTestButton({
                 </div>
               }
               overlay={cameraBadge}
+              watermark={proctored ? watermark : undefined}
             >
               <ExamPaper
                 ref={examRef}
@@ -519,6 +552,7 @@ export function StartTestButton({
               label={isDoc ? "Question paper" : "Assessment form"}
               toolbar={countdown}
               overlay={cameraBadge}
+              watermark={proctored ? watermark : undefined}
               sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
             />
           )}
@@ -551,7 +585,11 @@ export function StartTestButton({
                   : "Have you pressed Submit inside the form? Finishing closes the paper and you cannot open it again."}
               </p>
               <div className="grid grid-cols-2 gap-2">
-                <Button type="button" variant="outline" onClick={() => setConfirmingFinish(false)}>
+                <Button type="button" variant="outline" onClick={() => {
+                    setConfirmingFinish(false);
+                    // A fresh click, so the browser allows full screen again.
+                    if (proctored) fullscreen.expand();
+                  }}>
                   Keep working
                 </Button>
                 <Button
