@@ -19,7 +19,7 @@ interface ContentGuardProps {
  * Stops the paper being copied out, saved or printed, and blanks it while a
  * screenshot is being taken.
  *
- * Copy, cut, the right-click menu, drag, text selection and printing are
+ * Copy, cut, paste, the right-click menu, drag, text selection and printing are
  * refused outright (selection and printing through the `exam-locked` class in
  * globals.css). Screenshots cannot be refused -- the OS takes them -- so the
  * paper is covered for a moment when the key or chord for one goes down, and
@@ -28,7 +28,7 @@ interface ContentGuardProps {
  * at all, and keys pressed while focus is inside a cross-origin frame (a Google
  * Form) never reach this page.
  *
- * Answers stay typeable and pasteable; only taking the paper out is blocked.
+ * Answers stay typeable; nothing can be pasted in or copied out.
  */
 export function ContentGuard({ active }: ContentGuardProps) {
   const [covered, setCovered] = useState(false);
@@ -71,6 +71,7 @@ export function ContentGuard({ active }: ContentGuardProps) {
 
     document.addEventListener("copy", refuse);
     document.addEventListener("cut", refuse);
+    document.addEventListener("paste", refuse);
     document.addEventListener("contextmenu", refuse);
     document.addEventListener("dragstart", refuse);
     document.addEventListener("keydown", onKeyDown);
@@ -82,6 +83,7 @@ export function ContentGuard({ active }: ContentGuardProps) {
       html.classList.remove("exam-locked");
       document.removeEventListener("copy", refuse);
       document.removeEventListener("cut", refuse);
+      document.removeEventListener("paste", refuse);
       document.removeEventListener("contextmenu", refuse);
       document.removeEventListener("dragstart", refuse);
       document.removeEventListener("keydown", onKeyDown);
