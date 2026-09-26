@@ -377,12 +377,15 @@ export function TestsClient({ tests }: TestsClientProps) {
       {/* Dense Table */}
       <div className="rounded-xl border border-brand-border bg-white shadow-card overflow-hidden">
         <div className="hidden xl:block">
-        <Table>
+        {/* Tighter cell padding, and the columns sized to fit the ~960px the
+            admin layout leaves at the xl breakpoint, so the table never
+            scrolls sideways and pushes the actions off screen. */}
+        <Table className="[&_th]:px-3 [&_td]:px-3">
           <TableHeader>
             <TableRow>
               <TableHead className="w-[45px]">Icon</TableHead>
               <TableHead
-                className="cursor-pointer hover:text-brand-blue select-none"
+                className="w-full cursor-pointer hover:text-brand-blue select-none"
                 onClick={() => handleSort("title")}
               >
                 <div className="flex items-center gap-1.5">
@@ -391,7 +394,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                 </div>
               </TableHead>
               <TableHead
-                className="w-[140px] cursor-pointer hover:text-brand-blue select-none"
+                className="w-[215px] cursor-pointer hover:text-brand-blue select-none"
                 onClick={() => handleSort("subject")}
               >
                 <div className="flex items-center gap-1.5">
@@ -399,9 +402,9 @@ export function TestsClient({ tests }: TestsClientProps) {
                   <ArrowUpDown className="h-3 w-3 opacity-60" />
                 </div>
               </TableHead>
-              <TableHead className="w-[100px] text-center">Status</TableHead>
+              <TableHead className="w-[95px] text-center">Status</TableHead>
               <TableHead
-                className="w-[130px] text-center cursor-pointer hover:text-brand-blue select-none"
+                className="w-[95px] text-center cursor-pointer hover:text-brand-blue select-none"
                 onClick={() => handleSort("assignments")}
               >
                 <div className="flex items-center justify-center gap-1.5">
@@ -410,7 +413,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                 </div>
               </TableHead>
               <TableHead
-                className="w-[120px] cursor-pointer hover:text-brand-blue select-none"
+                className="w-[85px] cursor-pointer hover:text-brand-blue select-none"
                 onClick={() => handleSort("createdAt")}
               >
                 <div className="flex items-center gap-1.5">
@@ -418,7 +421,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                   <ArrowUpDown className="h-3 w-3 opacity-60" />
                 </div>
               </TableHead>
-              <TableHead className="w-[300px] text-right">Actions</TableHead>
+              <TableHead className="w-[190px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -437,11 +440,14 @@ export function TestsClient({ tests }: TestsClientProps) {
                     </div>
                   </TableCell>
 
-                  <TableCell className="font-medium text-brand-navy">
+                  {/* max-w-0 lets this cell take whatever width is left and
+                      truncate the description, instead of the description's
+                      full length widening the whole table. */}
+                  <TableCell className="max-w-0 font-medium text-brand-navy">
                     <div>
                       <span className="font-semibold text-[13px]">{test.title}</span>
                       {test.description && (
-                        <p className="text-[11px] text-brand-ink/60 truncate max-w-md">
+                        <p className="text-[11px] text-brand-ink/60 truncate">
                           {test.description}
                         </p>
                       )}
@@ -458,7 +464,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                           </span>
                         )}
                       </span>
-                      <span className="inline-flex w-fit items-center gap-1 text-[10px] font-medium text-brand-ink/60">
+                      <span className="inline-flex w-fit items-center gap-1 whitespace-nowrap text-[10px] font-medium text-brand-ink/60">
                         <FormatLabel format={test.format} />
                         {test.durationMinutes ? (
                           <span className="inline-flex items-center gap-1 text-brand-blue">
@@ -505,7 +511,10 @@ export function TestsClient({ tests }: TestsClientProps) {
                   </TableCell>
 
                   <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1.5">
+                    {/* Two tidy rows: the icon links, then Turn off / Delete. The
+                        minimum width is what stops the column collapsing into a
+                        one-button-per-line stack. */}
+                    <div className="ml-auto flex min-w-[175px] flex-wrap items-center justify-end gap-1.5">
                       {test.answerSheets && (
                         <Link
                           href={`/admin/tests/${test.id}/marking`}
