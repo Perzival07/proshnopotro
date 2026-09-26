@@ -421,7 +421,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                   <ArrowUpDown className="h-3 w-3 opacity-60" />
                 </div>
               </TableHead>
-              <TableHead className="w-[190px] text-right">Actions</TableHead>
+              <TableHead className="w-[190px] text-right 2xl:w-[355px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -511,10 +511,11 @@ export function TestsClient({ tests }: TestsClientProps) {
                   </TableCell>
 
                   <TableCell className="text-right">
-                    {/* Two tidy rows: the icon links, then Turn off / Delete. The
-                        minimum width is what stops the column collapsing into a
-                        one-button-per-line stack. */}
-                    <div className="ml-auto flex min-w-[175px] flex-wrap items-center justify-end gap-1.5">
+                    {/* Two tidy rows -- the icon links, then Turn off / Delete -- or
+                        one row once the screen is wide enough. The minimum width is
+                        what stops the column collapsing into a one-button-per-line
+                        stack. */}
+                    <div className="ml-auto flex min-w-[175px] flex-wrap 2xl:min-w-[345px] items-center justify-end gap-1.5">
                       {test.answerSheets && (
                         <Link
                           href={`/admin/tests/${test.id}/marking`}

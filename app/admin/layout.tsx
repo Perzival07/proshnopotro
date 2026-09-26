@@ -69,7 +69,9 @@ export default async function AdminLayout({
         </header>
 
         {/* Dynamic page content */}
-        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl w-full mx-auto flex-1 min-w-0">{children}</div>
+        {/* Wide, because the admin pages are mostly tables: capped at 1280px they
+            scrolled sideways on a laptop and left a large monitor half empty. */}
+        <div className="p-4 sm:p-6 lg:px-6 lg:py-8 max-w-[1680px] w-full mx-auto flex-1 min-w-0">{children}</div>
       </div>
     </div>
   );
