@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   CAMERA_CONSTRAINTS,
   cameraErrorMessage,
+  clampBadgePosition,
   isCameraSupported,
   PROCTOR_NOTICE,
   stopStream,
@@ -15,7 +16,7 @@ import {
   type FaceStore,
 } from "@/components/student/ProctorDetection";
 import { coverRect } from "@/lib/proctor-detect";
-import { Video, VideoOff } from "lucide-react";
+import { GripHorizontal, Video, VideoOff } from "lucide-react";
 
 /**
  * Owns the exam camera.
@@ -107,6 +108,10 @@ interface ProctorCameraBadgeProps {
  * It sits above the full-screen question paper (z-50) but below the tab-switch
  * warning (z-60) and the answer upload (z-70), so it is always visible during
  * the exam and never covers the things that end it.
+ *
+ * It starts in the bottom-right corner and can be dragged anywhere on screen
+ * (mouse, touch or pen) so the student can move it off the question they are
+ * reading. It is kept fully on screen, and follows a window resize.
  */
 export function ProctorCameraBadge({
   stream,
@@ -117,6 +122,61 @@ export function ProctorCameraBadge({
   onRetry,
 }: ProctorCameraBadgeProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // null until first dragged: the badge then sits in its default corner.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const dragRef = useRef<{ dx: number; dy: number } | null>(null);
+
+  const place = useCallback((x: number, y: number) => {
+    const el = rootRef.current;
+    if (!el) return;
+    const { width, height } = el.getBoundingClientRect();
+    setPos(
+      clampBadgePosition(
+        { x, y },
+        { width, height },
+        { width: window.innerWidth, height: window.innerHeight }
+      )
+    );
+  }, []);
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Let the "Turn camera on" button be a button.
+    if ((e.target as HTMLElement).closest("button")) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = { dx: e.clientX - rect.left, dy: e.clientY - rect.top };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setDragging(true);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (d) place(e.clientX - d.dx, e.clientY - d.dy);
+  };
+
+  const endDrag = () => {
+    dragRef.current = null;
+    setDragging(false);
+  };
+
+  // A rotated phone or resized window must not strand the badge off screen.
+  useEffect(() => {
+    const onResize = () => {
+      setPos((current) => {
+        const el = rootRef.current;
+        if (!current || !el) return current;
+        const { width, height } = el.getBoundingClientRect();
+        return clampBadgePosition(
+          current,
+          { width, height },
+          { width: window.innerWidth, height: window.innerHeight }
+        );
+      });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -136,7 +196,17 @@ export function ProctorCameraBadge({
   const boxColor = snapshot.boxes.length === 1 ? "border-emerald-400" : "border-red-500";
 
   return (
-    <div className="fixed bottom-3 right-3 z-[55] w-40 overflow-hidden rounded-xl border border-brand-border bg-white shadow-lg sm:w-64">
+    <div
+      ref={rootRef}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+      style={pos ? { left: pos.x, top: pos.y } : undefined}
+      className={`fixed z-[55] w-40 touch-none select-none overflow-hidden rounded-xl border border-brand-border bg-white shadow-lg sm:w-64 ${
+        pos ? "" : "bottom-3 right-3"
+      } ${dragging ? "cursor-grabbing" : "cursor-grab"}`}
+    >
       <div className="relative aspect-[4/3] bg-brand-navy">
         {live ? (
           <video
@@ -184,6 +254,14 @@ export function ProctorCameraBadge({
             {snapshot.boxes.length === 0 ? "No face detected" : `${snapshot.boxes.length} faces detected`}
           </span>
         )}
+
+        <span
+          className="pointer-events-none absolute right-1.5 top-1.5 rounded bg-black/55 px-1 py-0.5 text-white/80"
+          title="Drag to move"
+          aria-hidden="true"
+        >
+          <GripHorizontal className="h-3 w-3" />
+        </span>
 
         {live && (
           <span className="absolute left-1.5 top-1.5 inline-flex items-center gap-1 rounded bg-black/55 px-1.5 py-0.5">

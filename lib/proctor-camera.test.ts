@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import {
+  clampBadgePosition,
   CAMERA_CONSTRAINTS,
   cameraErrorMessage,
   isCameraLive,
@@ -76,5 +77,29 @@ describe("stopStream", () => {
     expect(() => stopStream({ getTracks: () => [bad, good] })).not.toThrow();
     expect(good.stop).toHaveBeenCalledOnce();
     expect(() => stopStream(null)).not.toThrow();
+  });
+});
+
+describe("clampBadgePosition", () => {
+  const badge = { width: 100, height: 80 };
+  const viewport = { width: 800, height: 600 };
+
+  it("leaves a position that is already on screen alone", () => {
+    expect(clampBadgePosition({ x: 300, y: 200 }, badge, viewport)).toEqual({ x: 300, y: 200 });
+  });
+
+  it("holds the whole badge inside every edge", () => {
+    expect(clampBadgePosition({ x: -50, y: -50 }, badge, viewport)).toEqual({ x: 8, y: 8 });
+    expect(clampBadgePosition({ x: 5000, y: 5000 }, badge, viewport)).toEqual({
+      x: 800 - 100 - 8,
+      y: 600 - 80 - 8,
+    });
+  });
+
+  it("pins a badge larger than the screen to the near edge", () => {
+    expect(clampBadgePosition({ x: 300, y: 300 }, { width: 900, height: 700 }, viewport)).toEqual({
+      x: 8,
+      y: 8,
+    });
   });
 });

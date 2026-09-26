@@ -113,3 +113,28 @@ export const PROCTOR_NOTICE = {
   screen: "Screen activity recorded",
   detection: "Face & phone check on",
 } as const;
+
+/** Keeps a dragged badge this far from the screen edge, in px. */
+export const BADGE_EDGE_MARGIN = 8;
+
+/**
+ * Where a dragged badge may sit: its top-left corner, held so the whole badge
+ * stays on screen. The student moves it off the question they are reading, but
+ * never loses it past an edge -- the camera has to remain visible.
+ */
+export function clampBadgePosition(
+  pos: { x: number; y: number },
+  badge: { width: number; height: number },
+  viewport: { width: number; height: number },
+  margin: number = BADGE_EDGE_MARGIN
+): { x: number; y: number } {
+  const clamp = (value: number, size: number, room: number) => {
+    const max = room - size - margin;
+    // A badge bigger than the screen pins to the near edge rather than flipping.
+    return Math.max(margin, Math.min(value, Math.max(margin, max)));
+  };
+  return {
+    x: clamp(pos.x, badge.width, viewport.width),
+    y: clamp(pos.y, badge.height, viewport.height),
+  };
+}
