@@ -27,6 +27,7 @@ function optionShape(type: string, options: unknown): string {
 import type { MarkingScheme } from "@/lib/marking";
 import { regradeTest } from "@/lib/grade-attempt";
 import { signQuestionImageUpload, type UploadSignature } from "@/lib/cloudinary";
+import { org } from "@/lib/org";
 
 type Result = { success?: true; error?: string; errors?: ImportError[] };
 
@@ -461,6 +462,7 @@ export async function saveTranslation(
   language: string
 ): Promise<Result & { problems?: string[]; translated?: number }> {
   await requireAdmin();
+  if (!org.features.secondLanguage) return { error: "A second language is switched off for this organisation." };
   const loaded = await loadQuestionTest(testId);
   if ("error" in loaded) return { error: loaded.error };
   const name = language.trim() || "हिन्दी";

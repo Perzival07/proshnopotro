@@ -1,6 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import { markPaper, type ResponseValue } from "@/lib/marking";
 import { normalizeScheme, toMarkableSections } from "@/lib/paper";
+import { org } from "@/lib/org";
+import { effectiveFeatures } from "@/lib/org-features";
 
 /**
  * Marks a closed attempt at a QUESTIONS test and records the score.
@@ -67,7 +69,7 @@ export async function gradeAssignment(assignmentId: string): Promise<void> {
     }),
     // An objective paper has no answer sheets to photograph, so the upload
     // step is closed at once and the student is never asked for one.
-    ...(assignment.test.answerSheets || assignment.answersUploadedAt
+    ...(effectiveFeatures(assignment.test, org.features).answerSheets || assignment.answersUploadedAt
       ? []
       : [
           prisma.assignment.updateMany({

@@ -38,13 +38,18 @@ describe("warningMessage", () => {
 });
 
 describe("isProctored", () => {
+  const on = { proctoring: true };
   it("is true only when the tutor left the guard on", () => {
-    expect(isProctored({ test: { proctored: true } })).toBe(true);
-    expect(isProctored({ test: { proctored: false } })).toBe(false);
+    expect(isProctored({ test: { proctored: true } }, on)).toBe(true);
+    expect(isProctored({ test: { proctored: false } }, on)).toBe(false);
   });
 
   it("is false when the flag is missing rather than assuming it is on", () => {
-    expect(isProctored({ test: {} })).toBe(false);
-    expect(isProctored({ test: { proctored: null } })).toBe(false);
+    expect(isProctored({ test: {} }, on)).toBe(false);
+    expect(isProctored({ test: { proctored: null } }, on)).toBe(false);
+  });
+
+  it("is false for every test when the organisation has proctoring off", () => {
+    expect(isProctored({ test: { proctored: true } }, { proctoring: false })).toBe(false);
   });
 });

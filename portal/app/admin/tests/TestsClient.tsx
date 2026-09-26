@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { org } from "@/lib/org";
 import Link from "next/link";
 import {
   Table,
@@ -300,7 +301,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                     {formatDurationLabel(test.durationMinutes)}
                   </span>
                 ) : null}
-                {test.proctored && (
+                {test.proctored && org.features.proctoring && (
                   <span className="inline-flex items-center gap-1 text-brand-navy">
                     <Eye className="h-3 w-3" />
                     Watched
@@ -472,7 +473,7 @@ export function TestsClient({ tests }: TestsClientProps) {
                             {formatDurationLabel(test.durationMinutes)}
                           </span>
                         ) : null}
-                        {test.proctored && (
+                        {test.proctored && org.features.proctoring && (
                           <span
                             title="Students get one warning when they leave the tab, and are submitted on the second time"
                             className="inline-flex items-center gap-1 text-brand-navy"

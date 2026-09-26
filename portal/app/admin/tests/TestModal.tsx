@@ -33,6 +33,7 @@ import { KIND_HINTS, KIND_LABELS, TEST_KINDS, type TestKind } from "@/lib/schedu
 import { BOARDS, CLASS_LEVELS } from "@/lib/syllabus";
 import { detectTestFormat, toEmbedUrl, type LinkFormat, type TestFormat } from "@/lib/test-resource";
 import { MAX_DURATION_MINUTES, MIN_DURATION_MINUTES } from "@/lib/exam-timer";
+import { org } from "@/lib/org";
 
 interface TestModalProps {
   isOpen: boolean;
@@ -412,6 +413,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                 </div>
               </div>
 
+              {org.features.answerSheetUpload && (
               <div className="flex items-start space-x-2">
                 <Checkbox
                   id="answer-sheets"
@@ -429,6 +431,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                   </span>
                 </label>
               </div>
+              )}
 
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs font-semibold text-brand-navy">
@@ -461,6 +464,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                 </p>
               </div>
 
+              {org.features.calculator && (
               <div className="flex items-start space-x-2">
                 <Checkbox
                   id="calculator"
@@ -476,6 +480,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
                   </span>
                 </label>
               </div>
+              )}
 
               <div className="flex items-start space-x-2">
                 <Checkbox
@@ -524,7 +529,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             </p>
           </div>
 
-          {(mode === "LINK" || answerSheets) && (
+          {(mode === "LINK" || (answerSheets && org.features.answerSheetUpload)) && (
             <div>
               <Label htmlFor="upload-minutes" className="text-xs font-semibold text-brand-navy">
                 Minutes to upload answer photos
@@ -547,6 +552,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             </div>
           )}
 
+          {org.features.proctoring && (
           <div className="flex items-start space-x-2 pt-2">
             <Checkbox
               id="proctored"
@@ -561,12 +567,13 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
               <span className="block text-[11px] text-brand-ink/55">
                 Warn them when they switch to another tab, window or app, and submit
                 the assessment automatically on the second time. Also turns on full
-                screen, the camera, and the copy and screenshot block.
+                screen, {org.features.cameraProctoring ? "the camera, " : ""}and the copy and screenshot block.
               </span>
             </label>
           </div>
+          )}
 
-          {proctored && mode === "LINK" && (
+          {org.features.proctoring && proctored && mode === "LINK" && (
             <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-relaxed text-amber-900">
               A linked paper (Google Form, Doc or PDF) is shown in a frame the portal cannot
               see into, so copying inside it and screenshot keys pressed there are not blocked.

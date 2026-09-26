@@ -24,6 +24,8 @@ import {
 } from "@/lib/answer-upload";
 import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
 import { gradeAssignment } from "@/lib/grade-attempt";
+import { org } from "@/lib/org";
+import { effectiveFeatures } from "@/lib/org-features";
 import { isNotYetOpen } from "@/lib/schedule";
 import { shuffleSections } from "@/lib/shuffle";
 import {
@@ -164,8 +166,9 @@ export async function resolveSecureFormUrl(
     // Always stamped for a paper written here, timed or not: answers are only
     // taken once it has been opened, and the tutor's editor locks the paper's
     // shape from that moment.
-    paper.calculator = assignment.test.calculator;
-    paper.secondLanguage = assignment.test.secondLanguage;
+    const features = effectiveFeatures(assignment.test, org.features);
+    paper.calculator = features.calculator;
+    paper.secondLanguage = features.secondLanguage;
     const startedAt = await ensureStarted(assignment, true);
     const windows = sectionWindows(
       paper.sections.map((s, position) => ({ id: s.id, position, durationMinutes: s.durationMinutes }))
@@ -545,7 +548,7 @@ export async function recordTabSwitch(
   }
 
   // Nothing to police on an unproctored test or a finished attempt.
-  if (!isProctored(assignment)) return { count: 0, remaining: MAX_UNWATCHED };
+  if (!isProctored(assignment, org.features)) return { count: 0, remaining: MAX_UNWATCHED };
   if (isAssignmentSubmitted(assignment)) {
     return { submitted: true, count: assignment.tabSwitches };
   }
@@ -617,7 +620,7 @@ export async function recordProctorFlag(
     return { error: "Unauthorized." };
   }
 
-  if (!isProctored(assignment)) return {};
+  if (!isProctored(assignment, org.features)) return {};
   if (isAssignmentSubmitted(assignment)) return { submitted: true };
 
   const column = DETECTION_COLUMN[kind];
@@ -667,7 +670,7 @@ export async function recordCaptureAttempt(
     return { error: "Unauthorized." };
   }
 
-  if (!isProctored(assignment)) return {};
+  if (!isProctored(assignment, org.features)) return {};
   if (isAssignmentSubmitted(assignment)) return { submitted: true };
 
   const updated = await prisma.assignment.update({

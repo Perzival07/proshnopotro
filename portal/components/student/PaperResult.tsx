@@ -6,6 +6,8 @@ import { markPaper, maxMarksFor, type QuestionStatus, type ResponseValue } from 
 import { normalizeScheme, parseAnswerKey, parseMatrixOptions, parseOptions, toMarkableSections } from "@/lib/paper";
 import { formatDate } from "@/lib/utils";
 import { parseTranslation } from "@/lib/translation";
+import { org } from "@/lib/org";
+import { effectiveFeatures } from "@/lib/org-features";
 import { shuffleSections } from "@/lib/shuffle";
 import { MarkedSheets } from "@/components/student/MarkedSheets";
 import { chapterBreakdown } from "@/lib/chapter-report";
@@ -97,6 +99,7 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
   }
 
   const scheme = normalizeScheme(test.markingScheme);
+  const { secondLanguage } = effectiveFeatures(test, org.features);
   // Written answers stay "awaiting marking" until the tutor returns the copy,
   // however far the marking has got, so a half-marked paper is never shown.
   const returned = assignment.returnedAt !== null;
@@ -355,13 +358,13 @@ export async function PaperResult({ assignmentId, studentEmail }: { assignmentId
 
                   <RichText text={q.stem} className="text-sm" />
                   {(() => {
-                    const tr = test.secondLanguage ? parseTranslation(q.translation) : null;
+                    const tr = secondLanguage ? parseTranslation(q.translation) : null;
                     if (!tr) return null;
                     const list = [...tr.options, ...tr.columns];
                     return (
                       <details className="rounded-md border border-dashed border-brand-blue/30 bg-brand-tint/30 px-3 py-2 text-sm">
                         <summary className="cursor-pointer text-xs font-semibold text-brand-navy">
-                          Read in {test.secondLanguage}
+                          Read in {secondLanguage}
                         </summary>
                         <div className="mt-2 space-y-2">
                           <RichText text={tr.stem} />

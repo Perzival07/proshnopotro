@@ -11,6 +11,8 @@
  * meant to catch.
  */
 
+import type { OrgFeatures } from "./org-features";
+
 /**
  * Departures allowed before the attempt is submitted. The first one buys a
  * single warning; the second ends the attempt.
@@ -57,7 +59,13 @@ export function warningMessage(outcome: SwitchOutcome, reason: DepartureReason =
   } will submit your test automatically. Your timer has kept running.`;
 }
 
-/** Whether an attempt should be watched at all. */
-export function isProctored(assignment: { test: { proctored?: boolean | null } }): boolean {
-  return assignment.test.proctored === true;
+/**
+ * Whether an attempt should be watched at all: the tutor left the guard on
+ * and the organisation has proctoring switched on.
+ */
+export function isProctored(
+  assignment: { test: { proctored?: boolean | null } },
+  features: Pick<OrgFeatures, "proctoring">
+): boolean {
+  return assignment.test.proctored === true && features.proctoring;
 }

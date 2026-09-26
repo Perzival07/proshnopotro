@@ -14,6 +14,8 @@ import { isAssignmentSubmitted } from "@/lib/assignment-status";
 import { attemptDeadline, formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
 import { closeExpiredAttempts } from "@/lib/close-expired";
 import { uploadState } from "@/lib/answer-upload";
+import { org } from "@/lib/org";
+import { effectiveFeatures } from "@/lib/org-features";
 import { AlertTriangle, ArrowLeft, Calendar, Shield, Timer } from "lucide-react";
 import Link from "next/link";
 
@@ -192,6 +194,8 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
     !awaitingUpload && (timed || assignment.test.format === "QUESTIONS") && assignment.startedAt
       ? attemptDeadline(assignment)
       : null;
+  // This test's settings with the organisation's feature switches applied.
+  const features = effectiveFeatures(assignment.test, org.features);
 
   return (
     <div className="min-h-screen flex flex-col justify-between bg-brand-page">
@@ -284,7 +288,7 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                         )} starts the moment you open the paper and keeps running if you close this page. When it reaches zero the assessment is submitted automatically.`}
                   </p>
                 )}
-                {assignment.test.proctored && (
+                {features.proctored && (
                   <>
                     <p className="text-xs leading-relaxed font-medium">
                       Stay on this tab once the paper opens. Switching to another tab,
@@ -300,6 +304,7 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                       submitted automatically. Your tutor can see all of this, and how
                       quickly each question was answered.
                     </p>
+                    {features.camera && (
                     <p className="text-xs leading-relaxed font-medium">
                       This assessment is camera-proctored. You will be asked to allow
                       the camera every time you open the paper, and a quick face check
@@ -308,6 +313,7 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                       saved or sent anywhere &mdash; the camera is there so you can see
                       that the assessment is being supervised.
                     </p>
+                    )}
                   </>
                 )}
                 {assignment.test.format === "QUESTIONS" && (
@@ -316,7 +322,7 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                     connection loses nothing already answered.
                   </p>
                 )}
-                {(assignment.test.format !== "QUESTIONS" || assignment.test.answerSheets) && (
+                {(assignment.test.format !== "QUESTIONS" || features.answerSheets) && (
                 <p className="text-xs leading-relaxed font-medium">
                   When you finish or the time runs out, the paper closes. You then
                   have {assignment.test.uploadMinutes} minutes to photograph your answers
@@ -341,8 +347,9 @@ export default async function TestConfirmationPage({ params: paramsPromise }: Pa
                 studentEmail={user.email}
                 initialEndsAt={endsAt?.toISOString() ?? null}
                 initialServerNow={endsAt ? new Date().toISOString() : null}
-                proctored={assignment.test.proctored}
-                answerSheets={assignment.test.answerSheets}
+                proctored={features.proctored}
+                camera={features.camera}
+                answerSheets={features.answerSheets}
                 initialPhase={awaitingUpload ? "upload" : "exam"}
               />
             </div>

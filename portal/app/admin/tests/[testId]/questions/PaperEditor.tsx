@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useDeferredValue, useMemo, useRef, useState } from "react";
+import { org } from "@/lib/org";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1552,6 +1553,9 @@ export function PaperEditor({ test, scheme, sections, passages, chapters }: Pape
   const locked = test.started > 0;
   const questionCount = sections.reduce((n, s) => n + s.questions.length, 0);
   const passageById = new Map(passages.map((p) => [p.id, p]));
+  // A paper keeps its translation when the organisation switches the second
+  // language off; it is just not shown.
+  const secondLanguage = org.features.secondLanguage ? test.secondLanguage : null;
 
   const maxScore = useMemo(
     () =>
@@ -1633,14 +1637,14 @@ export function PaperEditor({ test, scheme, sections, passages, chapters }: Pape
                     {alternative && (
                       <p className="text-center text-xs font-bold tracking-widest text-brand-navy">OR</p>
                     )}
-                    {firstOfPassage && passage && <PassageBlock passage={passage} language={test.secondLanguage} />}
+                    {firstOfPassage && passage && <PassageBlock passage={passage} language={secondLanguage} />}
                     <QuestionCard
                       testId={test.id}
                       number={number}
                       question={question}
                       scheme={section.scheme ?? scheme}
                       locked={locked}
-                      language={test.secondLanguage}
+                      language={secondLanguage}
                       chapters={chapters}
                       syllabus={test.syllabus}
                     />
@@ -1660,7 +1664,7 @@ export function PaperEditor({ test, scheme, sections, passages, chapters }: Pape
               <ResultsCard test={test} />
             </Card>
           )}
-          {questionCount > 0 && (
+          {questionCount > 0 && org.features.secondLanguage && (
             <Card title="Second language">
               <TranslationPanel testId={test.id} language={test.secondLanguage} sections={sections} />
             </Card>

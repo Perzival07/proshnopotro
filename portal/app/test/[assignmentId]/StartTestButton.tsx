@@ -47,6 +47,8 @@ interface StartTestButtonProps {
   initialServerNow?: string | null;
   /** Whether leaving the tab is warned about and, on the second time, ends it. */
   proctored?: boolean;
+  /** Camera, face scan and face/phone detection. Only on a proctored paper. */
+  camera?: boolean;
   /** Whether answer sheets are photographed after the paper. */
   answerSheets?: boolean;
   /**
@@ -79,6 +81,7 @@ export function StartTestButton({
   initialEndsAt,
   initialServerNow,
   proctored = false,
+  camera: cameraProctored = false,
   answerSheets = true,
   initialPhase = "exam",
 }: StartTestButtonProps) {
@@ -136,7 +139,7 @@ export function StartTestButton({
   // not yet finished. Nothing it sees is captured or sent anywhere -- it is
   // shown back to the student so that being watched is visible rather than
   // claimed.
-  const cameraActive = proctored && opened && !timeUp;
+  const cameraActive = proctored && cameraProctored && opened && !timeUp;
   const camera = useProctorCamera(cameraActive);
 
   const handleGuardSubmitted = useCallback((message: string) => {
@@ -182,7 +185,7 @@ export function StartTestButton({
   const paperNoun = isDoc || isQuestions ? "Question Paper" : "Google Form";
 
   const handleOpenClick = () => {
-    if (proctored) {
+    if (proctored && cameraProctored) {
       setAskingCamera(true);
       return;
     }
@@ -216,7 +219,7 @@ export function StartTestButton({
     // to get here; this only covers the camera having dropped since. The
     // permission prompt was raised on the student's own click, not in an
     // effect over the paper, where it would be dismissed unread.
-    if (proctored) {
+    if (proctored && cameraProctored) {
       await camera.start();
     }
 
