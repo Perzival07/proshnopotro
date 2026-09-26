@@ -8,6 +8,7 @@ import { exitFullscreen } from "@/lib/fullscreen";
 import { isWrittenPaper, type TestFormat } from "@/lib/test-resource";
 import { ExamCountdown } from "@/components/student/ExamCountdown";
 import { TabGuard } from "@/components/student/TabGuard";
+import { ContentGuard } from "@/components/student/ContentGuard";
 import { AnswerUploadPanel } from "@/components/student/AnswerUploadPanel";
 import { FullscreenFrame, useFullscreen } from "@/components/student/FullscreenFrame";
 import {
@@ -316,6 +317,8 @@ export function StartTestButton({
           onSubmitted={handleGuardSubmitted}
         />
       )}
+
+      {proctored && <ContentGuard active={opened && !timeUp} />}
 
       {proctored && cameraActive && (
         <ProctorFlagBanner flag={detection.flag} onDismiss={detection.dismiss} />

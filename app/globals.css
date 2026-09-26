@@ -70,3 +70,26 @@
 .animate-atom-slow {
   animation: atom-spin 12s linear infinite;
 }
+
+/* ContentGuard: while a proctored paper is open, its text cannot be selected,
+   long-press-saved or printed. Answer fields must stay selectable, or iOS
+   Safari will not let the student type in them. */
+html.exam-locked body {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+html.exam-locked input,
+html.exam-locked textarea,
+html.exam-locked [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+html.exam-locked img {
+  -webkit-user-drag: none;
+}
+@media print {
+  html.exam-locked body {
+    display: none !important;
+  }
+}
