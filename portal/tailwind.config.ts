@@ -1,5 +1,8 @@
 import type { Config } from "tailwindcss";
 import defaultTheme from "tailwindcss/defaultTheme";
+import { loadOrg } from "./org-loader.mjs";
+
+const brand = loadOrg().colors;
 
 const config: Config = {
   darkMode: ["class"],
@@ -13,13 +16,14 @@ const config: Config = {
     extend: {
       colors: {
         // Brand palette (from tutor logo)
+        // Set per organisation in orgs/<ORG>/org.json.
         brand: {
-          navy: "#0A4B8C",   // Headers, primary buttons, major titles
-          blue: "#2E9CD8",   // Links, focus rings, interactive active states
-          tint: "#E8F3FB",   // Thumbnail card backgrounds, table hover states
-          page: "#F7F8FA",   // Main application background
-          ink: "#1A2230",    // Primary body text
-          border: "#DCE4EC", // Subtle hairline borders
+          navy: brand.navy,     // Headers, primary buttons, major titles
+          blue: brand.blue,     // Links, focus rings, interactive active states
+          tint: brand.tint,     // Thumbnail card backgrounds, table hover states
+          page: brand.page,     // Main application background
+          ink: brand.ink,       // Primary body text
+          border: brand.border, // Subtle hairline borders
         },
         // Strict Status Colors (Status only, never brand blue)
         status: {
@@ -40,26 +44,26 @@ const config: Config = {
           },
         },
         // Semantic system tokens
-        border: "#DCE4EC",
-        input: "#DCE4EC",
-        ring: "#2E9CD8",
-        background: "#F7F8FA",
-        foreground: "#1A2230",
+        border: brand.border,
+        input: brand.border,
+        ring: brand.blue,
+        background: brand.page,
+        foreground: brand.ink,
         primary: {
-          DEFAULT: "#0A4B8C",
+          DEFAULT: brand.navy,
           foreground: "#FFFFFF",
         },
         secondary: {
-          DEFAULT: "#E8F3FB",
-          foreground: "#0A4B8C",
+          DEFAULT: brand.tint,
+          foreground: brand.navy,
         },
         muted: {
           DEFAULT: "#F1EFE8",
           foreground: "#5A6578",
         },
         accent: {
-          DEFAULT: "#E8F3FB",
-          foreground: "#0A4B8C",
+          DEFAULT: brand.tint,
+          foreground: brand.navy,
         },
       },
       fontFamily: {

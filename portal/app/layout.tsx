@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { PwaSetup } from "@/components/pwa/PwaSetup";
+import { org, PRODUCT_NAME } from "@/lib/org";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -18,15 +19,16 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: "Classes by Koustav | Student Assessment Portal",
+  title: `${org.name} | Student Assessment Portal`,
   description:
-    "Official student assessment and test dashboard for Classes by Koustav. Track your scheduled tests, access Google Forms assessments, and view your results.",
-  applicationName: "Classes by Koustav",
+    `Official student assessment and test dashboard for ${org.name}. Track your scheduled tests, access Google Forms assessments, and view your results.`,
+  applicationName: org.name,
+  generator: PRODUCT_NAME,
   // iPhone and iPad read these rather than the manifest when the portal is
   // added to the home screen: open full screen, under this name.
   appleWebApp: {
     capable: true,
-    title: "Koustav",
+    title: org.shortName,
     statusBarStyle: "default",
   },
   formatDetection: { telephone: false },
@@ -36,7 +38,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0A4B8C",
+  themeColor: org.colors.navy,
 };
 
 export default function RootLayout({

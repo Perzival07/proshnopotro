@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { AtomMark } from "./AtomMark";
 import { cn } from "@/lib/utils";
+import { org } from "@/lib/org";
 
 interface LogoLockupProps {
   variant?: "white" | "navy";
@@ -17,8 +18,8 @@ export function LogoLockup({
   subtitle,
 }: LogoLockupProps) {
   const isWhite = variant === "white";
-  const strokeColor = isWhite ? "#FFFFFF" : "#0A4B8C";
-  const dotColor = isWhite ? "#62BEF0" : "#2E9CD8";
+  const strokeColor = isWhite ? "#FFFFFF" : org.colors.navy;
+  const dotColor = isWhite ? "#62BEF0" : org.colors.blue;
 
   const content = (
     <div className={cn("inline-flex items-center gap-3 select-none", className)}>
@@ -36,7 +37,7 @@ export function LogoLockup({
               isWhite ? "text-white/90" : "text-brand-ink"
             )}
           >
-            classes by
+            {org.logo.prefix}
           </span>
           <span
             className={cn(
@@ -44,7 +45,7 @@ export function LogoLockup({
               isWhite ? "text-white font-bold" : "text-brand-navy"
             )}
           >
-            KOUSTAV
+            {org.logo.main}
           </span>
         </div>
         {subtitle ? (
@@ -63,7 +64,7 @@ export function LogoLockup({
               isWhite ? "text-[#87CEEB]" : "text-brand-blue"
             )}
           >
-            Learn. Succeed. Shine.
+            {org.tagline}
           </span>
         )}
       </div>

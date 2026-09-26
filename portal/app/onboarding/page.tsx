@@ -1,4 +1,5 @@
 import React from "react";
+import { org } from "@/lib/org";
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
@@ -35,7 +36,7 @@ export default async function OnboardingPage() {
                 Complete Your Student Profile
               </h1>
               <p className="text-sm text-brand-ink/70 mt-1.5">
-                Welcome to <strong>Classes by Koustav</strong>. Please provide your academic details to activate your portal.
+                Welcome to <strong>{org.name}</strong>. Please provide your academic details to activate your portal.
               </p>
             </div>
 

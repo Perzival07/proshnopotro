@@ -1,6 +1,15 @@
+import { loadOrg, publicBranding } from "./org-loader.mjs";
+
+// Which organisation this deployment serves (ORG env var, see ../orgs/).
+const org = loadOrg();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Inlined into server and client code alike; read through lib/org.ts.
+  env: {
+    ORG_BRANDING: JSON.stringify(publicBranding(org)),
+  },
   // Every page here is personal and live, so the browser must not reuse a page
   // it visited a moment ago: by default Next keeps dynamic pages for 30 seconds
   // when moving between links, which showed a student the dashboard from before

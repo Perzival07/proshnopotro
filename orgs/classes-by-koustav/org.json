@@ -1,0 +1,29 @@
+{
+  "slug": "classes-by-koustav",
+  "name": "Classes by Koustav",
+  "shortName": "Koustav",
+  "logo": { "prefix": "classes by", "main": "KOUSTAV" },
+  "tagline": "Learn. Succeed. Shine.",
+  "support": {
+    "phone": "+919123924645",
+    "phoneDisplay": "+91 91239 24645",
+    "whatsapp": "919123924645"
+  },
+  "colors": {
+    "navy": "#0A4B8C",
+    "blue": "#2E9CD8",
+    "tint": "#E8F3FB",
+    "page": "#F7F8FA",
+    "ink": "#1A2230",
+    "border": "#DCE4EC"
+  },
+  "features": {
+    "proctoring": true,
+    "cameraProctoring": true,
+    "calculator": true,
+    "secondLanguage": true,
+    "answerSheetUpload": true
+  },
+  "limits": { "maxStudents": null },
+  "billing": { "pricePerStudentInr": null }
+}

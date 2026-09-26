@@ -4,15 +4,23 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Proshnopotro: a test-taking / tutoring portal (npm package name `test-taker`). Next.js 15 App Router, React 18, Prisma (Postgres/Supabase), Auth.js v5 beta, Tailwind + Radix UI, Cloudinary for answer-sheet photos. Deployed on Vercel (region `bom1`).
+Proshnopotro: a test-taking / tutoring portal (npm package name `proshnopotro`), sold to tuition organisations, each with its own deployment and database. Next.js 15 App Router, React 18, Prisma (Postgres/Supabase), Auth.js v5 beta, Tailwind + Radix UI, Cloudinary for answer-sheet photos. Deployed on Vercel (region `bom1`).
+
+## Repo layout
+
+- `portal/`: the app (everything below lives here). Vercel projects use Root Directory `portal`.
+- `orgs/<slug>/org.json`: per-organisation settings (name, logo text, contacts, colours, feature switches, limits, billing). The `ORG` env var picks one; default `classes-by-koustav`. `portal/org-loader.mjs` reads it at build time (next/tailwind/vitest configs); app code reads the public part via `portal/lib/org.ts`. Never hard-code the organisation's name, phone or colours; use `org`. See `orgs/README.md`.
+- `master/`: placeholder for the super admin app (not built).
 
 ## Commands
+
+Run from `portal/`.
 
 - `npm run dev` / `npm run build` / `npm start` / `npm run lint`
 - `npm test` (vitest, one run); `npm run test:watch`
 - Single test: `npx vitest run lib/score.test.ts` (add `-t "name"` to filter)
 - `npx prisma db push` / `npx prisma studio`; `prisma generate` runs on `postinstall`. Seed: `npx tsx prisma/seed.ts`
-- Env in `.env.local`: `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_URL`, `ADMIN_EMAILS` (comma list), `AUTH_GOOGLE_ID/SECRET`, `CLOUDINARY_*`.
+- Env in `portal/.env.local` (plus optional `ORG`): `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_URL`, `ADMIN_EMAILS` (comma list), `AUTH_GOOGLE_ID/SECRET`, `CLOUDINARY_*`.
 
 ## Working rules for this repo
 

@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { org } from "@/lib/org";
 
 /**
  * The web app manifest: what makes the portal installable from Chrome and
@@ -8,15 +9,15 @@ import type { MetadataRoute } from "next";
 export default function manifest(): MetadataRoute.Manifest {
   return {
     id: "/",
-    name: "Classes by Koustav",
-    short_name: "Koustav",
-    description: "Take your assigned tests and upload your answers for Classes by Koustav.",
+    name: org.name,
+    short_name: org.shortName,
+    description: `Take your assigned tests and upload your answers for ${org.name}.`,
     start_url: "/",
     scope: "/",
     display: "standalone",
     orientation: "any",
-    background_color: "#F7F8FA",
-    theme_color: "#0A4B8C",
+    background_color: org.colors.page,
+    theme_color: org.colors.navy,
     categories: ["education"],
     icons: [
       { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },

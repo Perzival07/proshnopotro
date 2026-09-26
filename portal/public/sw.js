@@ -8,7 +8,7 @@
  *
  * Bump VERSION whenever offline.html or the icons change.
  */
-const VERSION = "v1";
+const VERSION = "v2";
 const CACHE = `koustav-offline-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 

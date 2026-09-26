@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LogoLockup } from "@/components/brand/LogoLockup";
+import { org, PRODUCT_NAME } from "@/lib/org";
 import {
   FileText,
   UserPlus,
@@ -183,7 +184,7 @@ export function AdminSidebar({
       <div className="p-3 border-t border-white/15 bg-black/15 space-y-2">
         <InstallAppNavButton />
         <p className="text-[10px] text-white/40 text-center">
-          Classes by Koustav Admin v1.0
+          {org.name} Admin · {PRODUCT_NAME} v1.0
         </p>
       </div>
     </aside>

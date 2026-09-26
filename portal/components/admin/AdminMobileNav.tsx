@@ -7,6 +7,7 @@ import { AtomMark } from "@/components/brand/AtomMark";
 import { navFor } from "./AdminSidebar";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { org } from "@/lib/org";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
 
 /**
@@ -75,13 +76,13 @@ export function AdminMobileNav({
             <div>
               <div className="flex h-16 items-center justify-between gap-2 border-b border-white/15 bg-black/10 px-4">
                 {/* A compact lockup, not the full LogoLockup: beside the close
-                    button there is not room for "classes by KOUSTAV" on one
+                    button there is not room for the full organisation name on one
                     line, and it wrapped mid-phrase. */}
                 <Link href={role === "TUTOR" ? "/admin/marking" : "/admin/tests"} className="flex min-w-0 items-center gap-2.5">
                   <AtomMark size={30} strokeColor="#FFFFFF" dotColor="#62BEF0" className="shrink-0" />
                   <span className="min-w-0">
                     <span className="block truncate font-heading text-[15px] font-bold uppercase leading-none tracking-wide text-white">
-                      Koustav
+                      {org.shortName}
                     </span>
                     <span className="mt-1 block text-[10px] uppercase tracking-wider text-[#87CEEB]">
                       Admin Portal

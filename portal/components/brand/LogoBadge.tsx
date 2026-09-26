@@ -1,6 +1,7 @@
 import React from "react";
 import { AtomMark } from "./AtomMark";
 import { cn } from "@/lib/utils";
+import { org } from "@/lib/org";
 
 interface LogoBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: number;
@@ -31,11 +32,11 @@ export function LogoBadge({
         className="drop-shadow-md"
       >
         {/* Outer Navy Ring */}
-        <circle cx="120" cy="120" r="110" fill="#0A4B8C" />
+        <circle cx="120" cy="120" r="110" fill={org.colors.navy} />
 
         {/* Outer Ring Arc Paths for Text */}
         <defs>
-          {/* Top arc for "classes by KOUSTAV" */}
+          {/* Top arc for the organisation name, e.g. "classes by KOUSTAV" */}
           <path
             id="topTextPath"
             d="M 30,120 A 90,90 0 0,1 210,120"
@@ -62,17 +63,17 @@ export function LogoBadge({
             startOffset="50%"
             textAnchor="middle"
           >
-            classes by KOUSTAV
+            {org.logo.prefix} {org.logo.main}
           </textPath>
         </text>
 
         {/* Equator Blue Triangle Accents */}
         {/* Left triangle pointing in */}
-        <polygon points="26,120 40,111 40,129" fill="#2E9CD8" />
+        <polygon points="26,120 40,111 40,129" fill={org.colors.blue} />
         {/* Right triangle pointing in */}
-        <polygon points="214,120 200,111 200,129" fill="#2E9CD8" />
+        <polygon points="214,120 200,111 200,129" fill={org.colors.blue} />
 
-        {/* Bottom Arc Text: "LEARN. SUCCEED. SHINE." */}
+        {/* Bottom Arc Text: the tagline */}
         <text
           fill="#FFFFFF"
           fontFamily="var(--font-poppins), sans-serif"
@@ -85,7 +86,7 @@ export function LogoBadge({
             startOffset="50%"
             textAnchor="middle"
           >
-            &quot;LEARN. SUCCEED. SHINE.&quot;
+            &quot;{org.tagline.toUpperCase()}&quot;
           </textPath>
         </text>
 
@@ -95,7 +96,7 @@ export function LogoBadge({
           cy="120"
           r="66"
           fill="#FFFFFF"
-          stroke="#2E9CD8"
+          stroke={org.colors.blue}
           strokeWidth="4"
         />
 
@@ -103,8 +104,8 @@ export function LogoBadge({
         <g transform="translate(70, 70)">
           <AtomMark
             size={100}
-            strokeColor="#0A4B8C"
-            dotColor="#2E9CD8"
+            strokeColor={org.colors.navy}
+            dotColor={org.colors.blue}
           />
         </g>
       </svg>
@@ -112,11 +113,11 @@ export function LogoBadge({
       {/* Phone Number below the badge */}
       {showPhone && (
         <a
-          href="tel:+919123924645"
+          href={`tel:${org.support.phone}`}
           className="mt-3.5 font-heading font-semibold text-brand-ink text-base tracking-wider hover:text-brand-navy transition-colors flex items-center gap-1.5"
           style={{ fontSize: `${Math.max(14, 16 * scale)}px` }}
         >
-          <span>+91 91239 24645</span>
+          <span>{org.support.phoneDisplay}</span>
         </a>
       )}
     </div>

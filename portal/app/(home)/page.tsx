@@ -1,4 +1,5 @@
 import React from "react";
+import { org } from "@/lib/org";
 import { requireCompleteStudent } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
 import { Navbar } from "@/components/Navbar";
@@ -93,7 +94,7 @@ export default async function StudentDashboardPage() {
               </span>
             </div>
             <p className="text-body text-brand-ink/70 mt-1 text-sm">
-              Your assigned assessments for Classes by Koustav.
+              Your assigned assessments for {org.name}.
             </p>
 
             {/* The batches this student learns with. Their notes and tests

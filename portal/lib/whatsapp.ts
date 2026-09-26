@@ -1,5 +1,7 @@
+import { org } from "@/lib/org";
+
 /** The tutor's WhatsApp number, digits only, including country code. */
-export const TUTOR_WHATSAPP = process.env.NEXT_PUBLIC_TUTOR_WHATSAPP || "919123924645";
+export const TUTOR_WHATSAPP = process.env.NEXT_PUBLIC_TUTOR_WHATSAPP || org.support.whatsapp;
 
 /**
  * Builds a wa.me link with a prefilled message.
