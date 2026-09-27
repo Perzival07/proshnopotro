@@ -3,7 +3,7 @@ export const site = {
   name: "Proshnopotro",
   tagline: "The exam portal for tuition organisations",
   // Where "Book a demo" and the footer's contact link go.
-  contactEmail: "hello@proshnopotro.com",
+  contactEmail: "karishmarahaman19@gmail.com",
 };
 
 /**
