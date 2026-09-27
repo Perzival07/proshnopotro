@@ -129,3 +129,19 @@ export async function syncNow(slug: string) {
   revalidatePath("/admin");
   back(`/admin/orgs/${slug}`, result.ok ? { ok: `Synced: ${result.count} enrolled students.` } : { error: result.error });
 }
+
+/**
+ * Removes an organisation that has left, with its payments and its list of
+ * student emails. Its portal's own database, files and Vercel project are
+ * separate and must be deleted by hand; the page says so.
+ */
+export async function deleteOrg(slug: string, form: FormData) {
+  await requireSuperAdmin();
+  const org = await orgBySlug(slug);
+  if (String(form.get("confirm") ?? "").trim() !== org.slug) {
+    back(`/admin/orgs/${slug}`, { error: `Type ${org.slug} to confirm deleting ${org.name}.` });
+  }
+  await prisma.organisation.delete({ where: { id: org.id } });
+  revalidatePath("/admin");
+  back("/admin", { ok: `${org.name} deleted, with its payments and student list. Remember its portal's database, files and Vercel project.` });
+}

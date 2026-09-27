@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { completeProfile } from "./actions";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -133,6 +134,12 @@ export function OnboardingForm({ defaultName, email }: OnboardingFormProps) {
           </div>
         )}
       </Button>
+      <p className="text-center text-[11px] text-brand-ink/60">
+        By continuing you agree to the{" "}
+        <Link href="/terms" target="_blank" className="font-medium text-brand-blue hover:underline">terms of use</Link> and the{" "}
+        <Link href="/privacy" target="_blank" className="font-medium text-brand-blue hover:underline">privacy notice</Link>. If you
+        are under 18, a parent or guardian must agree too.
+      </p>
     </form>
   );
 }

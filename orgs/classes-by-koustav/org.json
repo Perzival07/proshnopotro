@@ -25,6 +25,13 @@
     "secondLanguage": true,
     "answerSheetUpload": true
   },
+  "legal": {
+    "entityName": null,
+    "address": null,
+    "city": null,
+    "grievanceOfficer": { "name": null, "email": null },
+    "effectiveDate": null
+  },
   "limits": { "maxStudents": null },
   "billing": { "pricePerStudentInr": null }
 }

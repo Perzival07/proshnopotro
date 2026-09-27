@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, devLoginEnabled, signIn } from "@/auth";
 import { LogoMark } from "@/components/Logo";
@@ -55,6 +56,10 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             </button>
           </form>
         )}
+        <p className="text-xs text-zinc-500">
+          By signing in you agree to the <Link href="/terms" className="text-brand-700 hover:underline">terms</Link> and the{" "}
+          <Link href="/privacy" className="text-brand-700 hover:underline">privacy policy</Link>.
+        </p>
       </div>
     </main>
   );

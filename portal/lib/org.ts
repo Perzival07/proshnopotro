@@ -29,6 +29,17 @@ export type OrgBranding = {
     secondLanguage: boolean;
     answerSheetUpload: boolean;
   };
+  /** Named in the privacy notice and terms; null until filled in. */
+  legal: {
+    /** The legal name of whoever runs the organisation. */
+    entityName: string | null;
+    address: string | null;
+    /** Whose courts the terms name. */
+    city: string | null;
+    grievanceOfficer: { name: string | null; email: string | null };
+    /** "YYYY-MM-DD"; null means the documents are still drafts. */
+    effectiveDate: string | null;
+  };
 };
 
 /** The product every organisation's portal is built on. */

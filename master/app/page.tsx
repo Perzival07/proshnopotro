@@ -604,6 +604,10 @@ export default function Home() {
         <div className="border-t border-slate-200">
           <p className="mx-auto max-w-7xl px-4 py-6 text-xs text-slate-500 sm:px-6 lg:px-8">
             © {new Date().getFullYear()} {site.name}. All rights reserved.
+            <span className="mx-2">·</span>
+            <a href="/privacy" className="hover:text-brand-600">Privacy</a>
+            <span className="mx-2">·</span>
+            <a href="/terms" className="hover:text-brand-600">Terms</a>
           </p>
         </div>
       </footer>

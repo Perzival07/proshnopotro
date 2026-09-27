@@ -45,6 +45,17 @@ rewritten, so turning a switch back on restores each test's own choice.
 | `secondLanguage`    | Translations are hidden and cannot be added (they are kept)           |
 | `answerSheetUpload` | Built-in question papers skip the photo upload after the paper. Google Doc, PDF and Form papers still collect photos, since that is how they are answered. Subjective questions tell students to write on paper, so avoid them when this is off |
 
+## Privacy notice and terms
+
+Each portal has `/privacy` and `/terms`, issued in the organisation's name
+(it is responsible for its students' data under India's DPDP Act). They
+read `legal` in `org.json`: `entityName` (legal name), `address`, `city`
+(for the courts clause) and `grievanceOfficer` (`name`, `email`). Anything
+missing shows as a highlighted gap. Both pages carry a "draft" banner until
+`effectiveDate` (`YYYY-MM-DD`) is set: set it only after a lawyer has
+reviewed them and the organisation collects parents' consent for students
+under 18.
+
 ## Colours
 
 All seven are required, as `#RRGGBB`: `navy` (headings, primary buttons,

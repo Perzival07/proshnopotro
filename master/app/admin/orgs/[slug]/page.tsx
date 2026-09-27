@@ -15,6 +15,7 @@ import {
 } from "@/lib/billing";
 import {
   recordPayment,
+  deleteOrg,
   deletePayment,
   rotateSecret,
   setPaidUpTo,
@@ -248,6 +249,24 @@ export default async function OrgPage({
           <button type="submit" className={buttonClass}>
             Save details
           </button>
+        </form>
+      </Card>
+
+      <Card title="Delete organisation" className="border-red-200">
+        <p className="text-sm text-zinc-700">
+          For an organisation that has left. This deletes its record here, its payments and its list of student emails, and cannot be
+          undone. Its portal&apos;s database, Cloudinary files and Vercel project are separate: delete those yourself, within the 30
+          days the terms promise.
+        </p>
+        <form action={deleteOrg.bind(null, org.slug)} className="mt-4 flex flex-wrap items-end gap-2">
+          <div className="min-w-[240px] flex-1">
+            <Field label={`Type ${org.slug} to confirm`}>
+              <input name="confirm" autoComplete="off" className={`${inputClass} font-mono`} />
+            </Field>
+          </div>
+          <ConfirmButton className={dangerButtonClass} message={`Delete ${org.name} for good?`}>
+            Delete organisation
+          </ConfirmButton>
         </form>
       </Card>
     </>

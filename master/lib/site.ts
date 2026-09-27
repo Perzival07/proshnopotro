@@ -7,6 +7,25 @@ export const site = {
 };
 
 /**
+ * Who runs Proshnopotro, for the privacy policy and terms. null until filled
+ * in: the pages show the gap, and a draft banner until effectiveDate is set
+ * ("YYYY-MM-DD"). Have a lawyer review both documents before setting it.
+ */
+export const legal: {
+  operatorName: string | null;
+  address: string | null;
+  city: string | null;
+  grievanceOfficer: { name: string | null; email: string | null };
+  effectiveDate: string | null;
+} = {
+  operatorName: null,
+  address: null,
+  city: null,
+  grievanceOfficer: { name: null, email: null },
+  effectiveDate: null,
+};
+
+/**
  * Organisations running their own Proshnopotro portal, for the "Find your
  * portal" list. Add one here when its portal goes live.
  */

@@ -1,4 +1,5 @@
 import React from "react";
+import Link from "next/link";
 import { Phone } from "lucide-react";
 import { org, PRODUCT_NAME } from "@/lib/org";
 
@@ -28,7 +29,10 @@ export function Footer() {
         </div>
       </div>
       <p className="mt-3 text-center text-[10px] text-brand-ink/40">
-        Powered by {PRODUCT_NAME}
+        <Link href="/privacy" className="hover:text-brand-navy hover:underline">Privacy</Link>
+        {" · "}
+        <Link href="/terms" className="hover:text-brand-navy hover:underline">Terms</Link>
+        {" · "}Powered by {PRODUCT_NAME}
       </p>
     </footer>
   );

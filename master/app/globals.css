@@ -59,3 +59,26 @@ body {
     animation: none !important;
   }
 }
+
+/* The privacy policy and terms (components/legal/LegalDoc.tsx). */
+@layer components {
+  .legal h1 {
+    @apply mb-1 text-3xl font-bold tracking-tight text-brand-900;
+  }
+  .legal h2 {
+    @apply mb-2 mt-9 text-lg font-semibold text-brand-900;
+  }
+  .legal p,
+  .legal li {
+    @apply text-[15px] leading-relaxed text-slate-700;
+  }
+  .legal p {
+    @apply mt-3;
+  }
+  .legal ul {
+    @apply mt-2 list-disc space-y-1.5 pl-5;
+  }
+  .legal a {
+    @apply font-medium text-brand-600 underline-offset-2 hover:underline;
+  }
+}

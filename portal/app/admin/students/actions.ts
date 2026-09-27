@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { validateStudent, type StudentInput } from "@/lib/students";
 import { normalizeEmail } from "@/lib/utils";
+import { destroyAnswerImages } from "@/lib/cloudinary";
 
 /** Every surface that shows students or their work. */
 function revalidateStudentViews() {
@@ -135,6 +136,21 @@ export async function deleteStudent(id: string) {
   }
 
   const email = normalizeEmail(user.email);
+
+  // Their answer photos go first, from Cloudinary: the rows below are the only
+  // record of where the files are, so deleting those first would leave
+  // pictures of a removed student in storage for good. If any file cannot be
+  // removed, nothing is deleted and the owner can simply try again.
+  const photos = await prisma.answerImage.findMany({
+    where: { assignment: { studentEmail: email } },
+    select: { publicId: true },
+  });
+  if (photos.length > 0) {
+    const { failed } = await destroyAnswerImages(photos.map((p) => p.publicId));
+    if (failed.length > 0) {
+      return { error: `Could not delete ${failed.length} of their answer photos from storage. Nothing was removed; try again.` };
+    }
+  }
 
   try {
     await prisma.$transaction(async (tx) => {

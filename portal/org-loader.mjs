@@ -62,10 +62,29 @@ export function loadOrg(slug = process.env.ORG || DEFAULT_ORG) {
   return org;
 }
 
+/**
+ * Who the privacy notice and terms name (orgs/<ORG>/org.json "legal"). Every
+ * field may be missing: the pages then show the gap and a draft banner.
+ */
+function legalDetails(legal = {}) {
+  const text = (v) => (typeof v === "string" && v.trim() ? v.trim() : null);
+  const effectiveDate = text(legal.effectiveDate);
+  if (effectiveDate && !/^\d{4}-\d{2}-\d{2}$/.test(effectiveDate)) {
+    throw new Error(`legal.effectiveDate must be YYYY-MM-DD, not "${effectiveDate}"`);
+  }
+  return {
+    entityName: text(legal.entityName),
+    address: text(legal.address),
+    city: text(legal.city),
+    grievanceOfficer: { name: text(legal.grievanceOfficer?.name), email: text(legal.grievanceOfficer?.email) },
+    effectiveDate,
+  };
+}
+
 /** The part of the organisation's settings that is safe to ship to browsers. */
 export function publicBranding(org) {
   const { slug, name, shortName, logo, tagline, support, colors, features } = org;
-  return { slug, name, shortName, logo, tagline, support, colors, features };
+  return { slug, name, shortName, logo, tagline, support, colors, features, legal: legalDetails(org.legal) };
 }
 
 /**

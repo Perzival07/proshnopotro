@@ -1,3 +1,4 @@
+import Link from "next/link";
 import React, { Suspense } from "react";
 import { getVerifiedSession } from "@/lib/auth-utils";
 import { redirect } from "next/navigation";
@@ -43,6 +44,11 @@ export default async function LoginPage() {
             <Suspense fallback={<div className="h-24" />}>
               <LoginForm />
             </Suspense>
+            <p className="mt-5 text-[11px] text-brand-ink/60">
+              By signing in you agree to the{" "}
+              <Link href="/terms" className="font-medium text-brand-blue hover:underline">terms of use</Link> and the{" "}
+              <Link href="/privacy" className="font-medium text-brand-blue hover:underline">privacy notice</Link>.
+            </p>
           </div>
 
           <InstallAppCard className="mt-4 w-full" />
