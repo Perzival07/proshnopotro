@@ -17,4 +17,10 @@ describe("resultsVisible", () => {
     expect(resultsVisible({ resultRelease: "AFTER_DEADLINE", resultsReleasedAt: null }, due, after)).toBe(true);
     expect(resultsVisible({ resultRelease: "AFTER_DEADLINE", resultsReleasedAt: before }, due, before)).toBe(true);
   });
+  it("shows a returned copy to its student before the test is released", () => {
+    const returned = { ...due, returnedAt: before };
+    expect(resultsVisible({ resultRelease: "ON_RELEASE", resultsReleasedAt: null }, returned, before)).toBe(true);
+    expect(resultsVisible({ resultRelease: "AFTER_DEADLINE", resultsReleasedAt: null }, returned, before)).toBe(true);
+    expect(resultsVisible({ resultRelease: "ON_RELEASE", resultsReleasedAt: null }, { ...due, returnedAt: null }, after)).toBe(false);
+  });
 });

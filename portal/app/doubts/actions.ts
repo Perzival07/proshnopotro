@@ -56,6 +56,7 @@ export async function askDoubt(assignmentId: string, questionId: string, raw: st
       studentEmail: true,
       status: true,
       dueAt: true,
+      returnedAt: true,
       test: { select: { id: true, resultRelease: true, resultsReleasedAt: true } },
     },
   });
