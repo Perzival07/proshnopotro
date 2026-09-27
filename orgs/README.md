@@ -6,6 +6,8 @@ holds settings only; the portal code lives once, in `../portal`.
 ```
 orgs/
   classes-by-koustav/
+    .env.local DIRECT_URL of its database, for db:push:all (git-ignored,
+               never committed)
     org.json   name, logo text, tagline, contact numbers, colours,
                feature switches, student limit, price per student
     logo.png
@@ -60,8 +62,10 @@ price, student limit and payments that count live in the master app
 
 1. Copy `classes-by-koustav/` to `orgs/<slug>/`, edit `org.json` (its
    `slug` must match the folder name) and replace the icons in `public/`.
-2. Create its Supabase database and Cloudinary account; run
-   `npx prisma db push` from `portal/` against the new database.
+2. Create its Supabase database and Cloudinary account. Put the database's
+   direct address in `orgs/<slug>/.env.local` as `DIRECT_URL=...` (git
+   ignores it), then run `npm run db:push:all -- --apply --only <slug>` from
+   `portal/` to create its tables.
 3. Create a Vercel project from this repo: Root Directory `portal`, with
    "Include files outside the Root Directory in the Build Step" on, and its own
    environment variables (`ORG=<slug>`, `DATABASE_URL`, `DIRECT_URL`,
@@ -72,3 +76,21 @@ price, student limit and payments that count live in the master app
 5. Add it in the master's `/admin`, put the `MASTER_URL` and
    `MASTER_SYNC_SECRET` shown there into the portal's Vercel project,
    redeploy, and press "Sync now".
+
+## Changing the database schema
+
+Every organisation has its own database, so a change to
+`portal/prisma/schema.prisma` has to reach each of them. From `portal/`:
+
+```
+npm run db:push:all                  # show each database's changes as SQL
+npm run db:push:all -- --apply       # make them
+```
+
+`--only a,b` limits it to some organisations. A change that would drop a
+column or table with data in it is refused until you add
+`--accept-data-loss` (with `--apply`); read the SQL first. The script reads
+each database's address from `orgs/<slug>/.env.local` (`DIRECT_URL`, not the
+pooled `DATABASE_URL`) and skips organisations without one. Run it before
+deploying the portal change, so no organisation's new code meets an old
+database.

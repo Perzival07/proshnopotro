@@ -1,10 +1,13 @@
 /**
  * Renders the installed-app icons from the atom mark.
  *
- *   node scripts/generate-app-icons.mjs
+ *   ORG=<slug> node scripts/generate-app-icons.mjs
  *
- * Needs Google Chrome installed (puppeteer-core drives it). Re-run whenever
- * the logo changes, then bump VERSION in public/sw.js.
+ * Writes into orgs/<ORG>/public/icons in that organisation's navy and blue
+ * (the build copies them into public/). Needs Google Chrome installed
+ * (puppeteer-core drives it). Re-run whenever the logo or colours change,
+ * then bump VERSION in public/sw.js. An organisation with its own logo
+ * can skip this and drop its own PNGs into that folder instead.
  *
  * Two shapes are produced:
  *   any       - a rounded navy tile with transparent corners, used as-is by
@@ -16,13 +19,15 @@
 import puppeteer from "puppeteer-core";
 import path from "path";
 import fs from "fs";
+import { ORGS_DIR, loadOrg } from "../org-loader.mjs";
 
 const CHROME_PATH =
   process.env.CHROME_PATH || "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
-const ROOT = process.cwd();
+const org = loadOrg();
+const ROOT = path.join(ORGS_DIR, org.slug, "public");
 
-const NAVY = "#0A4B8C";
-const BLUE = "#2E9CD8";
+const NAVY = org.colors.navy;
+const BLUE = org.colors.blue;
 
 function atom(size, offset) {
   const s = size / 100;
@@ -62,15 +67,13 @@ function svg(kind) {
 }
 
 const OUTPUTS = [
-  { file: "public/icons/icon-192.png", kind: "any", size: 192 },
-  { file: "public/icons/icon-512.png", kind: "any", size: 512 },
-  { file: "public/icons/maskable-192.png", kind: "maskable", size: 192 },
-  { file: "public/icons/maskable-512.png", kind: "maskable", size: 512 },
-  // Next.js links these automatically: the browser tab icon, and the icon
-  // iOS uses for Add to Home Screen (iOS rounds the corners itself, so it
-  // must be full-bleed with no transparency).
-  { file: "app/icon.png", kind: "any", size: 192 },
-  { file: "app/apple-icon.png", kind: "maskable", size: 180 },
+  { file: "icons/icon-192.png", kind: "any", size: 192 },
+  { file: "icons/icon-512.png", kind: "any", size: 512 },
+  { file: "icons/maskable-192.png", kind: "maskable", size: 192 },
+  { file: "icons/maskable-512.png", kind: "maskable", size: 512 },
+  // What iOS uses for Add to Home Screen (app/layout.tsx links it). iOS
+  // rounds the corners itself, so it must be full-bleed with no transparency.
+  { file: "icons/apple-icon.png", kind: "maskable", size: 180 },
 ];
 
 const browser = await puppeteer.launch({ executablePath: CHROME_PATH, headless: "new" });
@@ -86,7 +89,7 @@ try {
     const out = path.join(ROOT, file);
     fs.mkdirSync(path.dirname(out), { recursive: true });
     await page.screenshot({ path: out, omitBackground: true, clip: { x: 0, y: 0, width: size, height: size } });
-    console.log("wrote", file);
+    console.log("wrote", path.relative(process.cwd(), out));
   }
 } finally {
   await browser.close();

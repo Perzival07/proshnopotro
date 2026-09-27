@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "postinstall": "prisma generate",
+    "db:push:all": "tsx scripts/push-schema.ts",
     "test": "vitest run",
     "test:watch": "vitest"
   },

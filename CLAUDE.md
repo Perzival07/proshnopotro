@@ -20,6 +20,7 @@ Run from `portal/`.
 - `npm test` (vitest, one run); `npm run test:watch`. `master/` has its own `npm run dev` (port 3001) and `npm test`.
 - Single test: `npx vitest run lib/score.test.ts` (add `-t "name"` to filter)
 - `npx prisma db push` / `npx prisma studio`; `prisma generate` runs on `postinstall`. Seed: `npx tsx prisma/seed.ts`
+- Schema change for every organisation: `npm run db:push:all` (preview), `-- --apply` (each org's `DIRECT_URL` in git-ignored `orgs/<slug>/.env.local`; see `orgs/README.md`)
 - Env in `portal/.env.local` (plus optional `ORG`): `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_URL`, `ADMIN_EMAILS` (comma list), `AUTH_GOOGLE_ID/SECRET`, `CLOUDINARY_*`.
 
 ## Working rules for this repo
