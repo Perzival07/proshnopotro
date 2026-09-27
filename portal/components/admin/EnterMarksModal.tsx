@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { updateStudentScore } from "@/app/admin/roster/actions";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { Award, CheckCircle2, AlertCircle, Sparkles } from "lucide-react";
+import { org } from "@/lib/org";
 
 export interface StudentGradeTarget {
   assignmentId: string;
@@ -247,7 +248,7 @@ export function EnterMarksModal({
             >
               {loading ? (
                 <div className="flex items-center gap-1.5">
-                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Saving...</span>
                 </div>
               ) : (

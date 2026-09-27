@@ -16,6 +16,7 @@ import { reassignAssignment } from "@/app/admin/roster/actions";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { toDateTimeLocalValue } from "@/lib/utils";
 import { RotateCcw, AlertTriangle, Calendar, Info } from "lucide-react";
+import { org } from "@/lib/org";
 
 export interface ReassignTarget {
   assignmentId: string;
@@ -230,7 +231,7 @@ export function ReassignModal({
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Reassigning...</span>
                 </span>
               ) : marksAtRisk ? (

@@ -1,8 +1,9 @@
 import type { Config } from "tailwindcss";
 import defaultTheme from "tailwindcss/defaultTheme";
-import { loadOrg } from "./org-loader.mjs";
+import { loadOrg, rgbOf } from "./org-loader.mjs";
 
 const brand = loadOrg().colors;
+const shadow = rgbOf(brand.navy);
 
 const config: Config = {
   darkMode: ["class"],
@@ -24,6 +25,7 @@ const config: Config = {
           page: brand.page,     // Main application background
           ink: brand.ink,       // Primary body text
           border: brand.border, // Subtle hairline borders
+          "on-dark": brand.onDark, // Light accent on navy / dark buttons
         },
         // Strict Status Colors (Status only, never brand blue)
         status: {
@@ -75,9 +77,9 @@ const config: Config = {
         "body-lg": ["1rem", { lineHeight: "1.5rem" }],   // 16px
       },
       boxShadow: {
-        xs: "0 1px 2px 0 rgba(10, 75, 140, 0.05)",
-        card: "0 1px 3px 0 rgba(10, 75, 140, 0.04), 0 1px 2px -1px rgba(10, 75, 140, 0.02)",
-        "card-hover": "0 4px 12px 0 rgba(10, 75, 140, 0.08)",
+        xs: `0 1px 2px 0 rgba(${shadow}, 0.05)`,
+        card: `0 1px 3px 0 rgba(${shadow}, 0.04), 0 1px 2px -1px rgba(${shadow}, 0.02)`,
+        "card-hover": `0 4px 12px 0 rgba(${shadow}, 0.08)`,
       },
     },
   },

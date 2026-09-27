@@ -28,6 +28,7 @@ import {
   Check,
   RefreshCw,
 } from "lucide-react";
+import { org } from "@/lib/org";
 
 interface TestOption {
   id: string;
@@ -327,7 +328,7 @@ export function ResultsClient({ tests }: ResultsClientProps) {
             >
               {isAnalyzing ? (
                 <div className="flex items-center gap-2">
-                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Matching Assignments with Database...</span>
                 </div>
               ) : (
@@ -363,7 +364,7 @@ export function ResultsClient({ tests }: ResultsClientProps) {
             >
               {isCommitting ? (
                 <div className="flex items-center gap-2">
-                  <AtomMark size={18} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={18} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Committing Results...</span>
                 </div>
               ) : (

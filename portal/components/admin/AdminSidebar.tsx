@@ -162,7 +162,7 @@ export function AdminSidebar({
                 )}
               >
                 <div className="flex items-center gap-3">
-                  <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-[#87CEEB]")} />
+                  <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-white" : "text-brand-on-dark")} />
                   <span className="text-[13px]">{item.name}</span>
                 </div>
                 {(badges?.[item.href] ?? 0) > 0 && (

@@ -34,6 +34,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react";
+import { org } from "@/lib/org";
 
 export interface ClassroomOption {
   id: string;
@@ -446,7 +447,7 @@ export function NotesClient({ notes, classrooms, students }: NotesClientProps) {
               >
                 {scheduling ? (
                   <span className="flex items-center gap-2">
-                    <AtomMark size={16} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+                    <AtomMark size={16} strokeColor={org.colors.navy} dotColor={org.colors.blue} animate />
                     <span>Scheduling…</span>
                   </span>
                 ) : (

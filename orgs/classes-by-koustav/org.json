@@ -15,7 +15,8 @@
     "tint": "#E8F3FB",
     "page": "#F7F8FA",
     "ink": "#1A2230",
-    "border": "#DCE4EC"
+    "border": "#DCE4EC",
+    "onDark": "#87CEEB"
   },
   "features": {
     "proctoring": true,

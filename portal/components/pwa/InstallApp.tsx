@@ -10,6 +10,7 @@ import {
 } from "@/lib/pwa-platform";
 import { isRunningStandalone, promptInstall, useInstallPrompt } from "./PwaSetup";
 import { Download } from "lucide-react";
+import { org } from "@/lib/org";
 
 /**
  * Everything the install offer needs to decide whether to show. Worked out
@@ -62,7 +63,7 @@ export function InstallAppCard({ className = "" }: { className?: string }) {
       className={`flex items-start gap-3 rounded-xl border border-brand-border bg-white p-4 text-left shadow-card ${className}`}
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy">
-        <AtomMark size={28} strokeColor="#FFFFFF" dotColor="#62BEF0" />
+        <AtomMark size={28} strokeColor="#FFFFFF" dotColor={org.colors.onDark} />
       </div>
 
       <div className="min-w-0 flex-1 space-y-2">
@@ -112,7 +113,7 @@ export function InstallAppNavButton() {
         aria-expanded={offer.canPrompt ? undefined : showSteps}
         className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[13px] font-medium text-white/80 transition-all hover:bg-white/10 hover:text-white"
       >
-        <Download className="h-4 w-4 shrink-0 text-[#87CEEB]" />
+        <Download className="h-4 w-4 shrink-0 text-brand-on-dark" />
         <span>Install app</span>
       </button>
       {showSteps && offer.steps && (

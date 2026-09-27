@@ -1,7 +1,9 @@
-import { loadOrg, publicBranding } from "./org-loader.mjs";
+import { loadOrg, publicBranding, syncOrgPublic } from "./org-loader.mjs";
 
 // Which organisation this deployment serves (ORG env var, see ../orgs/).
 const org = loadOrg();
+// Its icons, favicon and offline page, into public/ before Next serves it.
+syncOrgPublic(org);
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {

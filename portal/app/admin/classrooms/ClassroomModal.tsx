@@ -25,6 +25,7 @@ import { AlertCircle, Info } from "lucide-react";
 import { MAX_CLASSROOM_NAME } from "@/lib/classrooms";
 import { createClassroom, updateClassroom } from "./actions";
 import type { ClassroomRow } from "./ClassroomsClient";
+import { org } from "@/lib/org";
 
 interface ClassroomModalProps {
   isOpen: boolean;
@@ -216,7 +217,7 @@ export function ClassroomModal({
             >
               {loading ? (
                 <span className="flex items-center gap-2">
-                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#87CEEB" animate />
+                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.onDark} animate />
                   <span>Saving…</span>
                 </span>
               ) : isEditing ? (

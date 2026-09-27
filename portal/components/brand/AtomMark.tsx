@@ -1,5 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
+import { org } from "@/lib/org";
 
 interface AtomMarkProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
@@ -12,8 +13,8 @@ interface AtomMarkProps extends React.SVGProps<SVGSVGElement> {
 export function AtomMark({
   className,
   size = 40,
-  strokeColor = "#0A4B8C",
-  dotColor = "#2E9CD8",
+  strokeColor = org.colors.navy,
+  dotColor = org.colors.blue,
   animate = false,
   ...props
 }: AtomMarkProps) {

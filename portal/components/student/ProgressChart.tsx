@@ -1,4 +1,5 @@
 import React from "react";
+import { org } from "@/lib/org";
 
 /**
  * Scores over time as a line: each test a point at its percentage, oldest on
@@ -23,10 +24,10 @@ export function ProgressChart({ points }: { points: { label: string; pct: number
           </text>
         </g>
       ))}
-      <path d={line} fill="none" stroke="#0A4B8C" strokeWidth={2.5} strokeLinejoin="round" />
+      <path d={line} fill="none" stroke={org.colors.navy} strokeWidth={2.5} strokeLinejoin="round" />
       {points.map((p, i) => (
         <g key={i}>
-          <circle cx={x(i)} cy={y(p.pct)} r={4} fill="#fff" stroke="#0A4B8C" strokeWidth={2} />
+          <circle cx={x(i)} cy={y(p.pct)} r={4} fill="#fff" stroke={org.colors.navy} strokeWidth={2} />
           <title>{`${p.label}: ${Math.round(p.pct * 100)}%`}</title>
         </g>
       ))}

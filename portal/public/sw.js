@@ -6,10 +6,11 @@
  * is ever served from a cache. The one job is a friendly offline page when a
  * page cannot be reached at all, instead of the browser's own error screen.
  *
- * Bump VERSION whenever offline.html or the icons change.
+ * Bump VERSION whenever offline.html or the icons change (both are copied in
+ * from orgs/<ORG>/ at build time, see org-loader.mjs).
  */
-const VERSION = "v2";
-const CACHE = `koustav-offline-${VERSION}`;
+const VERSION = "v3";
+const CACHE = `offline-${VERSION}`;
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {
@@ -26,7 +27,8 @@ self.addEventListener("activate", (event) => {
     (async () => {
       const keys = await caches.keys();
       await Promise.all(
-        keys.filter((key) => key.startsWith("koustav-offline-") && key !== CACHE).map((key) => caches.delete(key))
+        // "koustav-offline-" was the name before the portal served many organisations.
+        keys.filter((key) => /^(koustav-)?offline-/.test(key) && key !== CACHE).map((key) => caches.delete(key))
       );
       if (self.registration.navigationPreload) {
         await self.registration.navigationPreload.enable();

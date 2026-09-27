@@ -611,7 +611,7 @@ export function TestModal({ isOpen, onClose, testToEdit }: TestModalProps) {
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Saving...</span>
                 </div>
               ) : isEditing ? (

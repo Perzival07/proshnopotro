@@ -1,11 +1,12 @@
 import React from "react";
 import { AtomMark } from "@/components/brand/AtomMark";
+import { org } from "@/lib/org";
 
 export function EmptyState() {
   return (
     <div className="w-full flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-brand-border bg-white shadow-xs max-w-2xl mx-auto my-12">
       <div className="p-4 bg-brand-tint/60 rounded-full mb-4">
-        <AtomMark size={64} strokeColor="#0A4B8C" dotColor="#2E9CD8" />
+        <AtomMark size={64} strokeColor={org.colors.navy} dotColor={org.colors.blue} />
       </div>
       <h2 className="font-heading text-lg sm:text-xl font-semibold text-brand-navy mb-2">
         No tests assigned yet

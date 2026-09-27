@@ -19,7 +19,7 @@ export function LogoLockup({
 }: LogoLockupProps) {
   const isWhite = variant === "white";
   const strokeColor = isWhite ? "#FFFFFF" : org.colors.navy;
-  const dotColor = isWhite ? "#62BEF0" : org.colors.blue;
+  const dotColor = isWhite ? org.colors.onDark : org.colors.blue;
 
   const content = (
     <div className={cn("inline-flex items-center gap-3 select-none", className)}>
@@ -61,7 +61,7 @@ export function LogoLockup({
           <span
             className={cn(
               "text-[10px] font-sans tracking-widest uppercase mt-0.5 font-medium",
-              isWhite ? "text-[#87CEEB]" : "text-brand-blue"
+              isWhite ? "text-brand-on-dark" : "text-brand-blue"
             )}
           >
             {org.tagline}

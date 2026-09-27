@@ -32,6 +32,7 @@ import {
   CheckCircle2,
   Video,
 } from "lucide-react";
+import { org } from "@/lib/org";
 
 interface StartTestButtonProps {
   assignmentId: string;
@@ -458,7 +459,7 @@ export function StartTestButton({
               this page onto the student's result instead. */}
           {!submitting && isQuestions && !answerSheets && (
             <div className="flex items-center gap-2 rounded-xl border border-brand-border bg-white p-4 text-xs text-brand-ink/80">
-              <AtomMark size={18} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+              <AtomMark size={18} strokeColor={org.colors.navy} dotColor={org.colors.blue} animate />
               <span>Your answers are submitted. Loading your result&hellip;</span>
             </div>
           )}
@@ -492,7 +493,7 @@ export function StartTestButton({
           >
             {loading ? (
               <div className="flex items-center gap-2">
-                <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                <AtomMark size={20} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                 <span>Verifying &amp; Opening&hellip;</span>
               </div>
             ) : (

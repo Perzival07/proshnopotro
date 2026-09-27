@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AtomMark } from "@/components/brand/AtomMark";
 import { ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
+import { org } from "@/lib/org";
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -92,7 +93,7 @@ export function LoginForm() {
         className="w-full flex items-center justify-center gap-3 bg-brand-navy hover:bg-brand-navy/90 text-white font-medium py-2.5 px-4 rounded-md shadow transition-all duration-200"
       >
         {loading ? (
-          <AtomMark size={20} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+          <AtomMark size={20} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
         ) : (
           <svg className="h-5 w-5" viewBox="0 0 24 24">
             <path

@@ -42,3 +42,8 @@ next-env.d.ts
 # sqlite / db
 *.db
 *.db-journal
+
+# copied or generated from orgs/<ORG>/ at build time (portal/org-loader.mjs)
+/portal/public/icons/
+/portal/public/favicon.ico
+/portal/public/offline.html

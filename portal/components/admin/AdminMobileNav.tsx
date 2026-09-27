@@ -7,8 +7,8 @@ import { AtomMark } from "@/components/brand/AtomMark";
 import { navFor } from "./AdminSidebar";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { org } from "@/lib/org";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
+import { org } from "@/lib/org";
 
 /**
  * The admin navigation on phones and tablets.
@@ -79,12 +79,12 @@ export function AdminMobileNav({
                     button there is not room for the full organisation name on one
                     line, and it wrapped mid-phrase. */}
                 <Link href={role === "TUTOR" ? "/admin/marking" : "/admin/tests"} className="flex min-w-0 items-center gap-2.5">
-                  <AtomMark size={30} strokeColor="#FFFFFF" dotColor="#62BEF0" className="shrink-0" />
+                  <AtomMark size={30} strokeColor="#FFFFFF" dotColor={org.colors.onDark} className="shrink-0" />
                   <span className="min-w-0">
                     <span className="block truncate font-heading text-[15px] font-bold uppercase leading-none tracking-wide text-white">
                       {org.shortName}
                     </span>
-                    <span className="mt-1 block text-[10px] uppercase tracking-wider text-[#87CEEB]">
+                    <span className="mt-1 block text-[10px] uppercase tracking-wider text-brand-on-dark">
                       Admin Portal
                     </span>
                   </span>
@@ -122,7 +122,7 @@ export function AdminMobileNav({
                       <Icon
                         className={cn(
                           "h-4 w-4 shrink-0",
-                          isActive ? "text-white" : "text-[#87CEEB]"
+                          isActive ? "text-white" : "text-brand-on-dark"
                         )}
                       />
                       <span className="min-w-0 flex-1 truncate">{item.name}</span>

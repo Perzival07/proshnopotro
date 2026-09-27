@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AtomMark } from "@/components/brand/AtomMark";
 import { CLASS_OPTIONS } from "@/lib/students";
 import { AlertCircle, CheckCircle2 } from "lucide-react";
+import { org } from "@/lib/org";
 
 interface OnboardingFormProps {
   defaultName?: string | null;
@@ -122,7 +123,7 @@ export function OnboardingForm({ defaultName, email }: OnboardingFormProps) {
       >
         {loading ? (
           <div className="flex items-center gap-2">
-            <AtomMark size={18} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+            <AtomMark size={18} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
             <span>Saving Profile...</span>
           </div>
         ) : (

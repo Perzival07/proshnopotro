@@ -19,6 +19,8 @@ export type OrgBranding = {
     page: string;
     ink: string;
     border: string;
+    /** A light accent that reads on navy and other dark backgrounds. */
+    onDark: string;
   };
   features: {
     proctoring: boolean;

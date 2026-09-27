@@ -25,6 +25,7 @@ import {
   Trash2,
   UploadCloud,
 } from "lucide-react";
+import { org } from "@/lib/org";
 
 interface AnswerUploadPanelProps {
   assignmentId: string;
@@ -346,7 +347,7 @@ export function AnswerUploadPanel({
 
           {phase === "loading" && (
             <div className="flex items-center justify-center gap-2 py-10 text-xs text-brand-ink/70">
-              <AtomMark size={20} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+              <AtomMark size={20} strokeColor={org.colors.navy} dotColor={org.colors.blue} animate />
               <span>Getting your upload ready&hellip;</span>
             </div>
           )}
@@ -468,7 +469,7 @@ export function AnswerUploadPanel({
                         key={`processing-${i}`}
                         className="flex aspect-[3/4] max-w-full items-center justify-center rounded-lg border border-dashed border-brand-border bg-brand-page"
                       >
-                        <AtomMark size={20} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+                        <AtomMark size={20} strokeColor={org.colors.navy} dotColor={org.colors.blue} animate />
                       </div>
                     ))}
                   </div>
@@ -479,7 +480,7 @@ export function AnswerUploadPanel({
 
           {phase === "uploading" && (
             <div className="space-y-3 py-8 text-center">
-              <AtomMark size={32} strokeColor="#0A4B8C" dotColor="#2E9CD8" animate />
+              <AtomMark size={32} strokeColor={org.colors.navy} dotColor={org.colors.blue} animate />
               <p className="font-heading text-sm font-semibold text-brand-navy">
                 {progress.total === 0
                   ? "Finishing\u2026"

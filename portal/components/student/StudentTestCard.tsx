@@ -10,6 +10,7 @@ import { KIND_LABELS, type TestKind } from "@/lib/schedule";
 import { deriveCardStatus, type CardStatus } from "@/lib/assignment-status";
 import { formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
 import { Calendar, CheckCircle2, Clock, ArrowRight, Lock, Timer, UploadCloud } from "lucide-react";
+import { org } from "@/lib/org";
 
 export type { CardStatus };
 
@@ -111,7 +112,7 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
 
         {/* Faint AtomMark Watermark in the corner of thumbnail block */}
         <div className="absolute right-[-10px] bottom-[-15px] pointer-events-none opacity-[0.12] transition-transform duration-500 group-hover:scale-110">
-          <AtomMark size={90} strokeColor="#0A4B8C" dotColor="#2E9CD8" />
+          <AtomMark size={90} strokeColor={org.colors.navy} dotColor={org.colors.blue} />
         </div>
 
         {/* Status Badge */}

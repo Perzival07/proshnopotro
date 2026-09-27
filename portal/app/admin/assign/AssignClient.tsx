@@ -41,6 +41,7 @@ import {
   RotateCcw,
   AlertTriangle,
 } from "lucide-react";
+import { org } from "@/lib/org";
 
 interface TestOption {
   id: string;
@@ -691,7 +692,7 @@ export function AssignClient({ tests, students, classrooms }: AssignClientProps)
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <AtomMark size={18} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={18} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Assigning Test...</span>
                 </div>
               ) : (

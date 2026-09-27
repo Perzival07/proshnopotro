@@ -15,6 +15,7 @@ import { StudentPicker, type PickableStudent } from "@/components/admin/StudentP
 import { AlertCircle } from "lucide-react";
 import { setClassroomMembers } from "./actions";
 import type { ClassroomRow } from "./ClassroomsClient";
+import { org } from "@/lib/org";
 
 interface MembersModalProps {
   classroom: ClassroomRow | null;
@@ -88,7 +89,7 @@ export function MembersModal({ classroom, students, onClose, onSaved }: MembersM
           >
             {saving ? (
               <span className="flex items-center gap-2">
-                <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#87CEEB" animate />
+                <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.onDark} animate />
                 <span>Saving…</span>
               </span>
             ) : (

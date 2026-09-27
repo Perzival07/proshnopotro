@@ -24,6 +24,7 @@ import { AlertCircle, Info } from "lucide-react";
 import { CLASS_OPTIONS } from "@/lib/students";
 import { createStudent, updateStudent } from "./actions";
 import type { StudentRow } from "./StudentsClient";
+import { org } from "@/lib/org";
 
 interface StudentModalProps {
   isOpen: boolean;
@@ -204,7 +205,7 @@ export function StudentModal({
             >
               {loading ? (
                 <div className="flex items-center gap-2">
-                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor="#2E9CD8" animate />
+                  <AtomMark size={16} strokeColor="#FFFFFF" dotColor={org.colors.blue} animate />
                   <span>Saving...</span>
                 </div>
               ) : isEditing ? (
