@@ -14,6 +14,14 @@ export const organisations = [
   { name: "Classes by Koustav", url: "https://proshnopotro-nine.vercel.app" },
 ];
 
+/**
+ * Shown on every organisation admin's billing page. Payments are made
+ * directly to the platform owner, outside the app.
+ */
+export const paymentInstructions =
+  `Pay by bank transfer or UPI, then send the transaction reference to ${site.contactEmail} ` +
+  "so the payment can be recorded. Write to the same address for bank details or an invoice.";
+
 export const nav = [
   { label: "Platform", href: "#platform" },
   { label: "Proctoring", href: "#proctoring" },

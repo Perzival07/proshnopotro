@@ -14,6 +14,7 @@ orgs/
       icons/icon-192.png, icon-512.png          installed-app icons
       icons/maskable-192.png, maskable-512.png  (maskable: logo inside the
                                                  middle 80%, full-bleed background)
+      icons/apple-icon.png                      180x180, iPhone/iPad home screen
 ```
 
 A portal deployment picks its organisation with the `ORG` environment variable
@@ -51,8 +52,9 @@ backgrounds), `page` (page background), `ink` (body text), `border`, and
 bars, spinners on dark buttons). Status colours (green, amber, grey) and
 error red are the same for every organisation.
 
-Not wired up yet: `limits.maxStudents` and `billing` are recorded here but
-the portal does not act on them.
+`limits.maxStudents` and `billing` here are not used by the portal. The
+price, student limit and payments that count live in the master app
+(`master/`, `/admin`), per organisation.
 
 ## Adding an organisation
 
@@ -67,3 +69,6 @@ the portal does not act on them.
    `CLOUDINARY_*`).
 4. Add `https://<its domain>/api/auth/callback/google` as an authorised
    redirect URI on the shared Google OAuth client.
+5. Add it in the master's `/admin`, put the `MASTER_URL` and
+   `MASTER_SYNC_SECRET` shown there into the portal's Vercel project,
+   redeploy, and press "Sync now".

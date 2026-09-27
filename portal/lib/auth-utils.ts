@@ -2,6 +2,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import { homeFor } from "@/lib/permissions";
+import { isSuspended } from "@/lib/master";
 
 export interface SessionUser {
   id: string;
@@ -19,6 +20,10 @@ export interface SessionUser {
  * Re-reads and strictly verifies session identity against DB.
  */
 export async function getVerifiedSession(): Promise<SessionUser | null> {
+  // A suspended portal has no signed-in users, so every server action that
+  // checks the session is refused too, not only the pages (app/layout.tsx).
+  if (await isSuspended()) return null;
+
   const session = await auth();
   if (!session?.user?.email) {
     return null;

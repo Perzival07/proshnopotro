@@ -3,6 +3,8 @@ import { Inter, Poppins } from "next/font/google";
 import "./globals.css";
 import { PwaSetup } from "@/components/pwa/PwaSetup";
 import { org, PRODUCT_NAME } from "@/lib/org";
+import { isSuspended } from "@/lib/master";
+import { SuspendedNotice } from "@/components/SuspendedNotice";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,6 +33,14 @@ export const metadata: Metadata = {
     title: org.shortName,
     statusBarStyle: "default",
   },
+  // The organisation's own, copied in from orgs/<ORG>/public at build time.
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/icons/icon-192.png", type: "image/png", sizes: "192x192" },
+    ],
+    apple: { url: "/icons/apple-icon.png", sizes: "180x180" },
+  },
   formatDetection: { telephone: false },
   other: {
     "mobile-web-app-capable": "yes",
@@ -41,7 +51,7 @@ export const viewport: Viewport = {
   themeColor: org.colors.navy,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -50,7 +60,8 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} ${poppins.variable}`}>
       <body className="min-h-screen bg-brand-page text-brand-ink flex flex-col font-sans antialiased">
         <PwaSetup />
-        {children}
+        {/* Suspended by the platform owner (the master app): no page opens. */}
+        {(await isSuspended()) ? <SuspendedNotice /> : children}
       </body>
     </html>
   );

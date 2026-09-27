@@ -1,18 +1,50 @@
-# Proshnopotro site (master app)
+# Proshnopotro master app
 
-The public Proshnopotro website: what the product does, pricing, FAQ and a
-"Find your portal" list linking to each organisation's portal. It shares no
-code or data with `../portal`.
+One Next.js app with three parts. It shares no code or database with
+`../portal`; the two talk over signed HTTP requests.
 
-Later this app also becomes the super admin's workspace (organisation list,
-billing tracker, the student hub); see Part 2 of the features plan.
+- `/`: the public Proshnopotro website (content in `lib/site.ts`).
+- `/admin`: the super admin's workspace. Organisations (add, edit, suspend,
+  reactivate), each one's enrolled-student count, price and amount per month,
+  payments received, paid-up-to date and billing status (paid / due /
+  overdue, `lib/billing.ts`), and a printable monthly statement. Payments are
+  made outside the app; this only records them.
+- `/hub`: a student signs in with Google and sees every organisation that
+  has enrolled their email, then goes to that portal to sign in. With exactly
+  one organisation they go straight there.
 
-- `npm run dev` (port 3001, so it can run beside the portal on 3000)
-- Content that changes (contact email, the organisation list) lives in
-  `lib/site.ts`.
+## Commands
+
+- `npm run dev` (port 3001, beside the portal on 3000)
+- `npm test` (vitest, `lib/**/*.test.ts`)
+- `npx prisma db push` against the master's own database
+
+Environment: see `.env.example`. `SUPER_ADMIN_EMAILS` decides who can open
+`/admin`, checked on every request. Locally, an email-only "quick login"
+appears on `/login`; it is off in production unless `ENABLE_DEV_LOGIN=true`,
+which must never be set on the live site.
+
+## How the master and a portal talk
+
+Each organisation has a sync secret, made when it is added and shown on its
+page. The portal holds it as `MASTER_SYNC_SECRET` next to `MASTER_URL`.
+Requests either way are signed with it (`lib/signature.ts`, copied in
+`portal/lib/master-signature.ts`) and expire after five minutes.
+
+- Master -> portal `GET /api/master/roster`: the portal's student emails
+  (every `STUDENT` account). Run by "Sync now" and nightly by the Vercel cron
+  in `vercel.json` (`/api/cron/sync`, 03:00 IST, needs `CRON_SECRET`).
+- Portal -> master `GET /api/portal/<slug>/status`: suspended or not, and the
+  owner's billing page. The portal caches the answer for five minutes, so a
+  suspension or payment shows there within five minutes. If the master cannot
+  be reached the portal stays open.
+
+The master stores only student emails and which organisation enrolled them.
 
 ## Deploying
 
-A separate Vercel project from the same repo: Root Directory `master`, no
-environment variables. Its Ignored Build Step can be `git diff --quiet HEAD^
-HEAD -- .` so portal changes do not redeploy it.
+A separate Vercel project from the same repo: Root Directory `master`, its
+own Postgres database, and the variables in `.env.example`. Add
+`<master address>/api/auth/callback/google` to the shared Google OAuth
+client. Its Ignored Build Step can be `git diff --quiet HEAD^ HEAD -- .` so
+portal changes do not redeploy it.

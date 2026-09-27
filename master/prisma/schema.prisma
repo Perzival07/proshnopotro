@@ -1,0 +1,72 @@
+// The master app's own database: the organisation list, billing and the
+// registry of which student emails each organisation has enrolled. It holds
+// nothing else about students; their tests, results and profiles stay in each
+// organisation's own portal database.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum OrgStatus {
+  ACTIVE
+  /// The portal shows a "temporarily unavailable" page to everyone.
+  SUSPENDED
+}
+
+model Organisation {
+  id                 String    @id @default(cuid())
+  /// The folder name in orgs/ and the portal's ORG environment variable.
+  slug               String    @unique
+  name               String
+  /// The portal's address, e.g. https://classesbykoustav.proshnopotro.in
+  portalUrl          String
+  status             OrgStatus @default(ACTIVE)
+  /// Price per enrolled student per month, in whole rupees.
+  pricePerStudentInr Int       @default(0)
+  /// Recorded for the super admin; the portal does not enforce it yet.
+  maxStudents        Int?
+  /// The last day the organisation has paid for, inclusive.
+  paidUpTo           DateTime? @db.Date
+  /// Shared with the portal as MASTER_SYNC_SECRET; signs requests both ways.
+  syncSecret         String
+  /// Set by the last successful roster sync from the portal.
+  studentCount       Int       @default(0)
+  lastSyncAt         DateTime?
+  lastSyncError      String?
+  notes              String    @default("")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  payments  Payment[]
+  enrolment Enrolment[]
+}
+
+model Payment {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  amountInr  Int
+  receivedOn DateTime     @db.Date
+  /// UTR, cheque number, wire reference...
+  reference  String       @default("")
+  note       String       @default("")
+  createdAt  DateTime     @default(now())
+
+  @@index([orgId, receivedOn])
+}
+
+/// One student email enrolled in one organisation, copied from its portal.
+model Enrolment {
+  orgId String
+  org   Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  email String
+
+  @@id([orgId, email])
+  @@index([email])
+}

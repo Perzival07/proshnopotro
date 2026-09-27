@@ -10,14 +10,14 @@ Proshnopotro: a test-taking / tutoring portal (npm package name `proshnopotro`),
 
 - `portal/`: the app (everything below lives here). Vercel projects use Root Directory `portal`.
 - `orgs/<slug>/org.json`: per-organisation settings (name, logo text, contacts, colours, feature switches, limits, billing). The `ORG` env var picks one; default `classes-by-koustav`. `portal/org-loader.mjs` reads it at build time (next/tailwind/vitest configs); app code reads the public part via `portal/lib/org.ts`. Never hard-code the organisation's name, phone or colours; use `org`. See `orgs/README.md`.
-- `master/`: the public Proshnopotro website (separate Next.js app, own `package.json`, Root Directory `master` on Vercel); later also the super admin app. Content in `master/lib/site.ts`.
+- `master/`: separate Next.js app (own `package.json`, own Postgres via Prisma, Root Directory `master` on Vercel): the public Proshnopotro website (`/`, content in `master/lib/site.ts`), the super admin workspace (`/admin`: organisations, billing, payments, suspension) and the student hub (`/hub`). It talks to each portal over HMAC-signed requests (`master/lib/signature.ts`, copied as `portal/lib/master-signature.ts`); the portal side is `portal/lib/master.ts` and `portal/app/api/master/roster`. See `master/README.md`.
 
 ## Commands
 
 Run from `portal/`.
 
 - `npm run dev` / `npm run build` / `npm start` / `npm run lint`
-- `npm test` (vitest, one run); `npm run test:watch`
+- `npm test` (vitest, one run); `npm run test:watch`. `master/` has its own `npm run dev` (port 3001) and `npm test`.
 - Single test: `npx vitest run lib/score.test.ts` (add `-t "name"` to filter)
 - `npx prisma db push` / `npx prisma studio`; `prisma generate` runs on `postinstall`. Seed: `npx tsx prisma/seed.ts`
 - Env in `portal/.env.local` (plus optional `ORG`): `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `AUTH_URL`, `ADMIN_EMAILS` (comma list), `AUTH_GOOGLE_ID/SECRET`, `CLOUDINARY_*`.

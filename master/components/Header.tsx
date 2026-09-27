@@ -35,7 +35,7 @@ export function Header() {
 
         <div className="flex items-center gap-2">
           <a
-            href="#organisations"
+            href="/hub"
             className="hidden rounded-md px-3 py-2 text-sm font-medium text-brand-900 transition hover:text-brand-600 sm:inline-flex"
           >
             Log in
@@ -60,7 +60,7 @@ export function Header() {
 
       {open && (
         <nav aria-label="Main" className="border-t border-zinc-200/70 bg-white px-4 pb-4 pt-2 lg:hidden">
-          {[...nav, { label: "Log in", href: "#organisations" }].map((item) => (
+          {[...nav, { label: "Log in", href: "/hub" }].map((item) => (
             <a
               key={item.label}
               href={item.href}

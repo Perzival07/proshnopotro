@@ -31,6 +31,7 @@ const REQUIRED_PUBLIC_FILES = [
   "icons/icon-512.png",
   "icons/maskable-192.png",
   "icons/maskable-512.png",
+  "icons/apple-icon.png",
 ];
 
 export function loadOrg(slug = process.env.ORG || DEFAULT_ORG) {

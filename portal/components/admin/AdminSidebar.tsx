@@ -20,6 +20,7 @@ import {
   MessageCircleQuestion,
   PenLine,
   UserCog,
+  Receipt,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InstallAppNavButton } from "@/components/pwa/InstallApp";
@@ -113,6 +114,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: "/admin/team",
     icon: UserCog,
     description: "Tutors and what they can do",
+  },
+  {
+    name: "Billing",
+    href: "/admin/billing",
+    icon: Receipt,
+    description: "Your subscription and payments",
   },
 ];
 
