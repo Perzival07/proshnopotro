@@ -100,14 +100,14 @@ export function LogoBadge({
           strokeWidth="4"
         />
 
-        {/* Central Atom Mark embedded */}
-        <g transform="translate(70, 70)">
-          <AtomMark
-            size={100}
-            strokeColor={org.colors.navy}
-            dotColor={org.colors.blue}
-          />
-        </g>
+        {/* The organisation's logo from the master, else the atom mark */}
+        {org.hasLogoImage ? (
+          <image href="/org-logo.png" x="74" y="74" width="92" height="92" preserveAspectRatio="xMidYMid meet" />
+        ) : (
+          <g transform="translate(70, 70)">
+            <AtomMark size={100} strokeColor={org.colors.navy} dotColor={org.colors.blue} />
+          </g>
+        )}
       </svg>
 
       {/* Phone Number below the badge */}

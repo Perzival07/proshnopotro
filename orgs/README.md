@@ -1,7 +1,21 @@
 # Organisations
 
-One folder per organisation that runs its own Proshnopotro portal. The folder
-holds settings only; the portal code lives once, in `../portal`.
+Every organisation runs its own copy of the portal (`../portal`, the code is
+written once), as its own Vercel project in the same Vercel account, with its
+own database.
+
+**Branding lives in the master app.** On an organisation's page in the
+master's `/admin`, the Branding section sets its logo image, logo text,
+short name, tagline, phone and WhatsApp numbers, colours, feature switches
+and legal details. Saving it rebuilds that portal through its Vercel deploy
+hook (about three minutes). The portal fetches it while building
+(`portal/org-loader.mjs`), makes its app icons and favicon from the logo,
+and falls back to this folder if the master cannot be reached.
+
+A folder here is optional. It is the fallback, and what a portal uses when
+it is not connected to a master or nothing is saved there. An organisation
+without a folder needs the master to build. To move a folder's branding
+into the master once: `npm run org:import-branding -- <slug>` in `master/`.
 
 ```
 orgs/

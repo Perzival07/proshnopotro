@@ -43,7 +43,10 @@ next-env.d.ts
 *.db
 *.db-journal
 
-# copied or generated from orgs/<ORG>/ at build time (portal/org-loader.mjs)
+# fetched from the master, or copied or generated from orgs/<ORG>/, at build
+# time (portal/org-loader.mjs)
+/portal/.org-cache/
+/portal/public/org-logo.png
 /portal/public/icons/
 /portal/public/favicon.ico
 /portal/public/offline.html

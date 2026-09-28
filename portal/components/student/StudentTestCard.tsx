@@ -5,12 +5,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { SubjectIcon } from "@/components/SubjectIcon";
 import { AtomMark } from "@/components/brand/AtomMark";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { formatDate, formatDateShort } from "@/lib/utils";
 import { KIND_LABELS, type TestKind } from "@/lib/schedule";
 import { deriveCardStatus, type CardStatus } from "@/lib/assignment-status";
 import { formatDurationLabel, isTimed, isTimeUp } from "@/lib/exam-timer";
 import { Calendar, CheckCircle2, Clock, ArrowRight, Lock, Timer, UploadCloud } from "lucide-react";
-import { org } from "@/lib/org";
 
 export type { CardStatus };
 
@@ -112,7 +112,7 @@ export function StudentTestCard({ assignment, awaitingUpload = false }: StudentT
 
         {/* Faint AtomMark Watermark in the corner of thumbnail block */}
         <div className="absolute right-[-10px] bottom-[-15px] pointer-events-none opacity-[0.12] transition-transform duration-500 group-hover:scale-110">
-          <AtomMark size={90} strokeColor={org.colors.navy} dotColor={org.colors.blue} />
+          <BrandMark size={90} />
         </div>
 
         {/* Status Badge */}

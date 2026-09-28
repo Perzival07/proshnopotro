@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { AtomMark } from "@/components/brand/AtomMark";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { navFor } from "./AdminSidebar";
 import { Menu, X } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -79,7 +79,7 @@ export function AdminMobileNav({
                     button there is not room for the full organisation name on one
                     line, and it wrapped mid-phrase. */}
                 <Link href={role === "TUTOR" ? "/admin/marking" : "/admin/tests"} className="flex min-w-0 items-center gap-2.5">
-                  <AtomMark size={30} strokeColor="#FFFFFF" dotColor={org.colors.onDark} className="shrink-0" />
+                  <BrandMark size={30} onDark className="shrink-0" />
                   <span className="min-w-0">
                     <span className="block truncate font-heading text-[15px] font-bold uppercase leading-none tracking-wide text-white">
                       {org.shortName}

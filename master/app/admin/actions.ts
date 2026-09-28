@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSuperAdmin } from "@/lib/access";
 import { fromDateKey, rupees, todayIst } from "@/lib/billing";
 import { parseOrgForm, parsePaymentForm } from "@/lib/org-input";
+import { MAX_LOGO_BYTES, isDeployHook, logoType, parseBrandingForm } from "@/lib/branding";
 import { syncRoster } from "@/lib/sync";
 
 /**
@@ -56,8 +57,13 @@ export async function updateOrg(slug: string, form: FormData) {
   if (parsed.data.slug !== org.slug) {
     back(`/admin/orgs/${slug}`, { error: "The slug cannot change: the portal's ORG variable and orgs/ folder use it." });
   }
-  await prisma.organisation.update({ where: { id: org.id }, data: parsed.data });
+  const saved = await prisma.organisation.update({ where: { id: org.id }, data: parsed.data });
   revalidatePath("/admin");
+  // The name is part of what the portal shows, so a new one needs a rebuild.
+  if (parsed.data.name !== org.name && saved.branding) {
+    const rebuilt = await rebuildPortal(saved.deployHookUrl);
+    back(`/admin/orgs/${slug}`, { ok: `Saved. ${REBUILD_MESSAGE[rebuilt]}` });
+  }
   back(`/admin/orgs/${slug}`, { ok: "Saved." });
 }
 
@@ -144,4 +150,69 @@ export async function deleteOrg(slug: string, form: FormData) {
   await prisma.organisation.delete({ where: { id: org.id } });
   revalidatePath("/admin");
   back("/admin", { ok: `${org.name} deleted, with its payments and student list. Remember its portal's database, files and Vercel project.` });
+}
+
+/** Asks Vercel to rebuild the portal, if its deploy hook is saved. */
+async function rebuildPortal(hook: string | null): Promise<"started" | "no-hook" | "failed"> {
+  if (!hook || !isDeployHook(hook)) return "no-hook";
+  try {
+    const res = await fetch(hook, { method: "POST", signal: AbortSignal.timeout(10_000) });
+    return res.ok ? "started" : "failed";
+  } catch {
+    return "failed";
+  }
+}
+
+const REBUILD_MESSAGE = {
+  started: "Its portal is rebuilding and shows the change in about three minutes.",
+  "no-hook": "Add its deploy hook below so saving rebuilds the portal; until then it shows on its next deploy.",
+  failed: "Rebuilding the portal did not start: check its deploy hook, or redeploy it in Vercel.",
+};
+
+export async function saveBranding(slug: string, form: FormData) {
+  await requireSuperAdmin();
+  const org = await prisma.organisation.findUnique({ where: { slug }, select: { id: true, deployHookUrl: true } });
+  if (!org) back("/admin", { error: "That organisation no longer exists." });
+  const parsed = parseBrandingForm(form);
+  if ("error" in parsed) back(`/admin/orgs/${slug}`, parsed);
+
+  const logo: { logoImage?: Uint8Array<ArrayBuffer> | null; logoType?: string | null } = {};
+  const file = form.get("logo");
+  if (form.get("removeLogo") === "on") {
+    logo.logoImage = null;
+    logo.logoType = null;
+  } else if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_LOGO_BYTES) back(`/admin/orgs/${slug}`, { error: "The logo must be 1 MB or smaller." });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const type = logoType(bytes);
+    if (!type) back(`/admin/orgs/${slug}`, { error: "The logo must be a PNG, JPEG or WebP image." });
+    logo.logoImage = bytes;
+    logo.logoType = type;
+  }
+
+  await prisma.organisation.update({
+    where: { id: org.id },
+    data: { branding: parsed.data, brandingSavedAt: new Date(), ...logo },
+  });
+  const rebuilt = await rebuildPortal(org.deployHookUrl);
+  back(`/admin/orgs/${slug}`, { ok: `Branding saved. ${REBUILD_MESSAGE[rebuilt]}` });
+}
+
+export async function saveDeployHook(slug: string, form: FormData) {
+  await requireSuperAdmin();
+  const org = await orgBySlug(slug);
+  const hook = String(form.get("deployHookUrl") ?? "").trim();
+  if (hook && !isDeployHook(hook)) {
+    back(`/admin/orgs/${slug}`, { error: "That is not a Vercel deploy hook (https://api.vercel.com/v1/integrations/deploy/...)." });
+  }
+  await prisma.organisation.update({ where: { id: org.id }, data: { deployHookUrl: hook || null } });
+  back(`/admin/orgs/${slug}`, { ok: hook ? "Deploy hook saved." : "Deploy hook removed." });
+}
+
+export async function rebuildNow(slug: string) {
+  await requireSuperAdmin();
+  const org = await prisma.organisation.findUnique({ where: { slug }, select: { deployHookUrl: true } });
+  if (!org) back("/admin", { error: "That organisation no longer exists." });
+  const rebuilt = await rebuildPortal(org.deployHookUrl);
+  back(`/admin/orgs/${slug}`, rebuilt === "started" ? { ok: REBUILD_MESSAGE.started } : { error: REBUILD_MESSAGE[rebuilt] });
 }

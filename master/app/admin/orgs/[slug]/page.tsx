@@ -14,8 +14,11 @@ import {
   todayIst,
 } from "@/lib/billing";
 import {
+  rebuildNow,
   recordPayment,
   deleteOrg,
+  saveBranding,
+  saveDeployHook,
   deletePayment,
   rotateSecret,
   setPaidUpTo,
@@ -24,6 +27,8 @@ import {
   updateOrg,
 } from "../../actions";
 import { OrgFields } from "@/components/admin/OrgFields";
+import { BrandingForm } from "@/components/admin/BrandingForm";
+import { defaultBranding, type Branding } from "@/lib/branding";
 import { ConfirmButton } from "@/components/admin/ConfirmButton";
 import {
   BillingBadge,
@@ -70,6 +75,8 @@ export default async function OrgPage({
   const monthly = monthlyAmount(org.studentCount, org.pricePerStudentInr);
   const suspended = org.status === "SUSPENDED";
   const master = await masterUrl();
+  const branding = (org.branding as Branding | null) ?? defaultBranding(org.name);
+  const logoSrc = org.logoImage ? `data:${org.logoType};base64,${Buffer.from(org.logoImage).toString("base64")}` : null;
 
   return (
     <>
@@ -240,6 +247,40 @@ export default async function OrgPage({
               New secret
             </ConfirmButton>
           </form>
+        </div>
+      </Card>
+
+      <Card title="Branding">
+        <BrandingForm action={saveBranding.bind(null, org.slug)} branding={branding} logoSrc={logoSrc} saved={org.branding !== null} />
+        <div className="mt-6 space-y-3 border-t border-zinc-100 pt-5">
+          <p className="text-sm text-zinc-700">
+            Saving branding rebuilds the portal through its Vercel deploy hook (Vercel project → Settings → Git → Deploy Hooks,
+            branch <code className="rounded bg-zinc-100 px-1">main</code>).
+            {org.brandingSavedAt && <span className="text-zinc-500"> Last saved {timeFormat.format(org.brandingSavedAt)}.</span>}
+          </p>
+          <form action={saveDeployHook.bind(null, org.slug)} className="flex flex-wrap items-end gap-2">
+            <div className="min-w-[260px] flex-1">
+              <Field label="Deploy hook">
+                <input
+                  name="deployHookUrl"
+                  type="url"
+                  defaultValue={org.deployHookUrl ?? ""}
+                  placeholder="https://api.vercel.com/v1/integrations/deploy/..."
+                  className={`${inputClass} font-mono text-xs`}
+                />
+              </Field>
+            </div>
+            <button type="submit" className={secondaryButtonClass}>
+              Save hook
+            </button>
+          </form>
+          {org.deployHookUrl && (
+            <form action={rebuildNow.bind(null, org.slug)}>
+              <button type="submit" className={secondaryButtonClass}>
+                <RefreshCw className="h-4 w-4" /> Rebuild portal now
+              </button>
+            </form>
+          )}
         </div>
       </Card>
 

@@ -29,6 +29,8 @@ export type OrgBranding = {
     secondLanguage: boolean;
     answerSheetUpload: boolean;
   };
+  /** A logo was uploaded in the master; it is served at /org-logo.png. */
+  hasLogoImage: boolean;
   /** Named in the privacy notice and terms; null until filled in. */
   legal: {
     /** The legal name of whoever runs the organisation. */

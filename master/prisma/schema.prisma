@@ -40,6 +40,15 @@ model Organisation {
   lastSyncAt         DateTime?
   lastSyncError      String?
   notes              String    @default("")
+  /// What its portal shows and which features it has (lib/branding.ts
+  /// Branding). null = not set here yet: the portal uses its orgs/ folder.
+  branding           Json?
+  /// The uploaded logo (PNG, JPEG or WebP, at most 1 MB) and its type.
+  logoImage          Bytes?
+  logoType           String?
+  brandingSavedAt    DateTime?
+  /// The portal's Vercel deploy hook: called to rebuild it with new branding.
+  deployHookUrl      String?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { AtomMark } from "@/components/brand/AtomMark";
+import { BrandMark } from "@/components/brand/BrandMark";
 import { Button } from "@/components/ui/button";
 import {
   detectInstallPlatform,
@@ -10,7 +10,6 @@ import {
 } from "@/lib/pwa-platform";
 import { isRunningStandalone, promptInstall, useInstallPrompt } from "./PwaSetup";
 import { Download } from "lucide-react";
-import { org } from "@/lib/org";
 
 /**
  * Everything the install offer needs to decide whether to show. Worked out
@@ -63,7 +62,7 @@ export function InstallAppCard({ className = "" }: { className?: string }) {
       className={`flex items-start gap-3 rounded-xl border border-brand-border bg-white p-4 text-left shadow-card ${className}`}
     >
       <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy">
-        <AtomMark size={28} strokeColor="#FFFFFF" dotColor={org.colors.onDark} />
+        <BrandMark size={28} onDark />
       </div>
 
       <div className="min-w-0 flex-1 space-y-2">

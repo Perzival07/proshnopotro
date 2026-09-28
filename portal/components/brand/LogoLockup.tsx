@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { AtomMark } from "./AtomMark";
+import { BrandMark } from "./BrandMark";
 import { cn } from "@/lib/utils";
 import { org } from "@/lib/org";
 
@@ -18,17 +18,10 @@ export function LogoLockup({
   subtitle,
 }: LogoLockupProps) {
   const isWhite = variant === "white";
-  const strokeColor = isWhite ? "#FFFFFF" : org.colors.navy;
-  const dotColor = isWhite ? org.colors.onDark : org.colors.blue;
 
   const content = (
     <div className={cn("inline-flex items-center gap-3 select-none", className)}>
-      <AtomMark
-        size={36}
-        strokeColor={strokeColor}
-        dotColor={dotColor}
-        className="shrink-0 transition-transform duration-300 group-hover:scale-105"
-      />
+      <BrandMark size={36} onDark={isWhite} className="shrink-0 transition-transform duration-300 group-hover:scale-105" />
       <div className="flex flex-col">
         <div className="flex items-baseline gap-1.5 leading-none">
           <span
