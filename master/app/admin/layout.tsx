@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <header className="border-b border-zinc-200 bg-white print:hidden">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-3 sm:px-6">
           <Link href="/admin" className="inline-flex items-center gap-2.5">
-            <LogoMark className="h-8 w-8 rounded-lg" />
+            <LogoMark className="h-8 w-8" />
             <span className="font-bold text-brand-900">Super admin</span>
           </Link>
           <div className="order-last w-full sm:order-none sm:w-auto">

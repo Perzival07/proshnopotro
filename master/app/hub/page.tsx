@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowRight } from "lucide-react";
 import { signOut } from "@/auth";
-import { FullLogo } from "@/components/Logo";
+import { LogoMark } from "@/components/Logo";
 import { isSuperAdmin, requireSignedIn } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { site } from "@/lib/site";
@@ -39,7 +39,7 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
       <div className="w-full max-w-md space-y-6">
         <div className="space-y-3 text-center">
-          <FullLogo className="mx-auto w-48 shadow-lg shadow-brand-900/20" />
+          <LogoMark className="mx-auto h-14 w-14" />
           <h1 className="text-xl font-bold text-brand-900">Your organisations</h1>
           <p className="text-sm text-zinc-600">Signed in as {email}</p>
         </div>

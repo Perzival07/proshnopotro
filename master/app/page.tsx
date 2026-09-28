@@ -29,7 +29,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { Header } from "@/components/Header";
-import { FullLogo } from "@/components/Logo";
+import { Logo } from "@/components/Logo";
 import { Reveal } from "@/components/Reveal";
 import { ExamMock } from "@/components/ExamMock";
 import { Pipeline, PlatformFlow, type PipelineStep } from "@/components/Flow";
@@ -667,7 +667,7 @@ export default async function Home() {
       <footer className="border-t border-white/10 bg-night-950">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
           <div>
-            <FullLogo className="w-56" />
+            <Logo light />
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-400">
               {site.tagline}. Set papers, run proctored exams, mark on screen and track progress.
             </p>
