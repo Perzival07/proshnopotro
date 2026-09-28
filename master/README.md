@@ -13,9 +13,12 @@ One Next.js app with three parts. It shares no code or database with
   feature switches, legal details; `lib/branding.ts`) is edited here too.
   Saving it calls the portal's Vercel deploy hook, so the portal rebuilds
   with it in about three minutes.
-- `/hub`: a student signs in with Google and sees every organisation that
-  has enrolled their email, then goes to that portal to sign in. With exactly
-  one organisation they go straight there.
+- `/hub`: anyone signs in with Google and sees every organisation their email
+  belongs to, as a student, tutor or owner, then goes to that portal to sign
+  in. With exactly one organisation they go straight there. The public
+  pages are set up for search engines (`app/robots.ts`, `app/sitemap.ts`,
+  `SITE_URL`), so a search for Proshnopotro finds this site; each portal
+  keeps its private pages out of search and links here from its footer.
 
 ## Commands
 
@@ -37,8 +40,9 @@ page. The portal holds it as `MASTER_SYNC_SECRET` next to `MASTER_URL`.
 Requests either way are signed with it (`lib/signature.ts`, copied in
 `portal/lib/master-signature.ts`) and expire after five minutes.
 
-- Master -> portal `GET /api/master/roster`: the portal's student emails
-  (every `STUDENT` account). Run by "Sync now" and nightly by the Vercel cron
+- Master -> portal `GET /api/master/roster`: the portal's people -- student
+  emails (every `STUDENT` account, billed) and its owners and tutors with
+  their role (shown in the hub, not billed). Run by "Sync now" and nightly by the Vercel cron
   in `vercel.json` (`/api/cron/sync`, 03:00 IST, needs `CRON_SECRET`).
 - Portal build -> master `GET /api/portal/<slug>/branding`: the branding and
   logo, in the shape of an `orgs/<slug>/org.json`; 404 until some is saved
@@ -48,7 +52,8 @@ Requests either way are signed with it (`lib/signature.ts`, copied in
   suspension or payment shows there within five minutes. If the master cannot
   be reached the portal stays open.
 
-The master stores only student emails and which organisation enrolled them.
+The master stores only email addresses, which organisation each belongs to
+and as what (student, tutor or owner).
 
 ## Deploying
 

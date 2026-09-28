@@ -1,10 +1,21 @@
 /** Everything on the Proshnopotro site that is not layout: names, links, contacts. */
 export const site = {
   name: "Proshnopotro",
+  // প্রশ্নপত্র, "question paper": the name as people may type it in Bengali.
+  nameBengali: "প্রশ্নপত্র",
   tagline: "The exam portal for tuition organisations",
   // Where "Book a demo" and the footer's contact link go.
   contactEmail: "classesbykoustav@gmail.com",
 };
+
+/**
+ * This site's public address, for search engines (canonical links, the
+ * sitemap). SITE_URL on Vercel; AUTH_URL is the same address, so it is the
+ * fallback.
+ */
+export function siteUrl(): string {
+  return (process.env.SITE_URL || process.env.AUTH_URL || "http://localhost:3001").replace(/\/+$/, "");
+}
 
 /**
  * Who runs Proshnopotro, for the privacy policy and terms. null until filled

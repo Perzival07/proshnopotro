@@ -8,22 +8,28 @@ import { isSuperAdmin, requireSignedIn } from "@/lib/access";
 import { prisma } from "@/lib/prisma";
 import { site } from "@/lib/site";
 
-export const metadata: Metadata = { title: "Your organisations | Proshnopotro", robots: { index: false } };
+export const metadata: Metadata = { title: "Your organisations", robots: { index: false } };
 export const dynamic = "force-dynamic";
 
+const ROLE_LABEL: Record<string, string> = { STUDENT: "Student", TUTOR: "Tutor", ADMIN: "Owner" };
+
 /**
- * The student hub: every organisation this Google account is enrolled in,
- * from the rosters the portals sync to the master. Signing in to the chosen
- * portal is that portal's own Google sign-in, with the same account.
+ * The hub: every organisation this Google account belongs to -- as a
+ * student, a tutor or an owner -- from the lists the portals sync to the
+ * master. Signing in to the chosen portal is that portal's own Google
+ * sign-in, with the same account.
  */
 export default async function HubPage({ searchParams }: { searchParams: Promise<{ stay?: string }> }) {
   const email = await requireSignedIn("/hub");
   const { stay } = await searchParams;
-  const orgs = await prisma.organisation.findMany({
-    where: { status: "ACTIVE", enrolment: { some: { email } } },
-    select: { slug: true, name: true, portalUrl: true },
-    orderBy: { name: "asc" },
-  });
+  const orgs = (
+    await prisma.enrolment.findMany({
+      where: { email, org: { status: "ACTIVE" } },
+      select: { role: true, org: { select: { slug: true, name: true, portalUrl: true } } },
+    })
+  )
+    .map((e) => ({ ...e.org, role: ROLE_LABEL[e.role] ?? "Student" }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   // One organisation: straight in, unless they came back here on purpose.
   if (orgs.length === 1 && !stay && !isSuperAdmin(email)) redirect(`${orgs[0].portalUrl}/login`);
@@ -45,10 +51,10 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
 
         {orgs.length === 0 ? (
           <div className="space-y-2 rounded-xl border border-zinc-200 bg-white p-6 text-sm text-zinc-700 shadow-sm">
-            <p className="font-semibold text-brand-900">No organisation has enrolled this email yet.</p>
+            <p className="font-semibold text-brand-900">No organisation has added this email yet.</p>
             <p>
-              Ask your tuition to add <strong>{email}</strong> to their portal. New enrolments appear here within a day. If you used
-              another Google account with them, sign out and use that one.
+              Ask your tuition to add <strong>{email}</strong> to their portal. New students, tutors and owners appear here within a
+              day. If you used another Google account with them, sign out and use that one.
             </p>
           </div>
         ) : (
@@ -61,7 +67,9 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
                 >
                   <span>
                     <span className="block font-semibold text-brand-900">{o.name}</span>
-                    <span className="block text-xs text-zinc-500">{o.portalUrl.replace(/^https?:\/\//, "")}</span>
+                    <span className="block text-xs text-zinc-500">
+                      {o.role} · {o.portalUrl.replace(/^https?:\/\//, "")}
+                    </span>
                   </span>
                   <ArrowRight className="h-5 w-5 shrink-0 text-brand-600" />
                 </a>

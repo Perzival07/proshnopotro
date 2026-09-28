@@ -70,11 +70,14 @@ model Payment {
   @@index([orgId, receivedOn])
 }
 
-/// One student email enrolled in one organisation, copied from its portal.
+/// One person in one organisation, copied from its portal: a student, or an
+/// owner or tutor. Only students are billed; the hub shows everyone.
 model Enrolment {
   orgId String
   org   Organisation @relation(fields: [orgId], references: [id], onDelete: Cascade)
   email String
+  /// STUDENT, TUTOR or ADMIN (owner), as in the portal.
+  role  String       @default("STUDENT")
 
   @@id([orgId, email])
   @@index([email])

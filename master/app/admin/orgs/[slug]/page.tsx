@@ -228,7 +228,7 @@ export default async function OrgPage({
         <details className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-3 text-sm">
           <summary className="cursor-pointer font-medium text-brand-900">Show the sync secret</summary>
           <p className="mt-2 break-all font-mono text-xs">{org.syncSecret}</p>
-          <p className="mt-2 text-xs text-zinc-500">Anyone with this can read the organisation&apos;s student emails. Keep it in Vercel only.</p>
+          <p className="mt-2 text-xs text-zinc-500">Anyone with this can read the organisation&apos;s student and staff emails. Keep it in Vercel only.</p>
         </details>
         {org.lastSyncError && (
           <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Last sync failed: {org.lastSyncError}</p>
@@ -295,7 +295,7 @@ export default async function OrgPage({
 
       <Card title="Delete organisation" className="border-red-200">
         <p className="text-sm text-zinc-700">
-          For an organisation that has left. This deletes its record here, its payments and its list of student emails, and cannot be
+          For an organisation that has left. This deletes its record here, its payments and its list of student and staff emails, and cannot be
           undone. Its portal&apos;s database, Cloudinary files and Vercel project are separate: delete those yourself, within the 30
           days the terms promise.
         </p>

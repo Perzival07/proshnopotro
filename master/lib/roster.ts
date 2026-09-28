@@ -5,17 +5,43 @@ export const MAX_ROSTER = 50_000;
 
 const EMAIL = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
-/** The student emails in a portal's reply, lower-cased and de-duplicated, or an error. */
-export function parseRoster(body: unknown): { emails: string[] } | { error: string } {
-  const students = (body as { students?: unknown } | null)?.students;
+export type StaffRole = "ADMIN" | "TUTOR";
+export type Roster = { students: string[]; staff: { email: string; role: StaffRole }[] };
+
+function email(value: unknown): string | null {
+  return typeof value === "string" && value.length <= 320 && EMAIL.test(value.trim()) ? value.trim().toLowerCase() : null;
+}
+
+/**
+ * The people in a portal's reply: its students (billed) and its owners and
+ * tutors (shown in the hub only), lower-cased and de-duplicated. Someone
+ * listed as both counts as staff. `staff` is optional, for a portal that
+ * predates it.
+ */
+export function parseRoster(body: unknown): Roster | { error: string } {
+  const reply = body as { students?: unknown; staff?: unknown } | null;
+  const students = reply?.students;
+  const staffIn = reply?.staff ?? [];
   if (!Array.isArray(students)) return { error: "The portal's reply has no student list." };
-  if (students.length > MAX_ROSTER) return { error: `The portal sent ${students.length} students, more than ${MAX_ROSTER}.` };
-  const emails = new Set<string>();
-  for (const s of students) {
-    if (typeof s !== "string" || !EMAIL.test(s.trim()) || s.length > 320) {
-      return { error: "The portal's student list has something that is not an email address." };
-    }
-    emails.add(s.trim().toLowerCase());
+  if (!Array.isArray(staffIn)) return { error: "The portal's staff list is not a list." };
+  if (students.length + staffIn.length > MAX_ROSTER) {
+    return { error: `The portal sent ${students.length + staffIn.length} people, more than ${MAX_ROSTER}.` };
   }
-  return { emails: Array.from(emails).sort() };
+  const staff = new Map<string, StaffRole>();
+  for (const s of staffIn) {
+    const e = email((s as { email?: unknown })?.email);
+    const role = (s as { role?: unknown })?.role;
+    if (!e || (role !== "ADMIN" && role !== "TUTOR")) return { error: "The portal's staff list has an entry that is not an email and role." };
+    if (staff.get(e) !== "ADMIN") staff.set(e, role);
+  }
+  const studentSet = new Set<string>();
+  for (const s of students) {
+    const e = email(s);
+    if (!e) return { error: "The portal's student list has something that is not an email address." };
+    if (!staff.has(e)) studentSet.add(e);
+  }
+  return {
+    students: Array.from(studentSet).sort(),
+    staff: Array.from(staff, ([e, role]) => ({ email: e, role })).sort((a, b) => a.email.localeCompare(b.email)),
+  };
 }

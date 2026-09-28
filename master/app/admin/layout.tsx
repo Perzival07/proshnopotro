@@ -4,7 +4,7 @@ import { signOut } from "@/auth";
 import { LogoMark } from "@/components/Logo";
 import { requireSuperAdmin } from "@/lib/access";
 
-export const metadata: Metadata = { title: "Super admin | Proshnopotro", robots: { index: false } };
+export const metadata: Metadata = { title: "Super admin", robots: { index: false } };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const email = await requireSuperAdmin();

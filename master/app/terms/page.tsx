@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Filled, LegalDoc } from "@/components/legal/LegalDoc";
 import { legal, site } from "@/lib/site";
 
-export const metadata: Metadata = { title: `Terms | ${site.name}` };
+export const metadata: Metadata = { title: "Terms", alternates: { canonical: "/terms" } };
 
 /**
  * Proshnopotro's terms: mainly the agreement with the tuition organisations
@@ -59,8 +59,8 @@ export default function TermsPage() {
         <li>delete it when our agreement ends, as set out in section 7.</li>
       </ul>
       <p>
-        We keep a list of your students&apos; email addresses, and nothing else about them, to bill you and so that students can
-        find your portal from our website.
+        We keep a list of the email addresses of your students, tutors and owners (and which each is), and nothing else about
+        them, to bill you for your students and so that everyone can find your portal from our website.
       </p>
 
       <h2>4. Your content</h2>

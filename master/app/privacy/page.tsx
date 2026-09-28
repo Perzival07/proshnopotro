@@ -3,7 +3,7 @@ import Link from "next/link";
 import { Filled, LegalDoc } from "@/components/legal/LegalDoc";
 import { legal, site } from "@/lib/site";
 
-export const metadata: Metadata = { title: `Privacy policy | ${site.name}` };
+export const metadata: Metadata = { title: "Privacy policy", alternates: { canonical: "/privacy" } };
 
 /**
  * Proshnopotro's own privacy policy: this website, the student hub, and the
@@ -47,8 +47,8 @@ export default function PrivacyPage() {
           <strong>If you sign in to the student hub:</strong> your name and email address from Google.
         </li>
         <li>
-          <strong>From each organisation&apos;s portal:</strong> the email addresses of the students it has enrolled, and nothing
-          else about them: no names, phone numbers, answers or results.
+          <strong>From each organisation&apos;s portal:</strong> the email addresses of its students, tutors and owners, and which
+          of the three each is -- nothing else about them: no names, phone numbers, answers or results.
         </li>
         <li>
           <strong>About organisations we serve:</strong> their contact people, student counts, prices and payment records.
@@ -62,7 +62,7 @@ export default function PrivacyPage() {
       <h2>3. Why we use it</h2>
       <ul>
         <li>To answer you and arrange demos.</li>
-        <li>To show a student, after they sign in to the hub, which organisations have enrolled them, and take them there.</li>
+        <li>To show anyone who signs in to the hub which organisations they belong to, and take them there.</li>
         <li>To bill each organisation for the students it has enrolled.</li>
         <li>To run, secure and support the service, and to meet our legal obligations.</li>
       </ul>

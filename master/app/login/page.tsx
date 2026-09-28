@@ -5,7 +5,7 @@ import { auth, devLoginEnabled, signIn } from "@/auth";
 import { LogoMark } from "@/components/Logo";
 import { buttonClass, inputClass, secondaryButtonClass } from "@/components/admin/ui";
 
-export const metadata: Metadata = { title: "Sign in | Proshnopotro" };
+export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
 
 /** Only same-site paths, so the login page cannot bounce anyone elsewhere. */
 function safeNext(next: string | undefined): string {

@@ -32,7 +32,14 @@ export function Footer() {
         <Link href="/privacy" className="hover:text-brand-navy hover:underline">Privacy</Link>
         {" · "}
         <Link href="/terms" className="hover:text-brand-navy hover:underline">Terms</Link>
-        {" · "}Powered by {PRODUCT_NAME}
+        {" · "}Powered by{" "}
+        {process.env.MASTER_URL ? (
+          <a href={process.env.MASTER_URL} className="hover:text-brand-navy hover:underline">
+            {PRODUCT_NAME}
+          </a>
+        ) : (
+          PRODUCT_NAME
+        )}
       </p>
     </footer>
   );

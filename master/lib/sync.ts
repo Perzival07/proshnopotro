@@ -1,13 +1,14 @@
 import { prisma } from "./prisma";
-import { parseRoster } from "./roster";
+import { parseRoster, type Roster } from "./roster";
 import { SIGNATURE_HEADER, signRequest } from "./signature";
 
-/** Where each portal answers the master with its student emails. */
+/** Where each portal answers the master with its students, owners and tutors. */
 export const ROSTER_PATH = "/api/master/roster";
 
 /**
- * Asks an organisation's portal for its enrolled student emails and replaces
- * the master's copy with them. A failure keeps the last good copy and records
+ * Asks an organisation's portal who belongs to it -- students, owners and
+ * tutors -- and replaces the master's copy. Only students are counted for
+ * billing. A failure keeps the last good copy and records
  * why, so the dashboard can say the count is stale.
  */
 export async function syncRoster(orgId: string): Promise<{ ok: true; count: number } | { ok: false; error: string }> {
@@ -17,19 +18,21 @@ export async function syncRoster(orgId: string): Promise<{ ok: true; count: numb
     await prisma.organisation.update({ where: { id: orgId }, data: { lastSyncError: result.error } });
     return { ok: false, error: result.error };
   }
-  const { emails } = result;
+  const { students, staff } = result;
   await prisma.$transaction([
     prisma.enrolment.deleteMany({ where: { orgId } }),
-    prisma.enrolment.createMany({ data: emails.map((email) => ({ orgId, email })) }),
+    prisma.enrolment.createMany({
+      data: [...students.map((email) => ({ orgId, email, role: "STUDENT" })), ...staff.map((s) => ({ orgId, email: s.email, role: s.role }))],
+    }),
     prisma.organisation.update({
       where: { id: orgId },
-      data: { studentCount: emails.length, lastSyncAt: new Date(), lastSyncError: null },
+      data: { studentCount: students.length, lastSyncAt: new Date(), lastSyncError: null },
     }),
   ]);
-  return { ok: true, count: emails.length };
+  return { ok: true, count: students.length };
 }
 
-async function fetchRoster(portalUrl: string, secret: string): Promise<{ emails: string[] } | { error: string }> {
+async function fetchRoster(portalUrl: string, secret: string): Promise<Roster | { error: string }> {
   let res: Response;
   try {
     res = await fetch(`${portalUrl}${ROSTER_PATH}`, {
