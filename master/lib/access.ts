@@ -1,16 +1,25 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 
 /** SUPER_ADMIN_EMAILS, lower-cased. Read on every call, so removing an address takes effect at once. */
-function superAdmins(): string[] {
+export function envSuperAdmins(): string[] {
   return (process.env.SUPER_ADMIN_EMAILS || "")
     .split(",")
     .map((e) => e.trim().toLowerCase())
     .filter(Boolean);
 }
 
-export function isSuperAdmin(email: string | null | undefined): boolean {
-  return Boolean(email) && superAdmins().includes(email!.toLowerCase());
+/**
+ * A super admin is listed in SUPER_ADMIN_EMAILS (fixed, set in Vercel) or was
+ * added in the workspace's Settings (the SuperAdmin table). Checked on every
+ * request, so removing someone takes effect at once.
+ */
+export async function isSuperAdmin(email: string | null | undefined): Promise<boolean> {
+  if (!email) return false;
+  const e = email.toLowerCase();
+  if (envSuperAdmins().includes(e)) return true;
+  return (await prisma.superAdmin.count({ where: { email: e } })) > 0;
 }
 
 /** The signed-in email, or a trip to the login page. */
@@ -28,6 +37,6 @@ export async function requireSignedIn(next: string): Promise<string> {
  */
 export async function requireSuperAdmin(): Promise<string> {
   const email = await requireSignedIn("/admin");
-  if (!isSuperAdmin(email)) redirect("/hub");
+  if (!(await isSuperAdmin(email))) redirect("/hub");
   return email;
 }

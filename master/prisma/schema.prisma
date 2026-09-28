@@ -40,6 +40,12 @@ model Organisation {
   lastSyncAt         DateTime?
   lastSyncError      String?
   notes              String    @default("")
+  /// Who Proshnopotro deals with at the organisation. Only the super admin
+  /// sees these; the portal's public contact details are in its branding.
+  contactName        String    @default("")
+  contactEmail       String    @default("")
+  contactPhone       String    @default("")
+  address            String    @default("")
   /// What its portal shows and which features it has (lib/branding.ts
   /// Branding). null = not set here yet: the portal uses its orgs/ folder.
   branding           Json?
@@ -54,6 +60,7 @@ model Organisation {
 
   payments  Payment[]
   enrolment Enrolment[]
+  activity  ActivityLog[]
 }
 
 model Payment {
@@ -81,4 +88,38 @@ model Enrolment {
 
   @@id([orgId, email])
   @@index([email])
+}
+
+/// Super admins added in the workspace, beside the fixed SUPER_ADMIN_EMAILS.
+model SuperAdmin {
+  email     String   @id
+  addedBy   String
+  createdAt DateTime @default(now())
+}
+
+/// What each super admin did, newest first on /admin/activity.
+model ActivityLog {
+  id      String        @id @default(cuid())
+  at      DateTime      @default(now())
+  /// The super admin's email.
+  actor   String
+  orgId   String?
+  org     Organisation? @relation(fields: [orgId], references: [id], onDelete: SetNull)
+  /// Kept as text, so the entry still reads after the organisation is deleted.
+  orgName String        @default("")
+  action  String
+  detail  String        @default("")
+
+  @@index([at])
+  @@index([orgId, at])
+}
+
+/// Platform-wide settings: one row, id 1.
+model PlatformSettings {
+  id                        Int      @id @default(1)
+  /// Filled in on the "Add organisation" form.
+  defaultPricePerStudentInr Int      @default(0)
+  /// Shown on every owner's Billing page; empty = the text in lib/site.ts.
+  paymentInstructions       String   @default("")
+  updatedAt                 DateTime @updatedAt
 }

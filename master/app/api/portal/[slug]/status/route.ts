@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { SIGNATURE_HEADER, verifyRequest } from "@/lib/signature";
 import { billingStatus, dateKey, monthlyAmount, todayIst } from "@/lib/billing";
-import { paymentInstructions } from "@/lib/site";
+import { getSettings } from "@/lib/settings";
 
 /**
  * What a portal asks the master, a few times an hour: is it suspended, and
@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ slug
           amountInr: p.amountInr,
           reference: p.reference,
         })),
-        instructions: paymentInstructions,
+        instructions: (await getSettings()).paymentInstructions,
       },
     },
     { headers: { "Cache-Control": "no-store" } }

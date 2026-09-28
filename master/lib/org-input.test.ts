@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalisePortalUrl, parseOrgForm, parsePaymentForm } from "./org-input";
+import { normalisePortalUrl, parseOrgForm, parsePaymentForm, parsePersonForm, parseSettingsForm } from "./org-input";
 
 const form = (fields: Record<string, string>) => ({ get: (k: string) => fields[k] ?? null });
 
@@ -14,7 +14,18 @@ const good = {
 describe("parseOrgForm", () => {
   it("accepts a complete organisation and keeps only the portal's origin", () => {
     expect(parseOrgForm(form(good))).toEqual({
-      data: { slug: "classes-by-koustav", name: "Classes by Koustav", portalUrl: "https://koustav.example.in", pricePerStudentInr: 40, maxStudents: null, notes: "" },
+      data: {
+        slug: "classes-by-koustav",
+        name: "Classes by Koustav",
+        portalUrl: "https://koustav.example.in",
+        pricePerStudentInr: 40,
+        maxStudents: null,
+        notes: "",
+        contactName: "",
+        contactEmail: "",
+        contactPhone: "",
+        address: "",
+      },
     });
   });
   it("refuses a slug that is not a folder name", () => {
@@ -47,5 +58,37 @@ describe("parsePaymentForm", () => {
     expect(parsePaymentForm(form({ amountInr: "0", receivedOn: today }), today)).toHaveProperty("error");
     expect(parsePaymentForm(form({ amountInr: "10", receivedOn: "2026-09-28" }), today)).toHaveProperty("error");
     expect(parsePaymentForm(form({ amountInr: "10", receivedOn: today, paidUpTo: "2026-02-30x" }), today)).toHaveProperty("error");
+  });
+});
+
+describe("organisation contact details", () => {
+  it("lower-cases the organisation's email and refuses a bad one", () => {
+    expect(parseOrgForm(form({ ...good, contactEmail: " Office@Koustav.IN " }))).toMatchObject({ data: { contactEmail: "office@koustav.in" } });
+    expect(parseOrgForm(form({ ...good, contactEmail: "office" }))).toHaveProperty("error");
+  });
+});
+
+describe("parsePersonForm", () => {
+  const person = { role: "STUDENT", email: "Riya@Mail.com", name: "Riya", phone: "", className: "Class 10" };
+  it("builds the portal command", () => {
+    expect(parsePersonForm(form(person))).toEqual({
+      data: { action: "add", role: "STUDENT", email: "riya@mail.com", name: "Riya", phone: null, className: "Class 10" },
+    });
+  });
+  it("needs a name for students only, a known role and a listed class", () => {
+    expect(parsePersonForm(form({ ...person, name: "" }))).toHaveProperty("error");
+    expect(parsePersonForm(form({ ...person, role: "ADMIN", name: "" }))).toHaveProperty("data");
+    expect(parsePersonForm(form({ ...person, role: "OWNER" }))).toHaveProperty("error");
+    expect(parsePersonForm(form({ ...person, className: "Year 5" }))).toHaveProperty("error");
+    expect(parsePersonForm(form({ ...person, email: "riya" }))).toHaveProperty("error");
+  });
+});
+
+describe("parseSettingsForm", () => {
+  it("wants a whole-rupee default price", () => {
+    expect(parseSettingsForm(form({ defaultPricePerStudentInr: "35", paymentInstructions: " UPI " }))).toEqual({
+      data: { defaultPricePerStudentInr: 35, paymentInstructions: "UPI" },
+    });
+    expect(parseSettingsForm(form({ defaultPricePerStudentInr: "3.5" }))).toHaveProperty("error");
   });
 });

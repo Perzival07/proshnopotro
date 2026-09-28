@@ -3,6 +3,7 @@ import Link from "next/link";
 import { signOut } from "@/auth";
 import { LogoMark } from "@/components/Logo";
 import { requireSuperAdmin } from "@/lib/access";
+import { AdminNav } from "@/components/admin/AdminNav";
 
 export const metadata: Metadata = { title: "Super admin", robots: { index: false } };
 
@@ -16,6 +17,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             <LogoMark className="h-8 w-8 text-base" />
             <span className="font-bold text-brand-900">Super admin</span>
           </Link>
+          <div className="order-last w-full sm:order-none sm:w-auto">
+            <AdminNav />
+          </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="hidden text-zinc-500 sm:inline">{email}</span>
             <form

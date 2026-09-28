@@ -69,3 +69,17 @@ export function Flash({ ok, error }: { ok?: string; error?: string }) {
     </p>
   );
 }
+
+const ROLE_STYLES: Record<string, string> = {
+  ADMIN: "bg-brand-50 text-brand-800 border-brand-200",
+  TUTOR: "bg-sky-50 text-sky-800 border-sky-200",
+  STUDENT: "bg-zinc-50 text-zinc-700 border-zinc-200",
+};
+
+export function RoleBadge({ role }: { role: string }) {
+  return (
+    <span className={clsx("inline-flex rounded-full border px-2 py-0.5 text-xs font-semibold", ROLE_STYLES[role] ?? ROLE_STYLES.STUDENT)}>
+      {role === "ADMIN" ? "Owner" : role === "TUTOR" ? "Tutor" : "Student"}
+    </span>
+  );
+}

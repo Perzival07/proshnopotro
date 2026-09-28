@@ -1,6 +1,7 @@
 import React from "react";
 import { requireAdmin } from "@/lib/auth-utils";
 import { prisma } from "@/lib/prisma";
+import { envOwnerEmails } from "@/lib/people";
 import { TeamClient } from "./TeamClient";
 
 export const dynamic = "force-dynamic";
@@ -20,7 +21,9 @@ export default async function TeamPage() {
     }),
   ]);
   const links = await prisma.classroomTutor.findMany({ select: { classroomId: true, tutorEmail: true } });
-  const owners = (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  // Owners set by the master are ADMIN accounts; those in ADMIN_EMAILS count even before their first sign-in.
+  const admins = await prisma.user.findMany({ where: { role: "ADMIN" }, select: { email: true } });
+  const owners = Array.from(new Set([...envOwnerEmails(), ...admins.map((a) => a.email.toLowerCase())])).sort();
 
   return (
     <TeamClient

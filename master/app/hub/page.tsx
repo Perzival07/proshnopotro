@@ -31,8 +31,9 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
     .map((e) => ({ ...e.org, role: ROLE_LABEL[e.role] ?? "Student" }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  const superAdmin = await isSuperAdmin(email);
   // One organisation: straight in, unless they came back here on purpose.
-  if (orgs.length === 1 && !stay && !isSuperAdmin(email)) redirect(`${orgs[0].portalUrl}/login`);
+  if (orgs.length === 1 && !stay && !superAdmin) redirect(`${orgs[0].portalUrl}/login`);
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
@@ -43,7 +44,7 @@ export default async function HubPage({ searchParams }: { searchParams: Promise<
           <p className="text-sm text-zinc-600">Signed in as {email}</p>
         </div>
 
-        {isSuperAdmin(email) && (
+        {superAdmin && (
           <Link href="/admin" className="block rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm font-semibold text-brand-800 hover:bg-brand-100">
             Super admin workspace →
           </Link>

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ExternalLink, FileText, RefreshCw } from "lucide-react";
+import { ArrowLeft, ExternalLink, FileText, History, RefreshCw, Users } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import {
   billingStatus,
@@ -93,8 +93,27 @@ export default async function OrgPage({
           <a href={org.portalUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-sm text-brand-700 hover:underline">
             {org.portalUrl} <ExternalLink className="h-3.5 w-3.5" />
           </a>
+          {(org.contactName || org.contactEmail || org.contactPhone) && (
+            <p className="text-sm text-zinc-600">
+              {[org.contactName, org.contactPhone].filter(Boolean).join(" · ")}
+              {org.contactEmail && (
+                <>
+                  {(org.contactName || org.contactPhone) && " · "}
+                  <a href={`mailto:${org.contactEmail}`} className="text-brand-700 hover:underline">
+                    {org.contactEmail}
+                  </a>
+                </>
+              )}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
+          <Link href={`/admin/orgs/${org.slug}/people`} className={buttonClass}>
+            <Users className="h-4 w-4" /> People
+          </Link>
+          <Link href={`/admin/activity?org=${org.slug}`} className={secondaryButtonClass}>
+            <History className="h-4 w-4" /> Activity
+          </Link>
           <Link href={`/admin/orgs/${org.slug}/statement?month=${monthOf(today)}`} className={secondaryButtonClass}>
             <FileText className="h-4 w-4" /> Statement
           </Link>

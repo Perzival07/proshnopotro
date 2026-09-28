@@ -13,6 +13,17 @@ One Next.js app with three parts. It shares no code or database with
   feature switches, legal details; `lib/branding.ts`) is edited here too.
   Saving it calls the portal's Vercel deploy hook, so the portal rebuilds
   with it in about three minutes.
+  Each organisation also has contact details (person, email, phone,
+  address) and a People page (`/admin/orgs/<slug>/people`): the super admin
+  adds, removes and changes the role of its students, tutors and owners,
+  carried out in the portal over a signed request (`lib/portal-people.ts`).
+  Only the super admin makes owners; owners add their own students and tutors
+  in the portal's admin panel, which is the same for every organisation.
+  `/admin/people` finds anyone across all organisations by email,
+  `/admin/activity` records what each super admin did (`lib/activity.ts`),
+  and `/admin/settings` holds extra super admins (beside
+  `SUPER_ADMIN_EMAILS`), the default price and the payment instructions
+  shown on owners' Billing pages.
 - `/hub`: anyone signs in with Google and sees every organisation their email
   belongs to, as a student, tutor or owner, then goes to that portal to sign
   in. With exactly one organisation they go straight there. The public
@@ -44,6 +55,10 @@ Requests either way are signed with it (`lib/signature.ts`, copied in
   emails (every `STUDENT` account, billed) and its owners and tutors with
   their role (shown in the hub, not billed). Run by "Sync now" and nightly by the Vercel cron
   in `vercel.json` (`/api/cron/sync`, 03:00 IST, needs `CRON_SECRET`).
+- Master -> portal `POST /api/master/people`: add a student, tutor or
+  owner, remove someone (with their tests, results and answer photos), or
+  change their role (`portal/lib/master-people.ts`, `portal/lib/people.ts`).
+  Owners in the portal's `ADMIN_EMAILS` can only be changed there.
 - Portal build -> master `GET /api/portal/<slug>/branding`: the branding and
   logo, in the shape of an `orgs/<slug>/org.json`; 404 until some is saved
   here, and the portal then uses its `orgs/` folder.

@@ -159,7 +159,7 @@ export function TeamClient({ owners, classrooms, initial }: { owners: string[]; 
 
       <div className="rounded-xl border border-brand-border bg-white p-4 text-xs shadow-card">
         <p className="mb-1 font-semibold text-brand-navy">Owners</p>
-        <p className="mb-2 text-brand-ink/60">Set in the ADMIN_EMAILS setting on the server; owners can do everything.</p>
+        <p className="mb-2 text-brand-ink/60">Owners can do everything here. Proshnopotro adds and removes them: ask your Proshnopotro contact to change who is an owner.</p>
         <ul className="space-y-0.5">
           {owners.map((o) => <li key={o} className="font-mono text-[11px]">{o}</li>)}
         </ul>

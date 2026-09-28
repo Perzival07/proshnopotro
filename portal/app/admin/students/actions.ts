@@ -5,7 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { validateStudent, type StudentInput } from "@/lib/students";
 import { normalizeEmail } from "@/lib/utils";
-import { destroyAnswerImages } from "@/lib/cloudinary";
+import { addStudentRecord, removePersonRecord } from "@/lib/people";
 
 /** Every surface that shows students or their work. */
 function revalidateStudentViews() {
@@ -20,29 +20,9 @@ export async function createStudent(data: StudentInput) {
 
   const parsed = validateStudent(data);
   if (!parsed.ok) return { error: parsed.error };
-  const { name, email, phone, className } = parsed.value;
-
-  const existing = await prisma.user.findUnique({ where: { email } });
-  if (existing) {
-    return { error: `A ${existing.role.toLowerCase()} with the email ${email} already exists.` };
-  }
-
   try {
-    await prisma.user.create({
-      data: {
-        name,
-        email,
-        phone,
-        className,
-        role: "STUDENT",
-        // Added by the tutor, so the details are already on file: sending them
-        // through onboarding to retype what was just entered would be busywork.
-        // Google sign-in links to this row on their first login, because the
-        // provider is configured to link by verified email.
-        profileComplete: true,
-      },
-    });
-
+    const added = await addStudentRecord(parsed.value);
+    if ("error" in added) return { error: added.error };
     revalidateStudentViews();
     return { success: true };
   } catch (error) {
@@ -135,38 +115,9 @@ export async function deleteStudent(id: string) {
     return { error: "Admin accounts cannot be deleted here." };
   }
 
-  const email = normalizeEmail(user.email);
-
-  // Their answer photos go first, from Cloudinary: the rows below are the only
-  // record of where the files are, so deleting those first would leave
-  // pictures of a removed student in storage for good. If any file cannot be
-  // removed, nothing is deleted and the owner can simply try again.
-  const photos = await prisma.answerImage.findMany({
-    where: { assignment: { studentEmail: email } },
-    select: { publicId: true },
-  });
-  if (photos.length > 0) {
-    const { failed } = await destroyAnswerImages(photos.map((p) => p.publicId));
-    if (failed.length > 0) {
-      return { error: `Could not delete ${failed.length} of their answer photos from storage. Nothing was removed; try again.` };
-    }
-  }
-
   try {
-    await prisma.$transaction(async (tx) => {
-      // Assignments are keyed by email rather than by user id, so deleting the
-      // user alone would leave their rows behind: the roster would still list
-      // the address, and signing in again with Google would hand the tests
-      // straight back. Removing a student has to mean removing their work too.
-      await tx.assignment.deleteMany({ where: { studentEmail: email } });
-      // Same story for these: they hold the email with no foreign key to the
-      // user. DoubtMessage rows go with their Doubt (onDelete: Cascade).
-      await tx.classroomMember.deleteMany({ where: { studentEmail: email } });
-      await tx.noteStudent.deleteMany({ where: { studentEmail: email } });
-      await tx.doubt.deleteMany({ where: { studentEmail: email } });
-      await tx.user.delete({ where: { id } });
-    });
-
+    const removed = await removePersonRecord({ id });
+    if ("error" in removed) return { error: removed.error };
     revalidateStudentViews();
     return { success: true };
   } catch (error) {
