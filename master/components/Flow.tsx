@@ -9,16 +9,18 @@ import type { LucideIcon } from "lucide-react";
 
 export type FlowOutput = { label: string; color: string };
 
-const INPUT_Y = [150, 230, 310];
-const CENTER = { x: 500, y: 230, r: 54 };
-const OUT_Y = 378;
-const OUT_X = [110, 305, 500, 695, 890];
+// A mirror: sources in a column on the left, what Proshnopotro gives in a
+// column on the right, both spread over the same height around the core.
+const CENTER = { x: 500, y: 225, r: 54 };
+const INPUT_Y = [125, 225, 325];
+const OUTPUT_Y = [105, 165, 225, 285, 345];
+const COLUMN_LABEL_Y = 66;
+const CHIP = { w: 210, h: 38 };
+const LEFT = { chip: 40, dot: 282 };
+const RIGHT = { dot: 718, chip: 750 };
 
-const inPath = (y: number) => `M300,${y} C390,${y} 400,${CENTER.y} ${CENTER.x - CENTER.r - 8},${CENTER.y}`;
-const outPath = (x: number) =>
-  x === CENTER.x
-    ? `M${x},${CENTER.y + CENTER.r + 6} L${x},${OUT_Y - 10}`
-    : `M${CENTER.x},${CENTER.y + CENTER.r + 6} C${CENTER.x},${CENTER.y + 110} ${x},${OUT_Y - 70} ${x},${OUT_Y - 10}`;
+const inPath = (y: number) => `M${LEFT.dot + 8},${y} C390,${y} 400,${CENTER.y} ${CENTER.x - CENTER.r - 8},${CENTER.y}`;
+const outPath = (y: number) => `M${CENTER.x + CENTER.r + 8},${CENTER.y} C600,${CENTER.y} 610,${y} ${RIGHT.dot - 8},${y}`;
 
 function Pulse({ path, delay, color = "#c7cbff" }: { path: string; delay: number; color?: string }) {
   return (
@@ -45,7 +47,7 @@ export function PlatformFlow({
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute inset-0 bg-dot-grid-dark" />
         <div className="absolute -left-24 top-1/3 h-72 w-72 rounded-full bg-sky-500/15 blur-3xl" />
-        <div className="absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-accent-500/15 blur-3xl" />
+        <div className="absolute -right-24 top-1/3 h-72 w-72 rounded-full bg-accent-500/15 blur-3xl" />
         <div className="absolute left-1/2 top-1/2 h-64 w-64 -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-500/25 blur-3xl" />
       </div>
 
@@ -61,13 +63,14 @@ export function PlatformFlow({
       </div>
 
       {/* Wide screens: the full diagram */}
-      <svg viewBox="0 0 1000 430" className="relative hidden w-full md:block" role="img" aria-label={`${inputs.join(", ")} flow into Proshnopotro, which gives ${outputs.map((o) => o.label).join(", ")}`}>
+      <svg viewBox="0 0 1000 380" className="relative hidden w-full md:block" role="img" aria-label={`${inputs.join(", ")} flow into Proshnopotro, which gives ${outputs.map((o) => o.label).join(", ")}`}>
         <defs>
           <radialGradient id="flow-core" cx="50%" cy="40%" r="60%">
             <stop offset="0%" stopColor="#7f85fb" />
             <stop offset="100%" stopColor="#3730c2" />
           </radialGradient>
-          <linearGradient id="flow-in" x1="0" x2="1">
+          {/* In page units: a straight, flat line has no height to size a gradient by. */}
+          <linearGradient id="flow-in" gradientUnits="userSpaceOnUse" x1={LEFT.dot} y1="0" x2={CENTER.x - CENTER.r} y2="0">
             <stop offset="0%" stopColor="#a8aefc" stopOpacity="0.25" />
             <stop offset="100%" stopColor="#a8aefc" />
           </linearGradient>
@@ -76,38 +79,44 @@ export function PlatformFlow({
         {/* From the card down to the core */}
         <path d={`M500,0 L500,${CENTER.y - CENTER.r - 10}`} stroke="#7f85fb" strokeOpacity="0.5" strokeWidth="1.5" fill="none" className="flow-line" />
 
-        {/* Inputs */}
-        <text x="60" y="108" fill="#8b90b8" fontSize="11" fontWeight="600" letterSpacing="2.2">
+        {/* Inputs, on the left */}
+        <text x={LEFT.chip} y={COLUMN_LABEL_Y} fill="#8b90b8" fontSize="11" fontWeight="600" letterSpacing="2.2">
           PAPERS COME IN FROM
         </text>
         {inputs.map((label, i) => {
           const y = INPUT_Y[i];
           return (
             <g key={label}>
-              <rect x="60" y={y - 19} width="210" height="38" rx="10" fill="#11142a" stroke="rgba(255,255,255,0.12)" />
-              <text x="78" y={y + 5} fill="#e6e8ff" fontSize="14" fontWeight="500">
+              <rect x={LEFT.chip} y={y - CHIP.h / 2} width={CHIP.w} height={CHIP.h} rx="10" fill="#11142a" stroke="rgba(255,255,255,0.12)" />
+              <text x={LEFT.chip + 18} y={y + 5} fill="#e6e8ff" fontSize="14" fontWeight="500">
                 {label}
               </text>
-              <path d={`M270,${y} L292,${y}`} stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
-              <circle cx="300" cy={y} r="7" fill="#05060e" stroke="#a8aefc" strokeWidth="2" />
-              <circle cx="300" cy={y} r="2.5" fill="#a8aefc" />
+              <path d={`M${LEFT.chip + CHIP.w},${y} L${LEFT.dot - 8},${y}`} stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
+              <circle cx={LEFT.dot} cy={y} r="7" fill="#05060e" stroke="#a8aefc" strokeWidth="2" />
+              <circle cx={LEFT.dot} cy={y} r="2.5" fill="#a8aefc" />
               <path d={inPath(y)} stroke="url(#flow-in)" strokeWidth="2" fill="none" className="flow-line" />
               <Pulse path={inPath(y)} delay={i * 0.5} />
             </g>
           );
         })}
 
-        {/* Outputs */}
+        {/* Outputs, on the right */}
+        <text x={RIGHT.chip + CHIP.w} y={COLUMN_LABEL_Y} textAnchor="end" fill="#8b90b8" fontSize="11" fontWeight="600" letterSpacing="2.2">
+          WHAT YOU GET
+        </text>
         {outputs.map(({ label, color }, i) => {
-          const x = OUT_X[i];
+          const y = OUTPUT_Y[i];
           return (
             <g key={label}>
-              <path d={outPath(x)} stroke={color} strokeOpacity="0.7" strokeWidth="2" fill="none" className="flow-line" />
-              <Pulse path={outPath(x)} delay={1.2 + i * 0.35} color={color} />
-              <circle cx={x} cy={OUT_Y} r="9" fill="#05060e" stroke={color} strokeWidth="2.5" />
-              <circle cx={x} cy={OUT_Y} r="3" fill={color} />
-              <text x={x} y={OUT_Y + 36} textAnchor="middle" fill="#c9cce6" fontSize="12" fontWeight="600" letterSpacing="1.8">
-                {label.toUpperCase()}
+              <path d={outPath(y)} stroke={color} strokeOpacity="0.7" strokeWidth="2" fill="none" className="flow-line" />
+              <Pulse path={outPath(y)} delay={1.2 + i * 0.35} color={color} />
+              <circle cx={RIGHT.dot} cy={y} r="7" fill="#05060e" stroke={color} strokeWidth="2" />
+              <circle cx={RIGHT.dot} cy={y} r="2.5" fill={color} />
+              <path d={`M${RIGHT.dot + 8},${y} L${RIGHT.chip},${y}`} stroke="rgba(255,255,255,0.18)" strokeWidth="1.5" />
+              <rect x={RIGHT.chip} y={y - CHIP.h / 2} width={CHIP.w} height={CHIP.h} rx="10" fill="#11142a" stroke="rgba(255,255,255,0.12)" />
+              <circle cx={RIGHT.chip + 20} cy={y} r="4.5" fill={color} />
+              <text x={RIGHT.chip + 34} y={y + 5} fill="#e6e8ff" fontSize="14" fontWeight="500">
+                {label}
               </text>
             </g>
           );
@@ -153,6 +162,7 @@ export function PlatformFlow({
           </span>
         </span>
         <VerticalLink />
+        <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">What you get</p>
         <div className="grid w-full grid-cols-2 gap-2">
           {outputs.map(({ label, color }) => (
             <span key={label} className="flex items-center gap-2 rounded-lg border border-white/10 bg-night-800 px-3 py-2 text-xs font-semibold text-slate-200">
