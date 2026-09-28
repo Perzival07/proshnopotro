@@ -44,11 +44,17 @@ export const paymentInstructions =
   `Pay by bank transfer or UPI, then send the transaction reference to ${site.contactEmail} ` +
   "so the payment can be recorded. Write to the same address for bank details or an invoice.";
 
-export const nav = [
-  { label: "How it works", href: "#how-it-works" },
+/**
+ * The header's links, in the order their sections come down the page, so
+ * moving along the bar moves steadily down it (components/Header.tsx follows
+ * the reader with a sliding highlight). `fallback` is used when the first
+ * section is not on the page (no organisation is listed yet).
+ */
+export const nav: { label: string; href: string; fallback?: string }[] = [
+  { label: "Organisations", href: "#joined", fallback: "#organisations" },
   { label: "Platform", href: "#platform" },
+  { label: "How it works", href: "#how-it-works" },
   { label: "Proctoring", href: "#proctoring" },
-  { label: "Organisations", href: "#joined" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];

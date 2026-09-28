@@ -675,8 +675,8 @@ export default async function Home() {
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Platform</p>
             <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
-              <li><a href="#how-it-works" className="hover:text-white">How it works</a></li>
               <li><a href="#platform" className="hover:text-white">Features</a></li>
+              <li><a href="#how-it-works" className="hover:text-white">How it works</a></li>
               <li><a href="#proctoring" className="hover:text-white">Proctoring</a></li>
               <li><a href="#pricing" className="hover:text-white">Pricing</a></li>
               <li><a href="#faq" className="hover:text-white">FAQ</a></li>
