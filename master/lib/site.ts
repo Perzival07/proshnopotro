@@ -41,7 +41,7 @@ export const legal: {
  * portal" list. Add one here when its portal goes live.
  */
 export const organisations = [
-  { name: "Classes by Koustav", url: "https://proshnopotro-nine.vercel.app" },
+  { name: "Classes by Koustav", url: "https://classes-by-koustav.vercel.app" },
 ];
 
 /**
