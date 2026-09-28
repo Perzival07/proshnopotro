@@ -18,6 +18,7 @@ import {
   recordPayment,
   deleteOrg,
   saveBranding,
+  saveWebsiteListing,
   saveDeployHook,
   deletePayment,
   rotateSecret,
@@ -76,6 +77,9 @@ export default async function OrgPage({
   const suspended = org.status === "SUSPENDED";
   const master = await masterUrl();
   const branding = (org.branding as Branding | null) ?? defaultBranding(org.name);
+  const websiteLogoSrc = org.websiteLogo
+    ? `data:${org.websiteLogoType};base64,${Buffer.from(org.websiteLogo).toString("base64")}`
+    : null;
   const logoSrc = org.logoImage ? `data:${org.logoType};base64,${Buffer.from(org.logoImage).toString("base64")}` : null;
 
   return (
@@ -301,6 +305,41 @@ export default async function OrgPage({
             </form>
           )}
         </div>
+      </Card>
+
+      <Card title="On the Proshnopotro website">
+        <form action={saveWebsiteListing.bind(null, org.slug)} className="space-y-4">
+          <div className="flex flex-wrap items-center gap-5">
+            <span className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-zinc-200 bg-white p-1.5">
+              {websiteLogoSrc || logoSrc ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={(websiteLogoSrc ?? logoSrc)!} alt="" className="h-full w-full object-contain" />
+              ) : (
+                <span className="text-3xl font-extrabold text-brand-700">{org.name.charAt(0).toUpperCase()}</span>
+              )}
+            </span>
+            <p className="max-w-md text-sm text-zinc-600">
+              Active organisations appear in &ldquo;The organisations that have joined us&rdquo; on the home page, with this logo.
+              {websiteLogoSrc ? "" : logoSrc ? " It uses the branding logo until you upload one here." : " Without a logo it shows the first letter of the name."}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm font-medium text-brand-900">
+            <input type="checkbox" name="showOnWebsite" defaultChecked={org.showOnWebsite} className="h-4 w-4 rounded border-zinc-300" />
+            Show on the website
+          </label>
+          <Field label="Website logo" hint="PNG, JPEG or WebP, up to 1 MB. Square works best; it sits on a white tile.">
+            <input name="websiteLogo" type="file" accept="image/png,image/jpeg,image/webp" className={inputClass} />
+          </Field>
+          {websiteLogoSrc && (
+            <label className="flex items-center gap-2 text-sm text-zinc-700">
+              <input type="checkbox" name="removeWebsiteLogo" className="h-4 w-4 rounded border-zinc-300" />
+              Remove the website logo
+            </label>
+          )}
+          <button type="submit" className={buttonClass}>
+            Save
+          </button>
+        </form>
       </Card>
 
       <Card title="Details">

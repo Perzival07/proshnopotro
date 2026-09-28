@@ -20,6 +20,9 @@ One Next.js app with three parts. It shares no code or database with
   Only the super admin makes owners; owners add their own students and tutors
   in the portal's admin panel, which is the same for every organisation.
   `/admin/people` finds anyone across all organisations by email,
+  Each organisation's page also sets whether it appears in the home page's
+  "organisations that have joined us" section and the logo shown there
+  (served at `/api/orgs/<slug>/logo`; `lib/showcase.ts`).
   `/admin/activity` records what each super admin did (`lib/activity.ts`),
   and `/admin/settings` holds extra super admins (beside
   `SUPER_ADMIN_EMAILS`), the default price and the payment instructions

@@ -33,8 +33,13 @@ import { Logo } from "@/components/Logo";
 import { Reveal } from "@/components/Reveal";
 import { ExamMock } from "@/components/ExamMock";
 import { Pipeline, PlatformFlow, type PipelineStep } from "@/components/Flow";
-import { demoHref, organisations, site } from "@/lib/site";
+import { JoinedOrgs } from "@/components/JoinedOrgs";
+import { demoHref, site } from "@/lib/site";
+import { showcaseOrgs, type ShowcaseOrg } from "@/lib/showcase";
 import { techStack } from "@/lib/tech-stack";
+
+// Organisations come from the master database; a new one shows within five minutes.
+export const revalidate = 300;
 
 const highlights = [
   { icon: LayoutDashboard, text: "NTA-style exam screen" },
@@ -199,30 +204,30 @@ function Heading({ children, className = "" }: { children: React.ReactNode; clas
   return <h2 className={`mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-[2.6rem] sm:leading-[1.1] ${className}`}>{children}</h2>;
 }
 
-/** An organisation's wordmark, or its logo file when it has one. */
-function OrgMark({ org }: { org: (typeof organisations)[number] }) {
-  if (org.image) {
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img src={org.image} alt={org.name} className="h-8 w-auto opacity-80 transition group-hover:opacity-100" />;
-  }
+/** An organisation's logo, or its initial, for the "Find your portal" list. */
+function OrgMark({ org }: { org: ShowcaseOrg }) {
   return (
-    <span className="flex items-center gap-2.5">
-      <span
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-extrabold text-white"
-        style={{ background: `linear-gradient(135deg, ${org.color}, #0A4B8C)` }}
-        aria-hidden="true"
-      >
-        {org.logo.main.charAt(0)}
+    <span className="flex items-center gap-3">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1">
+        {org.logoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={org.logoUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
+        ) : (
+          <span
+            className="flex h-full w-full items-center justify-center rounded-lg text-lg font-extrabold text-white"
+            style={{ background: `linear-gradient(135deg, ${org.color}, #1e1e4b)` }}
+          >
+            {org.name.charAt(0).toUpperCase()}
+          </span>
+        )}
       </span>
-      <span className="flex flex-col leading-none">
-        <span className="text-[10px] font-medium lowercase tracking-wide text-slate-400">{org.logo.prefix}</span>
-        <span className="text-lg font-extrabold tracking-wide text-white">{org.logo.main}</span>
-      </span>
+      <span className="font-semibold text-white">{org.name}</span>
     </span>
   );
 }
 
-export default function Home() {
+export default async function Home() {
+  const organisations = await showcaseOrgs();
   return (
     <div className="bg-night-950 font-display text-slate-200">
       <Header />
@@ -279,31 +284,31 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Organisations strip */}
-        <section aria-label="Organisations using Proshnopotro" className="border-y border-white/10 bg-night-900/80">
-          <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 py-7 sm:flex-row sm:justify-center sm:gap-12 sm:px-6 lg:px-8">
-            <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Trusted by</p>
-            <ul className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
-              {organisations.map((org) => (
-                <li key={org.url}>
-                  <a href={org.url} className="group inline-flex items-center gap-2 transition hover:opacity-100" title={`${org.name}'s portal`}>
-                    <OrgMark org={org} />
-                    <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-white" />
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="mask-fade-x overflow-hidden border-t border-white/5 py-3" aria-hidden="true">
-            <div className="flex w-max animate-marquee gap-12 whitespace-nowrap">
-              {[...marqueeWords, ...marqueeWords].map((w, i) => (
-                <span key={i} className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
-                  {w}
-                </span>
-              ))}
+        {/* Organisations that have joined */}
+        {organisations.length > 0 && (
+          <section id="joined" aria-labelledby="joined-heading" className="border-y border-white/10 bg-night-900/80">
+            <div className="mx-auto max-w-7xl px-4 pb-10 pt-12 sm:px-6 lg:px-8">
+              <div className="text-center">
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-brand-300">Our organisations</p>
+                <h2 id="joined-heading" className="mt-3 font-display text-2xl font-bold tracking-tight text-white sm:text-3xl">
+                  The organisations that have <span className="text-gradient-warm">joined us</span>
+                </h2>
+              </div>
+              <div className="mt-8">
+                <JoinedOrgs orgs={organisations} />
+              </div>
             </div>
-          </div>
-        </section>
+            <div className="mask-fade-x overflow-hidden border-t border-white/5 py-3" aria-hidden="true">
+              <div className="flex w-max animate-marquee gap-12 whitespace-nowrap">
+                {[...marqueeWords, ...marqueeWords].map((w, i) => (
+                  <span key={i} className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+                    {w}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* Problem */}
         <section className="bg-night-950">
@@ -505,14 +510,14 @@ export default function Home() {
             </Reveal>
             <div className="mx-auto mt-12 grid max-w-3xl gap-4">
               {organisations.map((org) => (
-                <Reveal key={org.url}>
+                <Reveal key={org.slug}>
                   <a
-                    href={org.url}
+                    href={org.portalUrl}
                     className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-night-900 p-5 transition hover:border-brand-400/50"
                   >
                     <span className="flex items-center gap-4">
                       <OrgMark org={org} />
-                      <span className="hidden text-sm text-slate-500 sm:block">{new URL(org.url).host}</span>
+                      <span className="hidden text-sm text-slate-500 sm:block">{new URL(org.portalUrl).host}</span>
                     </span>
                     <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-300">
                       Open portal
@@ -681,7 +686,7 @@ export default function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Organisations</p>
             <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
               {organisations.map((org) => (
-                <li key={org.url}><a href={org.url} className="hover:text-white">{org.name}</a></li>
+                <li key={org.slug}><a href={org.portalUrl} className="hover:text-white">{org.name}</a></li>
               ))}
             </ul>
           </div>

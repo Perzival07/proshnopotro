@@ -228,3 +228,29 @@ export async function rebuildNow(slug: string) {
   await logActivity(actor, "Rebuilt portal", { org, detail: rebuilt });
   back(`/admin/orgs/${slug}`, rebuilt === "started" ? { ok: REBUILD_MESSAGE.started } : { error: REBUILD_MESSAGE[rebuilt] });
 }
+
+/** Whether the organisation is listed on the website's "joined us" section, and the logo shown there. */
+export async function saveWebsiteListing(slug: string, form: FormData) {
+  const actor = await requireSuperAdmin();
+  const org = await orgBySlug(slug);
+  const data: {
+    showOnWebsite: boolean;
+    websiteLogo?: Uint8Array<ArrayBuffer> | null;
+    websiteLogoType?: string | null;
+    websiteLogoSavedAt?: Date | null;
+  } = { showOnWebsite: form.get("showOnWebsite") === "on" };
+  const file = form.get("websiteLogo");
+  if (form.get("removeWebsiteLogo") === "on") {
+    Object.assign(data, { websiteLogo: null, websiteLogoType: null, websiteLogoSavedAt: null });
+  } else if (file instanceof File && file.size > 0) {
+    if (file.size > MAX_LOGO_BYTES) back(`/admin/orgs/${slug}`, { error: "The logo must be 1 MB or smaller." });
+    const bytes = new Uint8Array(await file.arrayBuffer());
+    const type = logoType(bytes);
+    if (!type) back(`/admin/orgs/${slug}`, { error: "The logo must be a PNG, JPEG or WebP image." });
+    Object.assign(data, { websiteLogo: bytes, websiteLogoType: type, websiteLogoSavedAt: new Date() });
+  }
+  await prisma.organisation.update({ where: { id: org.id }, data });
+  await logActivity(actor, "Saved website listing", { org, detail: data.showOnWebsite ? "shown" : "hidden" });
+  revalidatePath("/");
+  back(`/admin/orgs/${slug}`, { ok: data.showOnWebsite ? "Saved. The website shows it within five minutes." : "Saved. It is no longer on the website." });
+}

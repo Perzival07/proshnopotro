@@ -53,6 +53,13 @@ model Organisation {
   logoImage          Bytes?
   logoType           String?
   brandingSavedAt    DateTime?
+  /// Listed on the Proshnopotro website's "joined us" section while active.
+  showOnWebsite      Boolean   @default(true)
+  /// The logo shown there (PNG, JPEG or WebP, at most 1 MB); without one the
+  /// branding logo is used, else its initial.
+  websiteLogo        Bytes?
+  websiteLogoType    String?
+  websiteLogoSavedAt DateTime?
   /// The portal's Vercel deploy hook: called to rebuild it with new branding.
   deployHookUrl      String?
   createdAt          DateTime  @default(now())

@@ -37,28 +37,6 @@ export const legal: {
 };
 
 /**
- * Organisations running their own Proshnopotro portal, for the home page's
- * logo strip and "Find your portal" list. Add one here when its portal goes
- * live and it has agreed to be named. `logo` is its wordmark (as in its
- * orgs/<slug>/org.json) and `color` its brand colour; `image` is an optional
- * logo file in public/, which replaces the wordmark.
- */
-export const organisations: {
-  name: string;
-  url: string;
-  logo: { prefix: string; main: string };
-  color: string;
-  image?: string;
-}[] = [
-  {
-    name: "Classes by Koustav",
-    url: "https://classes-by-koustav.vercel.app",
-    logo: { prefix: "classes by", main: "KOUSTAV" },
-    color: "#2E9CD8",
-  },
-];
-
-/**
  * Shown on every organisation admin's billing page. Payments are made
  * directly to the platform owner, outside the app.
  */
@@ -70,7 +48,7 @@ export const nav = [
   { label: "How it works", href: "#how-it-works" },
   { label: "Platform", href: "#platform" },
   { label: "Proctoring", href: "#proctoring" },
-  { label: "Organisations", href: "#organisations" },
+  { label: "Organisations", href: "#joined" },
   { label: "Pricing", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ];
