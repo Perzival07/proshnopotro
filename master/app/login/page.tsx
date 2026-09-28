@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth, devLoginEnabled, signIn } from "@/auth";
-import { LogoMark } from "@/components/Logo";
+import { FullLogo } from "@/components/Logo";
 import { buttonClass, inputClass, secondaryButtonClass } from "@/components/admin/ui";
 
 export const metadata: Metadata = { title: "Sign in", robots: { index: false } };
@@ -21,7 +21,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   return (
     <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-12">
       <div className="w-full max-w-sm space-y-6 rounded-2xl border border-zinc-200 bg-white p-8 text-center shadow-sm">
-        <LogoMark className="mx-auto h-12 w-12 text-2xl" />
+        <FullLogo className="mx-auto w-48 shadow-lg shadow-brand-900/20" />
         <div className="space-y-1">
           <h1 className="text-xl font-bold text-brand-900">Sign in to Proshnopotro</h1>
           <p className="text-sm text-zinc-600">Use the Google account your tuition knows you by.</p>

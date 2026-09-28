@@ -1,4 +1,5 @@
 import clsx from "clsx";
+import { LogoMark } from "./Logo";
 import type { LucideIcon } from "lucide-react";
 
 /**
@@ -53,9 +54,7 @@ export function PlatformFlow({
 
       {/* The card the diagram hangs from */}
       <div className="relative mx-auto flex max-w-xl items-center gap-4 rounded-2xl border border-white/10 bg-night-800/90 px-5 py-4 shadow-lg">
-        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-sky-600 font-bengali text-lg font-bold text-white">
-          প্র
-        </span>
+        <LogoMark className="h-11 w-11" />
         <div>
           <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-brand-300">{eyebrow}</p>
           <p className="mt-0.5 text-sm font-medium text-white sm:text-[15px]">{headline}</p>
@@ -70,6 +69,9 @@ export function PlatformFlow({
             <stop offset="100%" stopColor="#3730c2" />
           </radialGradient>
           {/* In page units: a straight, flat line has no height to size a gradient by. */}
+          <clipPath id="flow-core-clip">
+            <circle cx={CENTER.x} cy={CENTER.y} r={CENTER.r} />
+          </clipPath>
           <linearGradient id="flow-in" gradientUnits="userSpaceOnUse" x1={LEFT.dot} y1="0" x2={CENTER.x - CENTER.r} y2="0">
             <stop offset="0%" stopColor="#a8aefc" stopOpacity="0.25" />
             <stop offset="100%" stopColor="#a8aefc" />
@@ -135,12 +137,17 @@ export function PlatformFlow({
         />
         <circle cx={CENTER.x} cy={CENTER.y} r={CENTER.r + 10} fill="rgba(88,93,249,0.12)" stroke="rgba(168,174,252,0.25)" />
         <circle cx={CENTER.x} cy={CENTER.y} r={CENTER.r} fill="url(#flow-core)" />
-        <text x={CENTER.x} y={CENTER.y + 4} textAnchor="middle" fill="#fff" fontSize="30" fontWeight="700" className="font-bengali">
-          প্র
-        </text>
-        <text x={CENTER.x} y={CENTER.y + 26} textAnchor="middle" fill="#e6e8ff" fontSize="10" fontWeight="600" letterSpacing="1.5">
-          PROSHNOPOTRO
-        </text>
+        {/* The logo's emblem, in the core */}
+        <image
+          href="/brand/emblem.webp"
+          x={CENTER.x - CENTER.r}
+          y={CENTER.y - CENTER.r}
+          width={CENTER.r * 2}
+          height={CENTER.r * 2}
+          clipPath="url(#flow-core-clip)"
+          preserveAspectRatio="xMidYMid slice"
+        />
+        <circle cx={CENTER.x} cy={CENTER.y} r={CENTER.r} fill="none" stroke="#c7cbff" strokeOpacity="0.8" strokeWidth="2" />
       </svg>
 
       {/* Phones: the same flow, top to bottom */}
@@ -157,9 +164,7 @@ export function PlatformFlow({
         <VerticalLink />
         <span className="relative flex h-20 w-20 items-center justify-center">
           <span className="absolute inset-0 animate-node-pulse rounded-full border-2 border-brand-400" />
-          <span className="flex h-20 w-20 flex-col items-center justify-center rounded-full bg-gradient-to-br from-brand-400 to-brand-700 text-white shadow-lg shadow-brand-500/40">
-            <span className="font-bengali text-2xl font-bold leading-none">প্র</span>
-          </span>
+          <LogoMark className="h-20 w-20 rounded-full border-2 border-brand-200/80 shadow-lg shadow-brand-500/40" />
         </span>
         <VerticalLink />
         <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">What you get</p>

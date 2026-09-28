@@ -42,7 +42,6 @@ const config: Config = {
       fontFamily: {
         sans: ["var(--font-jakarta)", ...defaultTheme.fontFamily.sans],
         display: ["var(--font-geist)", "var(--font-jakarta)", ...defaultTheme.fontFamily.sans],
-        bengali: ["var(--font-bengali)", ...defaultTheme.fontFamily.sans],
       },
       keyframes: {
         "fade-up": {

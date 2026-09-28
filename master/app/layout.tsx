@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Noto_Sans_Bengali, Plus_Jakarta_Sans } from "next/font/google";
+import { Geist, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { site, siteUrl } from "@/lib/site";
 
@@ -14,14 +14,6 @@ const jakarta = Plus_Jakarta_Sans({
 const geist = Geist({
   subsets: ["latin"],
   variable: "--font-geist",
-  display: "swap",
-});
-
-// Only for the logo mark, প্র.
-const bengali = Noto_Sans_Bengali({
-  subsets: ["bengali"],
-  weight: ["700"],
-  variable: "--font-bengali",
   display: "swap",
 });
 
@@ -50,7 +42,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${jakarta.variable} ${geist.variable} ${bengali.variable}`}>
+    <html lang="en" className={`${jakarta.variable} ${geist.variable}`}>
       <head>
         {/* Without JavaScript nothing would fade in, so show it all at once. */}
         <noscript>
