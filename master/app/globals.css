@@ -29,6 +29,77 @@ body {
     background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
     background-size: 22px 22px;
   }
+
+  /* The public site's headline words: cool indigo warming into amber. */
+  .text-gradient-warm {
+    background-image: linear-gradient(95deg, #c7cbff 0%, #7f85fb 32%, #ffac3f 72%, #f29000 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* Fades a strip's edges into the page, for the scrolling logo rows. */
+  .mask-fade-x {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent);
+  }
+}
+
+/*
+ * Workflow diagrams (components/Flow.tsx): dashed connectors that march
+ * towards the next step, and dots that travel along them.
+ */
+.flow-line {
+  stroke-dasharray: 6 8;
+  animation: flow-dash 1.1s linear infinite;
+}
+@keyframes flow-dash {
+  to {
+    stroke-dashoffset: -14;
+  }
+}
+.flow-vline {
+  background-image: repeating-linear-gradient(to bottom, rgba(127, 133, 251, 0.75) 0 6px, transparent 6px 14px);
+  background-size: 2px 14px;
+  animation: flow-vdash 1.1s linear infinite;
+}
+@keyframes flow-vdash {
+  to {
+    background-position: 0 14px;
+  }
+}
+.flow-hline {
+  background-image: repeating-linear-gradient(to right, rgba(127, 133, 251, 0.75) 0 6px, transparent 6px 14px);
+  background-size: 14px 2px;
+  background-repeat: repeat-x;
+  background-position: 0 50%;
+  animation: flow-hdash 1.1s linear infinite;
+}
+@keyframes flow-hdash {
+  to {
+    background-position: 14px 50%;
+  }
+}
+.flow-traveller {
+  animation: flow-travel 2.8s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+@keyframes flow-travel {
+  0% {
+    left: 0%;
+    top: 0%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    left: 100%;
+    top: 100%;
+    opacity: 0;
+  }
 }
 
 /* Sections fade up as they scroll into view (components/Reveal.tsx). */
@@ -55,8 +126,17 @@ body {
   }
   .animate-float,
   .animate-fade-up,
-  .animate-tick {
+  .animate-tick,
+  .animate-marquee,
+  .animate-node-pulse,
+  .flow-line,
+  .flow-vline,
+  .flow-hline {
     animation: none !important;
+  }
+  .flow-traveller,
+  .flow-pulse {
+    display: none;
   }
 }
 

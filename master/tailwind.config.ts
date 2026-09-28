@@ -31,9 +31,17 @@ const config: Config = {
           600: "#d67600",
         },
         ink: "#101828",
+        // The public site's dark theme (app/page.tsx).
+        night: {
+          700: "#1c2037",
+          800: "#11142a",
+          900: "#0a0c19",
+          950: "#05060e",
+        },
       },
       fontFamily: {
         sans: ["var(--font-jakarta)", ...defaultTheme.fontFamily.sans],
+        display: ["var(--font-geist)", "var(--font-jakarta)", ...defaultTheme.fontFamily.sans],
         bengali: ["var(--font-bengali)", ...defaultTheme.fontFamily.sans],
       },
       keyframes: {
@@ -49,8 +57,18 @@ const config: Config = {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.35" },
         },
+        marquee: {
+          from: { transform: "translateX(0)" },
+          to: { transform: "translateX(-50%)" },
+        },
+        "node-pulse": {
+          "0%": { transform: "scale(1)", opacity: "0.55" },
+          "100%": { transform: "scale(1.9)", opacity: "0" },
+        },
       },
       animation: {
+        marquee: "marquee 40s linear infinite",
+        "node-pulse": "node-pulse 2.4s cubic-bezier(0.22, 1, 0.36, 1) infinite",
         "fade-up": "fade-up 0.7s cubic-bezier(0.22, 1, 0.36, 1) both",
         float: "float 6s ease-in-out infinite",
         tick: "tick 1s steps(1) infinite",

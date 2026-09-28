@@ -17,16 +17,16 @@ export function Header() {
   }, []);
 
   return (
-    <header className="sticky top-0 z-50 border-b border-zinc-200/70 bg-white/80 backdrop-blur-lg">
+    <header className="sticky top-0 z-50 border-b border-white/10 bg-night-950/75 backdrop-blur-xl">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:h-20 lg:px-8">
-        <Logo />
+        <Logo light />
 
         <nav aria-label="Main" className="hidden items-center gap-1 lg:flex">
           {nav.map((item) => (
             <a
               key={item.href}
               href={item.href}
-              className="rounded-md px-3.5 py-2 text-[15px] font-medium text-brand-900 transition hover:bg-slate-100"
+              className="rounded-md px-3 py-2 text-[15px] font-medium text-slate-300 transition hover:bg-white/5 hover:text-white"
             >
               {item.label}
             </a>
@@ -36,13 +36,13 @@ export function Header() {
         <div className="flex items-center gap-2">
           <a
             href="/hub"
-            className="hidden rounded-md px-3 py-2 text-sm font-medium text-brand-900 transition hover:text-brand-600 sm:inline-flex"
+            className="hidden rounded-md px-3 py-2 text-sm font-medium text-slate-300 transition hover:text-white sm:inline-flex"
           >
             Log in
           </a>
           <a
             href={demoHref}
-            className="inline-flex items-center justify-center rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-brand-500/30 transition hover:shadow-md hover:brightness-105"
+            className="inline-flex items-center justify-center rounded-lg bg-brand-500 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-brand-500/25 transition hover:bg-brand-400"
           >
             Book a demo
           </a>
@@ -51,7 +51,7 @@ export function Header() {
             onClick={() => setOpen((o) => !o)}
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-brand-900 transition hover:bg-slate-100 lg:hidden"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-md text-slate-200 transition hover:bg-white/10 lg:hidden"
           >
             {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
@@ -59,13 +59,13 @@ export function Header() {
       </div>
 
       {open && (
-        <nav aria-label="Main" className="border-t border-zinc-200/70 bg-white px-4 pb-4 pt-2 lg:hidden">
+        <nav aria-label="Main" className="border-t border-white/10 bg-night-950 px-4 pb-4 pt-2 lg:hidden">
           {[...nav, { label: "Log in", href: "/hub" }].map((item) => (
             <a
               key={item.label}
               href={item.href}
               onClick={() => setOpen(false)}
-              className="block rounded-md px-3 py-3 text-base font-medium text-brand-900 hover:bg-slate-100"
+              className="block rounded-md px-3 py-3 text-base font-medium text-slate-200 hover:bg-white/5"
             >
               {item.label}
             </a>

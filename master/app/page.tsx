@@ -1,14 +1,14 @@
 import {
   ArrowRight,
+  ArrowUpRight,
   BarChart3,
-  BookOpenCheck,
   Building2,
+  CalendarClock,
   Camera,
+  CheckCheck,
   CheckCircle2,
-  ClipboardCheck,
   Copy,
   Database,
-  Eye,
   FileWarning,
   Fingerprint,
   GraduationCap,
@@ -16,12 +16,15 @@ import {
   LayoutDashboard,
   Maximize,
   MessageCircleQuestion,
+  MonitorSmartphone,
   Palette,
   PenLine,
   ScanFace,
   Smartphone,
   Timer,
+  TimerOff,
   ToggleRight,
+  TrendingUp,
   Users,
   Wallet,
 } from "lucide-react";
@@ -29,7 +32,9 @@ import { Header } from "@/components/Header";
 import { Logo } from "@/components/Logo";
 import { Reveal } from "@/components/Reveal";
 import { ExamMock } from "@/components/ExamMock";
+import { Pipeline, PlatformFlow, type PipelineStep } from "@/components/Flow";
 import { demoHref, organisations, site } from "@/lib/site";
+import { techStack } from "@/lib/tech-stack";
 
 const highlights = [
   { icon: LayoutDashboard, text: "NTA-style exam screen" },
@@ -38,9 +43,24 @@ const highlights = [
   { icon: Smartphone, text: "Works on any phone, installs as an app" },
 ];
 
+const marqueeWords = [
+  "CBT exam screen",
+  "Camera proctoring",
+  "Auto-marking",
+  "On-screen answer marking",
+  "Question bank",
+  "Hindi papers",
+  "Doubt threads",
+  "Parent progress links",
+  "Word and CSV import",
+  "Classrooms and tutors",
+];
+
 const modules = [
   {
     n: "01",
+    tag: "Write once",
+    color: "#7f85fb",
     title: "Set papers",
     body: "Write papers in the portal or bring them in from Word and CSV.",
     points: [
@@ -52,6 +72,8 @@ const modules = [
   },
   {
     n: "02",
+    tag: "Exam day",
+    color: "#38bdf8",
     title: "Run exams",
     body: "Students sit papers on a screen modelled on NTA's computer-based test.",
     points: [
@@ -63,6 +85,8 @@ const modules = [
   },
   {
     n: "03",
+    tag: "Fair play",
+    color: "#fb7185",
     title: "Stop cheating",
     body: "Proctoring that runs on the student's device and records every strike.",
     points: [
@@ -74,6 +98,8 @@ const modules = [
   },
   {
     n: "04",
+    tag: "Less evenings",
+    color: "#34d399",
     title: "Mark faster",
     body: "Objective answers mark themselves. Written ones are marked on screen.",
     points: [
@@ -85,7 +111,9 @@ const modules = [
   },
   {
     n: "05",
-    title: "Keep everyone close",
+    tag: "After the exam",
+    color: "#ffac3f",
+    title: "Stay close",
     body: "Everything after the exam, in the same place as the exam.",
     points: [
       "Progress by subject and chapter over time",
@@ -94,6 +122,15 @@ const modules = [
       "A private progress link for parents",
     ],
   },
+];
+
+const examDay: PipelineStep[] = [
+  { icon: CalendarClock, title: "Assign", body: "Set a paper to a classroom. It opens and closes on schedule." },
+  { icon: ScanFace, title: "Face check", body: "A quick camera check must pass before the paper opens." },
+  { icon: MonitorSmartphone, title: "Sit the paper", body: "An NTA-style screen with timer, palette and calculator." },
+  { icon: TimerOff, title: "Auto-submit", body: "At time up, or on the second tab switch." },
+  { icon: CheckCheck, title: "Marked", body: "Objective answers at once; written ones on screen." },
+  { icon: TrendingUp, title: "Results", body: "Released to students, with a progress link for parents." },
 ];
 
 const pains = [
@@ -113,12 +150,12 @@ const proctoring = [
 ];
 
 const people = [
-  { icon: GraduationCap, title: "Students", body: "Tests, results, progress, notes and doubts, on phone or computer.", status: "Live" },
-  { icon: PenLine, title: "Teachers", body: "Mark answer sheets and answer doubts for their own classrooms.", status: "Live" },
-  { icon: Building2, title: "Organisation admins", body: "Tests, classrooms, students, notes, syllabus and the question bank.", status: "Live" },
-  { icon: Users, title: "Parents", body: "A private, read-only progress link the student can share or revoke.", status: "Live" },
-  { icon: LayoutDashboard, title: "One sign-in, every organisation", body: "Students enrolled with several organisations pick one from a single hub.", status: "Coming soon" },
-  { icon: Wallet, title: "Billing page", body: "Each organisation sees its student count, amount due and payment history.", status: "Coming soon" },
+  { icon: GraduationCap, title: "Students", body: "Tests, results, progress, notes and doubts, on phone or computer." },
+  { icon: PenLine, title: "Teachers", body: "Mark answer sheets and answer doubts for their own classrooms." },
+  { icon: Building2, title: "Organisation admins", body: "Tests, classrooms, students, notes, syllabus and the question bank." },
+  { icon: Users, title: "Parents", body: "A private, read-only progress link the student can share or revoke." },
+  { icon: LayoutDashboard, title: "One sign-in, every organisation", body: "Students enrolled with several organisations pick one from a single hub." },
+  { icon: Wallet, title: "Billing page", body: "Each organisation sees its student count, amount due and payment history." },
 ];
 
 const yours = [
@@ -154,95 +191,127 @@ const faqs = [
   },
 ];
 
-function Eyebrow({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
+function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-300">{children}</p>;
+}
+
+function Heading({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+  return <h2 className={`mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-[2.6rem] sm:leading-[1.1] ${className}`}>{children}</h2>;
+}
+
+/** An organisation's wordmark, or its logo file when it has one. */
+function OrgMark({ org }: { org: (typeof organisations)[number] }) {
+  if (org.image) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={org.image} alt={org.name} className="h-8 w-auto opacity-80 transition group-hover:opacity-100" />;
+  }
   return (
-    <p className={`text-xs font-semibold uppercase tracking-[0.18em] ${dark ? "text-brand-300" : "text-brand-600"}`}>
-      {children}
-    </p>
+    <span className="flex items-center gap-2.5">
+      <span
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-sm font-extrabold text-white"
+        style={{ background: `linear-gradient(135deg, ${org.color}, #0A4B8C)` }}
+        aria-hidden="true"
+      >
+        {org.logo.main.charAt(0)}
+      </span>
+      <span className="flex flex-col leading-none">
+        <span className="text-[10px] font-medium lowercase tracking-wide text-slate-400">{org.logo.prefix}</span>
+        <span className="text-lg font-extrabold tracking-wide text-white">{org.logo.main}</span>
+      </span>
+    </span>
   );
 }
 
 export default function Home() {
   return (
-    <>
+    <div className="bg-night-950 font-display text-slate-200">
       <Header />
       <main>
         {/* Hero */}
-        <section className="relative isolate overflow-hidden bg-dot-grid">
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-            <div className="absolute -left-40 top-0 h-[520px] w-[520px] rounded-full bg-brand-300/40 blur-3xl" />
-            <div className="absolute right-0 top-32 h-[420px] w-[420px] rounded-full bg-accent-400/25 blur-3xl" />
-            <div className="absolute bottom-0 left-1/3 h-[380px] w-[380px] rounded-full bg-sky-500/15 blur-3xl" />
+        <section className="relative isolate overflow-hidden">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+            <div className="absolute inset-0 bg-dot-grid-dark" />
+            <div className="absolute -left-48 -top-24 h-[620px] w-[620px] rounded-full bg-sky-500/25 blur-[120px]" />
+            <div className="absolute -right-40 top-40 h-[560px] w-[560px] rounded-full bg-accent-500/25 blur-[120px]" />
+            <div className="absolute bottom-[-200px] left-1/3 h-[480px] w-[480px] rounded-full bg-brand-600/30 blur-[120px]" />
           </div>
 
-          <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 py-16 sm:px-6 lg:grid-cols-[1.05fr_1fr] lg:px-8 lg:py-24">
+          <div className="mx-auto grid max-w-7xl items-center gap-14 px-4 pb-20 pt-16 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:px-8 lg:pb-28 lg:pt-24">
             <div>
-              <div className="animate-fade-up">
-                <span className="inline-flex items-center gap-2 rounded-full border border-brand-200 bg-white/70 px-3 py-1 text-xs font-semibold text-brand-700 backdrop-blur">
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent-500" />
-                  {site.tagline}
-                </span>
-              </div>
+              <p className="animate-fade-up text-xs font-semibold uppercase tracking-[0.25em] text-brand-300">{site.tagline}</p>
               <h1
-                className="mt-6 animate-fade-up text-balance text-4xl font-extrabold tracking-tight text-brand-900 sm:text-5xl lg:text-6xl"
+                className="mt-6 animate-fade-up text-balance text-[2.5rem] font-extrabold leading-[1.05] tracking-tight text-white sm:text-6xl lg:text-[3.6rem] xl:text-[3.9rem]"
                 style={{ animationDelay: "80ms" }}
               >
-                Every question paper, from <span className="text-gradient">setting</span> to{" "}
-                <span className="text-gradient">marking</span>, in one portal.
+                Every question paper, from <span className="text-gradient-warm">setting</span> to{" "}
+                <span className="text-gradient-warm">marking</span>, in one portal.
               </h1>
               <p
-                className="mt-6 max-w-xl animate-fade-up text-pretty text-lg leading-relaxed text-slate-600"
+                className="mt-6 max-w-xl animate-fade-up text-pretty text-lg leading-relaxed text-slate-300"
                 style={{ animationDelay: "160ms" }}
               >
                 Proshnopotro gives your tuition centre its own exam portal: papers students sit on a real CBT screen,
                 proctoring that holds up, marking on screen, and progress every student and parent can see.
               </p>
-              <div className="mt-8 flex animate-fade-up flex-wrap gap-3" style={{ animationDelay: "240ms" }}>
+              <div className="mt-9 flex animate-fade-up flex-wrap items-center gap-3" style={{ animationDelay: "240ms" }}>
                 <a
                   href={demoHref}
-                  className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-brand-500 to-brand-600 px-6 py-3 text-base font-semibold text-white shadow-md shadow-brand-500/30 transition hover:brightness-105"
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-400"
                 >
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </a>
                 <a
-                  href="#platform"
-                  className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-6 py-3 text-base font-semibold text-brand-900 transition hover:border-brand-300 hover:bg-brand-50"
+                  href="#how-it-works"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-night-900/80 px-6 py-3.5 text-base font-semibold text-white transition hover:border-white/30 hover:bg-night-800"
                 >
-                  See the platform
+                  See how it works
+                </a>
+                <a href="/hub" className="inline-flex items-center gap-1.5 px-3 py-3.5 text-base font-semibold text-slate-300 transition hover:text-white">
+                  Log in <ArrowRight className="h-4 w-4" />
                 </a>
               </div>
-              <p className="mt-6 animate-fade-up text-sm text-slate-500" style={{ animationDelay: "320ms" }}>
-                Running today at <span className="font-semibold text-brand-900">Classes by Koustav</span>.
-              </p>
             </div>
 
-            <div className="animate-fade-up" style={{ animationDelay: "200ms" }}>
+            <div className="relative animate-fade-up" style={{ animationDelay: "200ms" }}>
+              <div aria-hidden="true" className="absolute inset-6 -z-10 rounded-3xl bg-brand-500/30 blur-3xl" />
               <ExamMock />
             </div>
           </div>
         </section>
 
-        {/* Highlights strip */}
-        <section className="border-y border-slate-200 bg-white">
-          <div className="mx-auto grid max-w-7xl grid-cols-1 gap-x-8 gap-y-4 px-4 py-6 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:px-8">
-            {highlights.map(({ icon: Icon, text }) => (
-              <p key={text} className="flex items-center gap-3 text-sm font-medium text-brand-900">
-                <Icon className="h-5 w-5 shrink-0 text-brand-500" />
-                {text}
-              </p>
-            ))}
+        {/* Organisations strip */}
+        <section aria-label="Organisations using Proshnopotro" className="border-y border-white/10 bg-night-900/80">
+          <div className="mx-auto flex max-w-7xl flex-col items-center gap-6 px-4 py-7 sm:flex-row sm:justify-center sm:gap-12 sm:px-6 lg:px-8">
+            <p className="shrink-0 text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Trusted by</p>
+            <ul className="flex flex-wrap items-center justify-center gap-x-12 gap-y-4">
+              {organisations.map((org) => (
+                <li key={org.url}>
+                  <a href={org.url} className="group inline-flex items-center gap-2 transition hover:opacity-100" title={`${org.name}'s portal`}>
+                    <OrgMark org={org} />
+                    <ArrowUpRight className="h-3.5 w-3.5 text-slate-500 transition group-hover:text-white" />
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="mask-fade-x overflow-hidden border-t border-white/5 py-3" aria-hidden="true">
+            <div className="flex w-max animate-marquee gap-12 whitespace-nowrap">
+              {[...marqueeWords, ...marqueeWords].map((w, i) => (
+                <span key={i} className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-500">
+                  {w}
+                </span>
+              ))}
+            </div>
           </div>
         </section>
 
         {/* Problem */}
-        <section className="bg-slate-50">
+        <section className="bg-night-950">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-28">
             <Reveal>
               <Eyebrow>The problem</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-                Tuition exams still run on chat groups and forms.
-              </h2>
-              <p className="mt-5 text-lg leading-relaxed text-slate-600">
+              <Heading>Tuition exams still run on chat groups and forms.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">
                 The paper goes out as a file, answers come back as photos, and marks end up in a sheet. Every step
                 leaks time, and some of them leak the paper.
               </p>
@@ -250,11 +319,11 @@ export default function Home() {
             <div className="grid gap-4 sm:grid-cols-2">
               {pains.map(({ icon: Icon, text }, i) => (
                 <Reveal key={text} delay={i * 80}>
-                  <div className="h-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-500">
+                  <div className="h-full rounded-2xl border border-white/10 bg-night-900 p-5 transition hover:border-rose-400/40">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 text-rose-300">
                       <Icon className="h-5 w-5" />
                     </span>
-                    <p className="mt-4 font-medium leading-snug text-ink">{text}</p>
+                    <p className="mt-4 font-medium leading-snug text-slate-100">{text}</p>
                   </div>
                 </Reveal>
               ))}
@@ -262,35 +331,46 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Platform modules */}
-        <section id="platform" className="bg-white">
+        {/* Platform: the flow diagram and its five parts */}
+        <section id="platform" className="relative isolate border-t border-white/5 bg-night-900/60">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
-            <Reveal className="max-w-3xl">
+            <Reveal className="mx-auto max-w-3xl text-center">
               <Eyebrow>The platform</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-                Five parts, one portal, <span className="text-gradient">no spreadsheets</span>.
-              </h2>
-              <p className="mt-5 text-lg leading-relaxed text-slate-600">
-                From the moment a paper is written to the moment a parent sees the result, every step happens in the
-                same place.
+              <Heading>
+                From your papers to a parent&apos;s phone, <span className="text-gradient-warm">in one flow</span>.
+              </Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">
+                Bring papers in however you have them. Proshnopotro turns each one into a proctored, marked and tracked exam.
               </p>
             </Reveal>
 
-            <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            <Reveal className="mt-14">
+              <PlatformFlow
+                eyebrow="One portal"
+                headline="Turns every question paper into an exam students sit, you mark and parents see."
+                inputs={["Word and CSV files", "Your question bank", "Google Form, Doc, PDF"]}
+                outputs={modules.map((m) => ({ label: m.title, color: m.color }))}
+              />
+            </Reveal>
+
+            <div className="mt-6 grid gap-5 md:grid-cols-2 lg:grid-cols-6">
               {modules.map((m, i) => (
-                <Reveal key={m.n} delay={(i % 3) * 80}>
-                  <article className="group h-full rounded-2xl border border-slate-200 bg-white p-6 transition hover:-translate-y-1 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-900/5">
-                    <div className="flex items-baseline justify-between">
-                      <h3 className="text-xl font-bold text-brand-900">{m.title}</h3>
-                      <span className="font-mono text-sm font-semibold text-brand-300 transition group-hover:text-brand-500">
-                        {m.n}
-                      </span>
+                <Reveal key={m.n} delay={(i % 3) * 80} className={i < 3 ? "lg:col-span-2" : "lg:col-span-3"}>
+                  <article className="group h-full rounded-2xl border border-white/10 bg-night-900 p-6 transition hover:-translate-y-1 hover:border-white/20">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.2em]" style={{ color: m.color }}>
+                          {m.tag}
+                        </p>
+                        <h3 className="mt-1 text-xl font-bold text-white">{m.title}</h3>
+                      </div>
+                      <span className="font-mono text-sm font-semibold text-slate-600 transition group-hover:text-slate-300">{m.n}</span>
                     </div>
-                    <p className="mt-2 text-slate-600">{m.body}</p>
-                    <ul className="mt-5 space-y-2.5">
+                    <p className="mt-3 border-t border-white/5 pt-3 text-slate-400">{m.body}</p>
+                    <ul className="mt-4 space-y-2.5">
                       {m.points.map((p) => (
-                        <li key={p} className="flex gap-2.5 text-sm text-slate-700">
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-brand-500" />
+                        <li key={p} className="flex gap-2.5 text-sm text-slate-300">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" style={{ color: m.color }} />
                           {p}
                         </li>
                       ))}
@@ -298,41 +378,43 @@ export default function Home() {
                   </article>
                 </Reveal>
               ))}
-              <Reveal delay={160}>
-                <div className="flex h-full flex-col justify-between rounded-2xl bg-gradient-to-br from-brand-500 to-sky-600 p-6 text-white">
-                  <div>
-                    <ClipboardCheck className="h-8 w-8 text-white/80" />
-                    <h3 className="mt-4 text-xl font-bold">See it with your own papers</h3>
-                    <p className="mt-2 text-white/80">
-                      Send us one of your papers and we will set it up in a demo portal for you.
-                    </p>
-                  </div>
-                  <a
-                    href={demoHref}
-                    className="mt-6 inline-flex w-fit items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-                  >
-                    Book a demo <ArrowRight className="h-4 w-4" />
-                  </a>
-                </div>
-              </Reveal>
             </div>
           </div>
         </section>
 
-        {/* Proctoring */}
-        <section id="proctoring" className="relative isolate overflow-hidden bg-brand-950 text-white">
+        {/* How it works: exam day */}
+        <section id="how-it-works" className="relative isolate overflow-hidden border-t border-white/5 bg-night-950">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
             <div className="absolute inset-0 bg-dot-grid-dark" />
-            <div className="absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-brand-500/30 blur-3xl" />
-            <div className="absolute -bottom-40 left-0 h-[420px] w-[420px] rounded-full bg-sky-500/20 blur-3xl" />
+            <div className="absolute left-1/2 top-1/2 h-[420px] w-[900px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-brand-600/20 blur-[120px]" />
           </div>
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal className="max-w-3xl">
-              <Eyebrow dark>Proctoring</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">
-                An exam hall, without the hall.
-              </h2>
-              <p className="mt-5 text-lg leading-relaxed text-white/70">
+              <Eyebrow>How it works</Eyebrow>
+              <Heading>
+                Exam day, <span className="text-gradient-warm">step by step</span>.
+              </Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">
+                Nothing to collect, forward or total up. Each step starts the next one by itself.
+              </p>
+            </Reveal>
+            <Reveal className="mt-14">
+              <Pipeline steps={examDay} />
+            </Reveal>
+          </div>
+        </section>
+
+        {/* Proctoring */}
+        <section id="proctoring" className="relative isolate overflow-hidden border-t border-white/5 bg-night-900/60">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
+            <div className="absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-brand-500/20 blur-[120px]" />
+            <div className="absolute -bottom-40 left-0 h-[420px] w-[420px] rounded-full bg-accent-500/10 blur-[120px]" />
+          </div>
+          <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
+            <Reveal className="max-w-3xl">
+              <Eyebrow>Proctoring</Eyebrow>
+              <Heading>An exam hall, without the hall.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">
                 Strikes are counted on the server, so a reload never resets them. No video is saved or sent: the camera
                 works on the student&apos;s own device and only the flags reach the tutor.
               </p>
@@ -340,12 +422,10 @@ export default function Home() {
             <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {proctoring.map(({ icon: Icon, title, body }, i) => (
                 <Reveal key={title} delay={(i % 3) * 80}>
-                  <div className="h-full rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur transition hover:border-white/25 hover:bg-white/10">
-                    <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-brand-400 to-sky-500">
-                      <Icon className="h-5 w-5" />
-                    </span>
-                    <h3 className="mt-5 text-lg font-semibold">{title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-white/65">{body}</p>
+                  <div className="h-full rounded-2xl border border-white/10 bg-night-900 p-6 transition hover:border-brand-400/40">
+                    <Icon className="h-6 w-6 text-brand-300" />
+                    <h3 className="mt-5 text-lg font-semibold text-white">{title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
                   </div>
                 </Reveal>
               ))}
@@ -354,34 +434,24 @@ export default function Home() {
         </section>
 
         {/* Who it is for */}
-        <section className="bg-white">
+        <section className="border-t border-white/5 bg-night-950">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal className="max-w-3xl">
               <Eyebrow>Who it is for</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-                A view for everyone in the classroom.
-              </h2>
+              <Heading>A view for everyone in the classroom.</Heading>
             </Reveal>
             <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {people.map(({ icon: Icon, title, body, status }, i) => (
+              {people.map(({ icon: Icon, title, body }, i) => (
                 <Reveal key={title} delay={(i % 3) * 80}>
-                  <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-night-900 p-6">
                     <div className="flex items-start justify-between gap-3">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                        <Icon className="h-5 w-5" />
-                      </span>
-                      <span
-                        className={
-                          status === "Live"
-                            ? "rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700"
-                            : "rounded-full border border-accent-400/40 bg-accent-50 px-2.5 py-0.5 text-[11px] font-semibold text-accent-600"
-                        }
-                      >
-                        {status}
+                      <Icon className="h-6 w-6 text-brand-300" />
+                      <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                        Live
                       </span>
                     </div>
-                    <h3 className="mt-5 text-lg font-semibold text-brand-900">{title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
+                    <h3 className="mt-5 text-lg font-semibold text-white">{title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
                   </div>
                 </Reveal>
               ))}
@@ -390,27 +460,33 @@ export default function Home() {
         </section>
 
         {/* Your portal */}
-        <section className="bg-slate-50">
+        <section className="border-t border-white/5 bg-night-900/60">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-28">
             <Reveal>
               <Eyebrow>Your portal</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">
-                Your name on the door. Your data behind it.
-              </h2>
-              <p className="mt-5 text-lg leading-relaxed text-slate-600">
+              <Heading>Your name on the door. Your data behind it.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">
                 Every organisation runs its own copy of Proshnopotro, set up for it. Students see your brand, not ours.
               </p>
+              <ul className="mt-8 space-y-3">
+                {highlights.map(({ icon: Icon, text }) => (
+                  <li key={text} className="flex items-center gap-3 text-sm font-medium text-slate-300">
+                    <Icon className="h-5 w-5 shrink-0 text-brand-300" />
+                    {text}
+                  </li>
+                ))}
+              </ul>
             </Reveal>
             <div className="space-y-4">
               {yours.map(({ icon: Icon, title, body }, i) => (
                 <Reveal key={title} delay={i * 80}>
-                  <div className="flex gap-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+                  <div className="flex gap-5 rounded-2xl border border-white/10 bg-night-900 p-6">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-sky-600 text-white">
                       <Icon className="h-5 w-5" />
                     </span>
                     <div>
-                      <h3 className="text-lg font-semibold text-brand-900">{title}</h3>
-                      <p className="mt-1 text-slate-600">{body}</p>
+                      <h3 className="text-lg font-semibold text-white">{title}</h3>
+                      <p className="mt-1 text-slate-400">{body}</p>
                     </div>
                   </div>
                 </Reveal>
@@ -420,32 +496,25 @@ export default function Home() {
         </section>
 
         {/* Organisations / log in */}
-        <section id="organisations" className="bg-white">
+        <section id="organisations" className="border-t border-white/5 bg-night-950">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal className="mx-auto max-w-2xl text-center">
               <Eyebrow>Log in</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">Find your portal</h2>
-              <p className="mt-5 text-lg leading-relaxed text-slate-600">
-                Students and staff sign in on their own organisation&apos;s portal.
-              </p>
+              <Heading>Find your portal</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">Students and staff sign in on their own organisation&apos;s portal.</p>
             </Reveal>
             <div className="mx-auto mt-12 grid max-w-3xl gap-4">
               {organisations.map((org) => (
                 <Reveal key={org.url}>
                   <a
                     href={org.url}
-                    className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-brand-300 hover:shadow-md"
+                    className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-night-900 p-5 transition hover:border-brand-400/50"
                   >
                     <span className="flex items-center gap-4">
-                      <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-brand-50 text-brand-600">
-                        <BookOpenCheck className="h-5 w-5" />
-                      </span>
-                      <span>
-                        <span className="block font-semibold text-brand-900">{org.name}</span>
-                        <span className="block text-sm text-slate-500">{new URL(org.url).host}</span>
-                      </span>
+                      <OrgMark org={org} />
+                      <span className="hidden text-sm text-slate-500 sm:block">{new URL(org.url).host}</span>
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-300">
                       Open portal
                       <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                     </span>
@@ -457,14 +526,14 @@ export default function Home() {
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="bg-slate-50">
+        <section id="pricing" className="border-t border-white/5 bg-night-900/60">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal>
-              <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm lg:grid-cols-[1.2fr_1fr]">
+              <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-night-900 lg:grid-cols-[1.2fr_1fr]">
                 <div className="p-8 sm:p-10">
                   <Eyebrow>Pricing</Eyebrow>
-                  <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900">Pay per student. Nothing else.</h2>
-                  <p className="mt-4 text-lg leading-relaxed text-slate-600">
+                  <Heading className="sm:text-3xl">Pay per student. Nothing else.</Heading>
+                  <p className="mt-4 text-lg leading-relaxed text-slate-400">
                     One monthly price for each student on your roster. Every feature, every exam, every teacher included.
                   </p>
                   <ul className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -476,19 +545,19 @@ export default function Home() {
                       "Setup of your first papers",
                       "Pay by bank transfer, UPI or cheque",
                     ].map((f) => (
-                      <li key={f} className="flex gap-2.5 text-sm text-slate-700">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+                      <li key={f} className="flex gap-2.5 text-sm text-slate-300">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
                         {f}
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div className="flex flex-col justify-center bg-gradient-to-br from-brand-900 to-brand-700 p-8 text-white sm:p-10">
+                <div className="relative isolate flex flex-col justify-center overflow-hidden bg-gradient-to-br from-brand-700 to-night-800 p-8 text-white sm:p-10">
+                  <div aria-hidden="true" className="absolute -right-16 -top-16 -z-10 h-56 w-56 rounded-full bg-accent-500/30 blur-3xl" />
                   <p className="text-sm font-semibold uppercase tracking-wider text-brand-200">Per enrolled student</p>
                   <p className="mt-3 text-4xl font-extrabold tracking-tight">Talk to us</p>
                   <p className="mt-3 text-white/70">
-                    Pricing depends on the size of your roster. Tell us how many students you have and we will send a
-                    quote.
+                    Pricing depends on the size of your roster. Tell us how many students you have and we will send a quote.
                   </p>
                   <a
                     href={demoHref}
@@ -503,32 +572,32 @@ export default function Home() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="bg-white">
+        <section id="faq" className="border-t border-white/5 bg-night-950">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8 lg:py-28">
             <Reveal>
               <Eyebrow>FAQ</Eyebrow>
-              <h2 className="mt-4 text-3xl font-bold tracking-tight text-brand-900 sm:text-4xl">Questions, answered.</h2>
-              <p className="mt-5 text-lg leading-relaxed text-slate-600">
+              <Heading>Questions, answered.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-400">
                 Something else on your mind?{" "}
-                <a href={demoHref} className="font-semibold text-brand-600 underline-offset-4 hover:underline">
+                <a href={demoHref} className="font-semibold text-brand-300 underline-offset-4 hover:underline">
                   Write to us
                 </a>
                 .
               </p>
             </Reveal>
-            <div className="divide-y divide-slate-200 border-y border-slate-200">
+            <div className="divide-y divide-white/10 border-y border-white/10">
               {faqs.map(({ q, a }) => (
                 <details key={q} className="group py-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left font-semibold text-brand-900 [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left font-semibold text-white [&::-webkit-details-marker]:hidden">
                     <span className="flex items-center gap-3">
-                      <MessageCircleQuestion className="h-5 w-5 shrink-0 text-brand-400" />
+                      <MessageCircleQuestion className="h-5 w-5 shrink-0 text-brand-300" />
                       {q}
                     </span>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 text-brand-500 transition group-open:rotate-45">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 text-brand-300 transition group-open:rotate-45">
                       +
                     </span>
                   </summary>
-                  <p className="mt-3 pl-8 leading-relaxed text-slate-600">{a}</p>
+                  <p className="mt-3 pl-8 leading-relaxed text-slate-400">{a}</p>
                 </details>
               ))}
             </div>
@@ -536,28 +605,26 @@ export default function Home() {
         </section>
 
         {/* Final CTA */}
-        <section className="bg-white px-4 pb-20 sm:px-6 lg:px-8 lg:pb-28">
+        <section className="bg-night-950 px-4 pb-20 sm:px-6 lg:px-8 lg:pb-28">
           <Reveal>
-            <div className="relative isolate mx-auto max-w-7xl overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-brand-500 to-sky-600 px-6 py-16 text-center text-white sm:px-12">
+            <div className="relative isolate mx-auto max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-night-900 px-6 py-16 text-center sm:px-12">
               <div aria-hidden="true" className="absolute inset-0 -z-10 bg-dot-grid-dark" />
-              <div aria-hidden="true" className="absolute -right-20 -top-20 -z-10 h-72 w-72 rounded-full bg-accent-400/40 blur-3xl" />
-              <Eye className="mx-auto h-10 w-10 text-white/80" />
-              <h2 className="mx-auto mt-5 max-w-2xl text-3xl font-bold tracking-tight sm:text-4xl">
-                Give your students an exam that feels like the real one.
+              <div aria-hidden="true" className="absolute -left-20 -top-24 -z-10 h-80 w-80 rounded-full bg-sky-500/25 blur-3xl" />
+              <div aria-hidden="true" className="absolute -bottom-24 -right-20 -z-10 h-80 w-80 rounded-full bg-accent-500/25 blur-3xl" />
+              <h2 className="mx-auto max-w-2xl font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Give your students an exam that feels like <span className="text-gradient-warm">the real one</span>.
               </h2>
-              <p className="mx-auto mt-4 max-w-xl text-lg text-white/80">
-                We will set up a portal with your name on it and one of your own papers inside.
-              </p>
+              <p className="mx-auto mt-4 max-w-xl text-lg text-slate-400">We will set up a portal with your name on it and one of your own papers inside.</p>
               <div className="mt-8 flex flex-wrap justify-center gap-3">
                 <a
                   href={demoHref}
-                  className="inline-flex items-center gap-2 rounded-lg bg-white px-6 py-3 font-semibold text-brand-700 shadow-lg transition hover:bg-brand-50"
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-500 px-6 py-3 font-semibold text-white shadow-lg shadow-brand-500/30 transition hover:bg-brand-400"
                 >
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </a>
                 <a
                   href="#platform"
-                  className="inline-flex items-center gap-2 rounded-lg border border-white/40 px-6 py-3 font-semibold text-white transition hover:bg-white/10"
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-6 py-3 font-semibold text-white transition hover:bg-white/5"
                 >
                   Explore features
                 </a>
@@ -565,52 +632,77 @@ export default function Home() {
             </div>
           </Reveal>
         </section>
+
+        {/* Technology strip */}
+        <section aria-label="Technologies Proshnopotro is built on" className="border-t border-white/10 bg-night-900/80">
+          <div className="mx-auto max-w-7xl px-4 pt-10 text-center sm:px-6 lg:px-8">
+            <p className="text-xs font-semibold uppercase tracking-[0.25em] text-slate-400">Built on</p>
+            <p className="mt-2 text-sm text-slate-500">Hosted in Mumbai, on services trusted by some of the web&apos;s largest products.</p>
+          </div>
+          <div className="mask-fade-x overflow-hidden py-8">
+            <ul className="flex w-max animate-marquee items-center gap-14 [animation-duration:50s] hover:[animation-play-state:paused]">
+              {[...techStack, ...techStack].map((t, i) => (
+                <li
+                  key={i}
+                  aria-hidden={i >= techStack.length}
+                  className="flex items-center gap-2.5 whitespace-nowrap text-slate-400 transition hover:text-white"
+                >
+                  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden="true">
+                    <path d={t.path} />
+                  </svg>
+                  <span className="text-base font-semibold">{t.name}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 bg-slate-50">
+      <footer className="border-t border-white/10 bg-night-950">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 sm:px-6 md:grid-cols-[1.4fr_1fr_1fr_1fr] lg:px-8">
           <div>
-            <Logo />
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-600">
+            <Logo light />
+            <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-400">
               {site.tagline}. Set papers, run proctored exams, mark on screen and track progress.
             </p>
           </div>
           <div>
-            <p className="text-sm font-semibold text-brand-900">Platform</p>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-600">
-              <li><a href="#platform" className="hover:text-brand-600">Features</a></li>
-              <li><a href="#proctoring" className="hover:text-brand-600">Proctoring</a></li>
-              <li><a href="#pricing" className="hover:text-brand-600">Pricing</a></li>
-              <li><a href="#faq" className="hover:text-brand-600">FAQ</a></li>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Platform</p>
+            <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
+              <li><a href="#how-it-works" className="hover:text-white">How it works</a></li>
+              <li><a href="#platform" className="hover:text-white">Features</a></li>
+              <li><a href="#proctoring" className="hover:text-white">Proctoring</a></li>
+              <li><a href="#pricing" className="hover:text-white">Pricing</a></li>
+              <li><a href="#faq" className="hover:text-white">FAQ</a></li>
             </ul>
           </div>
           <div>
-            <p className="text-sm font-semibold text-brand-900">Organisations</p>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-600">
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Organisations</p>
+            <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
               {organisations.map((org) => (
-                <li key={org.url}><a href={org.url} className="hover:text-brand-600">{org.name}</a></li>
+                <li key={org.url}><a href={org.url} className="hover:text-white">{org.name}</a></li>
               ))}
             </ul>
           </div>
           <div>
-            <p className="text-sm font-semibold text-brand-900">Contact</p>
-            <ul className="mt-4 space-y-2.5 text-sm text-slate-600">
-              <li><a href={`mailto:${site.contactEmail}`} className="hover:text-brand-600">{site.contactEmail}</a></li>
-              <li><a href={demoHref} className="hover:text-brand-600">Book a demo</a></li>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Contact</p>
+            <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
+              <li><a href={`mailto:${site.contactEmail}`} className="hover:text-white">{site.contactEmail}</a></li>
+              <li><a href={demoHref} className="hover:text-white">Book a demo</a></li>
             </ul>
           </div>
         </div>
-        <div className="border-t border-slate-200">
+        <div className="border-t border-white/10">
           <p className="mx-auto max-w-7xl px-4 py-6 text-xs text-slate-500 sm:px-6 lg:px-8">
             © {new Date().getFullYear()} {site.name}. All rights reserved.
             <span className="mx-2">·</span>
-            <a href="/privacy" className="hover:text-brand-600">Privacy</a>
+            <a href="/privacy" className="hover:text-white">Privacy</a>
             <span className="mx-2">·</span>
-            <a href="/terms" className="hover:text-brand-600">Terms</a>
+            <a href="/terms" className="hover:text-white">Terms</a>
           </p>
         </div>
       </footer>
-    </>
+    </div>
   );
 }
