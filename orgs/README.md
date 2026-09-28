@@ -85,22 +85,30 @@ price, student limit and payments that count live in the master app
 
 ## Adding an organisation
 
-1. Copy `classes-by-koustav/` to `orgs/<slug>/`, edit `org.json` (its
-   `slug` must match the folder name) and replace the icons in `public/`.
-2. Create its Supabase database and Cloudinary account. Put the database's
-   direct address in `orgs/<slug>/.env.local` as `DIRECT_URL=...` (git
-   ignores it), then run `npm run db:push:all -- --apply --only <slug>` from
-   `portal/` to create its tables.
-3. Create a Vercel project from this repo: Root Directory `portal`, with
-   "Include files outside the Root Directory in the Build Step" on, and its own
-   environment variables (`ORG=<slug>`, `DATABASE_URL`, `DIRECT_URL`,
-   `AUTH_SECRET`, `AUTH_URL`, `ADMIN_EMAILS`, `AUTH_GOOGLE_ID/SECRET`,
-   `CLOUDINARY_*`).
-4. Add `https://<its domain>/api/auth/callback/google` as an authorised
-   redirect URI on the shared Google OAuth client.
-5. Add it in the master's `/admin`, put the `MASTER_URL` and
-   `MASTER_SYNC_SECRET` shown there into the portal's Vercel project,
-   redeploy, and press "Sync now".
+1. Create its Supabase database (a new project) and copy its two addresses:
+   pooled (port 6543) and direct (5432). Optionally its own Cloudinary
+   account; otherwise `SHARED_CLOUDINARY_URL` is used.
+2. From `master/`, with `.env.local` loaded (`set -a; source .env.local;
+   set +a`) and `VERCEL_TOKEN`, `GITHUB_REPO` and `MASTER_PUBLIC_URL` filled in:
+
+   ```
+   npm run add-org -- --slug new-org --name "New Org Academy" --phone 9000000002 \
+     --admins owner@neworg.in --database-url "<pooled>" --direct-url "<direct>" \
+     [--cloudinary-url cloudinary://...] [--domain neworg.proshnopotro.in] [--price 40]
+   ```
+
+   Add `--dry-run` first to check everything without changing anything. It
+   creates the tables, registers the organisation in the master, creates its
+   Vercel project (Root Directory `portal`, files outside it included, every
+   variable set), adds the domain, starts the first deploy and writes
+   `orgs/new-org/.env.local` for `db:push:all`.
+3. The two steps it prints, which no API can do: add
+   `https://<its domain>/api/auth/callback/google` to the shared Google OAuth
+   client, and create a Deploy Hook (Vercel project -> Settings -> Git,
+   branch `main`) and paste it into the organisation's page in the master.
+4. Set its logo, colours and details in the master's Branding section.
+
+No `orgs/<slug>/` folder is needed: its branding lives in the master.
 
 ## Changing the database schema
 

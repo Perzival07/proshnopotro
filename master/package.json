@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "postinstall": "prisma generate",
-    "org:import-branding": "tsx scripts/import-branding.ts"
+    "org:import-branding": "tsx scripts/import-branding.ts",
+    "add-org": "tsx scripts/add-org.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

@@ -17,7 +17,7 @@ Proshnopotro: a test-taking / tutoring portal (npm package name `proshnopotro`),
 Run from `portal/`.
 
 - `npm run dev` / `npm run build` / `npm start` / `npm run lint`
-- `npm test` (vitest, one run); `npm run test:watch`. `master/` has its own `npm run dev` (port 3001) and `npm test`.
+- `npm test` (vitest, one run); `npm run test:watch`. `master/` has its own `npm run dev` (port 3001) and `npm test`, plus `npm run add-org` (new organisation: database tables, master record, Vercel project; see `orgs/README.md`).
 - Single test: `npx vitest run lib/score.test.ts` (add `-t "name"` to filter)
 - `npx prisma db push` / `npx prisma studio`; `prisma generate` runs on `postinstall`. Seed: `npx tsx prisma/seed.ts`
 - Schema change for every organisation: `npm run db:push:all` (preview), `-- --apply` (each org's `DIRECT_URL` in git-ignored `orgs/<slug>/.env.local`; see `orgs/README.md`)
