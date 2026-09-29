@@ -50,7 +50,7 @@ export function LogoLockup({
           >
             {subtitle}
           </span>
-        ) : (
+        ) : org.tagline ? (
           <span
             className={cn(
               "text-[10px] font-sans tracking-widest uppercase mt-0.5 font-medium",
@@ -59,7 +59,7 @@ export function LogoLockup({
           >
             {org.tagline}
           </span>
-        )}
+        ) : null}
       </div>
     </div>
   );

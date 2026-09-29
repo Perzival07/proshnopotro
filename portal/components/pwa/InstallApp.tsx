@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { textOnlyBrand } from "@/lib/org";
 import { Button } from "@/components/ui/button";
 import {
   detectInstallPlatform,
@@ -61,9 +62,11 @@ export function InstallAppCard({ className = "" }: { className?: string }) {
     <div
       className={`flex items-start gap-3 rounded-xl border border-brand-border bg-white p-4 text-left shadow-card ${className}`}
     >
-      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy">
-        <BrandMark size={28} onDark />
-      </div>
+      {!textOnlyBrand && (
+        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-brand-navy">
+          <BrandMark size={28} onDark />
+        </div>
+      )}
 
       <div className="min-w-0 flex-1 space-y-2">
         <div>

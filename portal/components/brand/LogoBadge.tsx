@@ -1,7 +1,7 @@
 import React from "react";
 import { AtomMark } from "./AtomMark";
 import { cn } from "@/lib/utils";
-import { org } from "@/lib/org";
+import { org, textOnlyBrand } from "@/lib/org";
 
 interface LogoBadgeProps extends React.HTMLAttributes<HTMLDivElement> {
   size?: number;
@@ -16,6 +16,16 @@ export function LogoBadge({
 }: LogoBadgeProps) {
   // Relative scaling based on base 240px
   const scale = size / 240;
+
+  if (textOnlyBrand) {
+    return (
+      <div className={cn("select-none text-center", className)} {...props}>
+        <span className="font-heading font-bold uppercase tracking-[0.2em] text-brand-navy" style={{ fontSize: `${Math.round(44 * scale)}px` }}>
+          {org.logo.main}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

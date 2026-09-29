@@ -1,12 +1,15 @@
 import React from "react";
 import { BrandMark } from "@/components/brand/BrandMark";
+import { textOnlyBrand } from "@/lib/org";
 
 export function EmptyState() {
   return (
     <div className="w-full flex flex-col items-center justify-center p-12 text-center rounded-2xl border border-dashed border-brand-border bg-white shadow-xs max-w-2xl mx-auto my-12">
-      <div className="p-4 bg-brand-tint/60 rounded-full mb-4">
-        <BrandMark size={64} />
-      </div>
+      {!textOnlyBrand && (
+        <div className="p-4 bg-brand-tint/60 rounded-full mb-4">
+          <BrandMark size={64} />
+        </div>
+      )}
       <h2 className="font-heading text-lg sm:text-xl font-semibold text-brand-navy mb-2">
         No tests assigned yet
       </h2>

@@ -13,7 +13,7 @@ export function Footer() {
           </span>
           <span className="hidden sm:inline text-brand-border">|</span>
           <span className="text-brand-ink/60 font-medium">
-            Assessment Portal • &ldquo;{org.tagline}&rdquo;
+            Assessment Portal{org.tagline && <> • &ldquo;{org.tagline}&rdquo;</>}
           </span>
         </div>
 

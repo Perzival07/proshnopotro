@@ -1,6 +1,6 @@
 import React from "react";
 import { cn } from "@/lib/utils";
-import { org } from "@/lib/org";
+import { org, textOnlyBrand } from "@/lib/org";
 
 interface AtomMarkProps extends React.SVGProps<SVGSVGElement> {
   className?: string;
@@ -18,6 +18,14 @@ export function AtomMark({
   animate = false,
   ...props
 }: AtomMarkProps) {
+  if (textOnlyBrand) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 100 100" fill="none" className={cn(animate && "animate-spin", className)} {...props}>
+        <circle cx="50" cy="50" r="38" stroke={strokeColor} strokeOpacity="0.25" strokeWidth="10" />
+        <path d="M50 12a38 38 0 0 1 38 38" stroke={dotColor} strokeWidth="10" strokeLinecap="round" />
+      </svg>
+    );
+  }
   return (
     <svg
       width={size}

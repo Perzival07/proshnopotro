@@ -2,8 +2,11 @@
   "slug": "demo",
   "name": "Demo",
   "shortName": "Demo",
-  "logo": { "prefix": "", "main": "DEMO" },
-  "tagline": "Demo portal",
+  "logo": {
+    "prefix": "",
+    "main": "DEMO"
+  },
+  "tagline": "",
   "support": {
     "phone": "",
     "phoneDisplay": "",
@@ -29,9 +32,16 @@
     "entityName": null,
     "address": null,
     "city": null,
-    "grievanceOfficer": { "name": null, "email": null },
+    "grievanceOfficer": {
+      "name": null,
+      "email": null
+    },
     "effectiveDate": null
   },
-  "limits": { "maxStudents": null },
-  "billing": { "pricePerStudentInr": null }
+  "limits": {
+    "maxStudents": null
+  },
+  "billing": {
+    "pricePerStudentInr": null
+  }
 }

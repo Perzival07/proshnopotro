@@ -2,7 +2,7 @@ import React from "react";
 import Image from "next/image";
 import { AtomMark } from "./AtomMark";
 import { cn } from "@/lib/utils";
-import { org } from "@/lib/org";
+import { org, textOnlyBrand } from "@/lib/org";
 
 /**
  * The organisation's mark: the logo uploaded in the master when there is
@@ -11,6 +11,7 @@ import { org } from "@/lib/org";
  * (Loading spinners stay the animated atom, whatever the logo.)
  */
 export function BrandMark({ size, onDark = false, className }: { size: number; onDark?: boolean; className?: string }) {
+  if (textOnlyBrand) return null;
   if (org.hasLogoImage) {
     return (
       <span

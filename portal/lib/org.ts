@@ -57,3 +57,9 @@ function readOrg(): OrgBranding {
 }
 
 export const org: OrgBranding = readOrg();
+
+/**
+ * The demo portal shows its name as plain text and no mark at all: no atom,
+ * no round badge, and loading spinners are a plain ring.
+ */
+export const textOnlyBrand = org.slug === "demo";
