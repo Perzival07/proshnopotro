@@ -6,6 +6,8 @@ export const site = {
   tagline: "The exam portal for tuition organisations",
   // Where "Book a demo" and the footer's contact link go.
   contactEmail: "classesbykoustav@gmail.com",
+  // Where visitors ask to be let into the demo portal.
+  demoEmail: "proshnopotro.by.koustav@gmail.com",
 };
 
 /**
@@ -60,3 +62,6 @@ export const nav: { label: string; href: string; fallback?: string }[] = [
 ];
 
 export const demoHref = `mailto:${site.contactEmail}?subject=${encodeURIComponent("Proshnopotro demo")}`;
+
+/** Asks for a place in the demo portal: the super admin adds the Google account. */
+export const demoAccessHref = `mailto:${site.demoEmail}?subject=${encodeURIComponent("Proshnopotro demo access")}`;

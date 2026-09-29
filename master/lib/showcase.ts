@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { DEMO_SLUG } from "./demo";
 
 /** An organisation as the home page's "joined us" section shows it. */
 export type ShowcaseOrg = {
@@ -19,7 +20,7 @@ export type ShowcaseOrg = {
 export async function showcaseOrgs(): Promise<ShowcaseOrg[]> {
   try {
     const orgs = await prisma.organisation.findMany({
-      where: { status: "ACTIVE", showOnWebsite: true },
+      where: { status: "ACTIVE", showOnWebsite: true, slug: { not: DEMO_SLUG } },
       orderBy: { createdAt: "asc" },
       select: {
         slug: true,

@@ -17,6 +17,7 @@ export function Footer() {
           </span>
         </div>
 
+        {org.support.phone && (
         <div className="flex items-center gap-2">
           <span className="text-brand-ink/60">For questions or support:</span>
           <a
@@ -27,6 +28,7 @@ export function Footer() {
             <span>{org.support.phoneDisplay}</span>
           </a>
         </div>
+        )}
       </div>
       <p className="mt-3 text-center text-[10px] text-brand-ink/40">
         <Link href="/privacy" className="hover:text-brand-navy hover:underline">Privacy</Link>

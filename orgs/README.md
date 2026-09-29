@@ -127,3 +127,18 @@ each database's address from `orgs/<slug>/.env.local` (`DIRECT_URL`, not the
 pooled `DATABASE_URL`) and skips organisations without one. Run it before
 deploying the portal change, so no organisation's new code meets an old
 database.
+
+## The demo organisation
+
+`orgs/demo` is a portal for trying Proshnopotro: every feature on, no logo,
+no contact details. Its Vercel project is an ordinary portal with `ORG=demo`
+and its own Supabase database; the master's home page shows "Access demo"
+while an organisation with the slug `demo` is active there, and it is left
+out of billing totals and the "joined us" list.
+
+Only people added on its People page in the master can sign in; anyone else
+sees "Request access", which emails `proshnopotro.by.koustav@gmail.com`. A
+student or tutor added there is put in the sample class, and a student gets
+the sample paper. "Reset demo data" on its page in the master deletes every
+test, attempt, photo, class, note and doubt and writes the sample content
+again (`portal/lib/demo.ts`, `lib/demo-reset.ts`); people stay.

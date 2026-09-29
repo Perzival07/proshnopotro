@@ -515,10 +515,13 @@ export function AnswerUploadPanel({
                 <p className="font-heading text-sm font-semibold text-brand-navy">
                   {savedCount} {savedCount === 1 ? "page" : "pages"} uploaded
                 </p>
+                {TUTOR_WHATSAPP && (
                 <p className="text-xs text-brand-ink/70">
                   Last step: tell your tutor on WhatsApp that your work is done.
                 </p>
+                )}
               </div>
+              {TUTOR_WHATSAPP && (
               <a
                 href={whatsappHref}
                 target="_blank"
@@ -528,6 +531,7 @@ export function AnswerUploadPanel({
                 <MessageCircle className="h-4 w-4" />
                 <span>Send &ldquo;Work done&rdquo; on WhatsApp</span>
               </a>
+              )}
             </div>
           )}
         </div>

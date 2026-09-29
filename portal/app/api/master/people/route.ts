@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { org } from "@/lib/org";
+import { DEMO_SLUG } from "@/lib/demo";
+import { enrolInDemo } from "@/lib/demo-reset";
 import { masterConfig } from "@/lib/master";
 import { SIGNATURE_HEADER, verifyRequest } from "@/lib/master-signature";
 import { parsePeopleCommand, type PeopleCommand } from "@/lib/master-people";
@@ -42,6 +45,8 @@ export async function POST(request: Request) {
 
   try {
     const result = await carryOut(command);
+    // On the demo, whoever is approved finds the sample class and paper waiting.
+    if (org.slug === DEMO_SLUG && command.action !== "remove" && "success" in result) await enrolInDemo(command.email);
     return NextResponse.json(result, { status: "error" in result ? 409 : 200, headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     console.error("[master] people command failed:", err);

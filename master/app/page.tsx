@@ -34,7 +34,8 @@ import { Reveal } from "@/components/Reveal";
 import { ExamMock } from "@/components/ExamMock";
 import { Pipeline, PlatformFlow, type PipelineStep } from "@/components/Flow";
 import { JoinedOrgs } from "@/components/JoinedOrgs";
-import { demoHref, site } from "@/lib/site";
+import { demoAccessHref, demoHref, site } from "@/lib/site";
+import { demoPortalUrl } from "@/lib/demo";
 import { showcaseOrgs, type ShowcaseOrg } from "@/lib/showcase";
 import { techStack } from "@/lib/tech-stack";
 
@@ -227,7 +228,7 @@ function OrgMark({ org }: { org: ShowcaseOrg }) {
 }
 
 export default async function Home() {
-  const organisations = await showcaseOrgs();
+  const [organisations, demoUrl] = await Promise.all([showcaseOrgs(), demoPortalUrl()]);
   return (
     <div className="bg-night-950 font-display text-slate-200">
       <Header />
@@ -265,6 +266,14 @@ export default async function Home() {
                 >
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </a>
+                {demoUrl && (
+                  <a
+                    href={`${demoUrl}/login`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-brand-400/60 bg-brand-500/10 px-6 py-3.5 text-base font-semibold text-white transition hover:border-brand-300 hover:bg-brand-500/20"
+                  >
+                    Access demo <ArrowUpRight className="h-4 w-4" />
+                  </a>
+                )}
                 <a
                   href="#how-it-works"
                   className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-night-900/80 px-6 py-3.5 text-base font-semibold text-white transition hover:border-white/30 hover:bg-night-800"
@@ -275,6 +284,13 @@ export default async function Home() {
                   Log in <ArrowRight className="h-4 w-4" />
                 </a>
               </div>
+              <p className="mt-5 animate-fade-up text-sm text-slate-400" style={{ animationDelay: "280ms" }}>
+                {demoUrl ? "The demo is open to invited people. " : ""}To try it, write to{" "}
+                <a href={demoAccessHref} className="font-semibold text-brand-300 underline-offset-4 hover:underline">
+                  {site.demoEmail}
+                </a>
+                .
+              </p>
             </div>
 
             <div className="relative animate-fade-up" style={{ animationDelay: "200ms" }}>
@@ -627,6 +643,14 @@ export default async function Home() {
                 >
                   Book a demo <ArrowRight className="h-4 w-4" />
                 </a>
+                {demoUrl && (
+                  <a
+                    href={`${demoUrl}/login`}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-6 py-3 font-semibold text-white transition hover:bg-white/5"
+                  >
+                    Access demo <ArrowUpRight className="h-4 w-4" />
+                  </a>
+                )}
                 <a
                   href="#platform"
                   className="inline-flex items-center gap-2 rounded-lg border border-white/15 px-6 py-3 font-semibold text-white transition hover:bg-white/5"
@@ -694,7 +718,9 @@ export default async function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Contact</p>
             <ul className="mt-4 space-y-2.5 text-sm text-slate-300">
               <li><a href={`mailto:${site.contactEmail}`} className="hover:text-white">{site.contactEmail}</a></li>
+              <li><a href={demoAccessHref} className="hover:text-white">{site.demoEmail}</a></li>
               <li><a href={demoHref} className="hover:text-white">Book a demo</a></li>
+              {demoUrl && <li><a href={`${demoUrl}/login`} className="hover:text-white">Access demo</a></li>}
             </ul>
           </div>
         </div>

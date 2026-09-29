@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { prisma } from "@/lib/prisma";
+import { DEMO_SLUG } from "@/lib/demo";
 import { billingStatus, dateKey, formatDay, monthlyAmount, rupees, todayIst } from "@/lib/billing";
 import { BillingBadge, Card, Flash, SuspendedBadge, buttonClass, inputClass, secondaryButtonClass } from "@/components/admin/ui";
 
@@ -23,7 +24,7 @@ export default async function AdminHome({
       overLimit: o.maxStudents !== null && o.studentCount > o.maxStudents,
     };
   });
-  const active = orgs.filter((o) => o.status === "ACTIVE");
+  const active = orgs.filter((o) => o.status === "ACTIVE" && o.slug !== DEMO_SLUG);
   const needle = q.trim().toLowerCase();
   const shown = orgs.filter(
     (o) =>
@@ -120,7 +121,13 @@ export default async function AdminHome({
                   <td className="px-4 py-3">{o.paidUpTo ? formatDay(o.paidUpTo) : <span className="text-zinc-400">Never paid</span>}</td>
                   <td className="px-4 py-3">
                     <div className="flex flex-wrap gap-1.5">
-                      {o.status === "SUSPENDED" ? <SuspendedBadge /> : <BillingBadge status={o.billing} />}
+                      {o.status === "SUSPENDED" ? (
+                        <SuspendedBadge />
+                      ) : o.slug === DEMO_SLUG ? (
+                        <span className="inline-flex rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-medium text-zinc-600">Demo, not billed</span>
+                      ) : (
+                        <BillingBadge status={o.billing} />
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -137,7 +137,7 @@ export default function PrivacyPage() {
       <p>
         Write to our grievance officer, <Filled value={officer.name} missing="name" />, at{" "}
         {officer.email ? <a href={`mailto:${officer.email}`}>{officer.email}</a> : <Filled value={null} missing="email address" />}, or
-        call {org.support.phoneDisplay}. We will reply as quickly as we can and within the time the law allows. If you are not
+        call <Filled value={org.support.phoneDisplay || null} missing="phone number" />. We will reply as quickly as we can and within the time the law allows. If you are not
         satisfied with our answer, you can complain to the Data Protection Board of India.
       </p>
 

@@ -26,7 +26,9 @@ import {
   setSuspended,
   syncNow,
   updateOrg,
+  resetDemo,
 } from "../../actions";
+import { DEMO_SLUG } from "@/lib/demo";
 import { OrgFields } from "@/components/admin/OrgFields";
 import { BrandingForm } from "@/components/admin/BrandingForm";
 import { defaultBranding, type Branding } from "@/lib/branding";
@@ -238,6 +240,21 @@ export default async function OrgPage({
           </div>
         )}
       </Card>
+
+      {org.slug === DEMO_SLUG && (
+        <Card title="Demo">
+          <p className="text-sm text-zinc-700">
+            Only people added on the People page can sign in to the demo; anyone else sees a &ldquo;Request access&rdquo; button that
+            emails you. Resetting deletes every test, attempt, answer photo, class, note and doubt in the demo portal and puts back the
+            sample class, paper and note. People stay, and every student and tutor is put back in the sample class.
+          </p>
+          <form action={resetDemo.bind(null, org.slug)} className="mt-4">
+            <ConfirmButton className={dangerButtonClass} message="Reset the demo? Everything visitors made in it is deleted.">
+              <RefreshCw className="h-4 w-4" /> Reset demo data
+            </ConfirmButton>
+          </form>
+        </Card>
+      )}
 
       <Card title="Connect the portal">
         <ol className="list-decimal space-y-2 pl-5 text-sm text-zinc-700">

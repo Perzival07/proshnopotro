@@ -86,7 +86,7 @@ export default function TermsPage() {
 
       <h2>10. Changes and contact</h2>
       <p>
-        We may update these terms and will tell you in the portal if a change matters. Questions: call {org.support.phoneDisplay}
+        We may update these terms and will tell you in the portal if a change matters. Questions: call <Filled value={org.support.phoneDisplay || null} missing="phone number" />
         {legal.grievanceOfficer.email ? (
           <>
             {" "}

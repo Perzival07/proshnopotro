@@ -11,6 +11,7 @@ import { MAX_LOGO_BYTES, isDeployHook, logoType, parseBrandingForm } from "@/lib
 import { syncRoster } from "@/lib/sync";
 import { logActivity } from "@/lib/activity";
 import { back } from "@/lib/back";
+import { DEMO_SLUG, resetDemoPortal } from "@/lib/demo";
 
 /**
  * The super admin's server actions. Each one checks the caller itself -- the
@@ -253,4 +254,20 @@ export async function saveWebsiteListing(slug: string, form: FormData) {
   await logActivity(actor, "Saved website listing", { org, detail: data.showOnWebsite ? "shown" : "hidden" });
   revalidatePath("/");
   back(`/admin/orgs/${slug}`, { ok: data.showOnWebsite ? "Saved. The website shows it within five minutes." : "Saved. It is no longer on the website." });
+}
+
+/** The demo organisation only: its portal deletes every test, attempt, class and note and writes the sample content again. */
+export async function resetDemo(slug: string) {
+  const actor = await requireSuperAdmin();
+  if (slug !== DEMO_SLUG) back(`/admin/orgs/${slug}`, { error: "Only the demo organisation can be reset." });
+  const org = await prisma.organisation.findUnique({ where: { slug }, select: { id: true, slug: true, name: true, portalUrl: true, syncSecret: true } });
+  if (!org) back("/admin", { error: "That organisation no longer exists." });
+  const result = await resetDemoPortal(org.portalUrl, org.syncSecret);
+  await logActivity(actor, "Reset demo data", { org, detail: result.ok ? "done" : result.error });
+  back(
+    `/admin/orgs/${slug}`,
+    result.ok
+      ? { ok: `Demo reset: the sample class, paper and note are back, given to ${result.students} students and ${result.tutors} tutors.` }
+      : { error: result.error }
+  );
 }

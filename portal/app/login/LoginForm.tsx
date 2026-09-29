@@ -7,8 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AtomMark } from "@/components/brand/AtomMark";
-import { ShieldCheck, UserCheck, AlertCircle } from "lucide-react";
+import { ShieldCheck, UserCheck, AlertCircle, Mail } from "lucide-react";
 import { org } from "@/lib/org";
+import { DEMO_SLUG, requestAccessHref } from "@/lib/demo";
+
+const isDemo = org.slug === DEMO_SLUG;
 
 const AUTH_ERROR_MESSAGES: Record<string, string> = {
   OAuthAccountNotLinked:
@@ -33,9 +36,11 @@ export function LoginForm() {
   const [devRole, setDevRole] = useState<"STUDENT" | "ADMIN">("STUDENT");
   const [showDevAuth, setShowDevAuth] = useState(false);
   const [error, setError] = useState<string | null>(
-    urlError
-      ? AUTH_ERROR_MESSAGES[urlError] || "Sign in failed. Please try again."
-      : null
+    urlError === "AccessDenied" && isDemo
+      ? "That Google account has not been given access to the demo yet."
+      : urlError
+        ? AUTH_ERROR_MESSAGES[urlError] || "Sign in failed. Please try again."
+        : null
   );
 
   const handleGoogleSignIn = async () => {
@@ -116,6 +121,23 @@ export function LoginForm() {
         )}
         <span>Continue with Google</span>
       </Button>
+
+      {/* The demo is open only to people the super admin has added; anyone
+          else asks for access by email. */}
+      {isDemo && (
+        <div className="rounded-lg border border-brand-border bg-brand-page p-3.5 text-left">
+          <p className="text-xs text-brand-ink/75">
+            The demo is open to invited people only. No access yet? Ask for it and we will add your Google account.
+          </p>
+          <a
+            href={requestAccessHref()}
+            className="mt-2.5 inline-flex w-full items-center justify-center gap-2 rounded-md border border-brand-navy/30 bg-white px-4 py-2 text-sm font-semibold text-brand-navy transition-colors hover:bg-brand-tint"
+          >
+            <Mail className="h-4 w-4" />
+            Request access
+          </a>
+        </div>
+      )}
 
       {/* Development Quick-Switch Box -- never rendered in production, where the
           credentials provider that backs it is not registered at all. */}

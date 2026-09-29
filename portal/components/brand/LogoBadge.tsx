@@ -111,7 +111,7 @@ export function LogoBadge({
       </svg>
 
       {/* Phone Number below the badge */}
-      {showPhone && (
+      {showPhone && org.support.phone && (
         <a
           href={`tel:${org.support.phone}`}
           className="mt-3.5 font-heading font-semibold text-brand-ink text-base tracking-wider hover:text-brand-navy transition-colors flex items-center gap-1.5"

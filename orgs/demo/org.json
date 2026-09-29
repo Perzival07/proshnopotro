@@ -1,0 +1,37 @@
+{
+  "slug": "demo",
+  "name": "Demo",
+  "shortName": "Demo",
+  "logo": { "prefix": "", "main": "DEMO" },
+  "tagline": "Demo portal",
+  "support": {
+    "phone": "",
+    "phoneDisplay": "",
+    "whatsapp": ""
+  },
+  "colors": {
+    "navy": "#334155",
+    "blue": "#64748B",
+    "tint": "#F1F5F9",
+    "page": "#F8FAFC",
+    "ink": "#0F172A",
+    "border": "#E2E8F0",
+    "onDark": "#CBD5E1"
+  },
+  "features": {
+    "proctoring": true,
+    "cameraProctoring": true,
+    "calculator": true,
+    "secondLanguage": true,
+    "answerSheetUpload": true
+  },
+  "legal": {
+    "entityName": null,
+    "address": null,
+    "city": null,
+    "grievanceOfficer": { "name": null, "email": null },
+    "effectiveDate": null
+  },
+  "limits": { "maxStudents": null },
+  "billing": { "pricePerStudentInr": null }
+}
