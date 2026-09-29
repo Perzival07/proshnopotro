@@ -124,6 +124,21 @@ export const authConfig: NextAuthConfig = {
           );
           throw err;
         }
+        return true;
+      }
+
+      // Anyone else must already be in this portal -- a student added on the
+      // Students page (or by the master), or a tutor added on the Team page.
+      // The adapter only creates a User row once this callback approves the
+      // sign-in, so refusing here for an unknown email stops it from ever
+      // being created, rather than minting a self-served STUDENT account for
+      // whoever happens to sign in with Google.
+      if (account?.provider === "google") {
+        const existing = await prisma.user.findUnique({
+          where: { email: normalizedEmail },
+          select: { id: true },
+        });
+        if (!existing) return false;
       }
 
       return true;
