@@ -32,11 +32,12 @@ const config: Config = {
         },
         ink: "#101828",
         // The public site's dark theme (app/page.tsx).
+        // A deep indigo navy rather than near-black, so the page reads lighter.
         night: {
-          700: "#1c2037",
-          800: "#11142a",
-          900: "#0a0c19",
-          950: "#05060e",
+          700: "#343a63",
+          800: "#282d52",
+          900: "#1f2346",
+          950: "#191c3b",
         },
       },
       fontFamily: {
