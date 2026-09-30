@@ -197,19 +197,24 @@ const faqs = [
   },
 ];
 
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return <p className="text-xs font-semibold uppercase tracking-[0.22em] text-brand-300">{children}</p>;
+/** `light` for the sections on a white or pale background. */
+function Eyebrow({ children, light = false }: { children: React.ReactNode; light?: boolean }) {
+  return <p className={`text-xs font-semibold uppercase tracking-[0.22em] ${light ? "text-brand-600" : "text-brand-300"}`}>{children}</p>;
 }
 
-function Heading({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <h2 className={`mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-[2.6rem] sm:leading-[1.1] ${className}`}>{children}</h2>;
+function Heading({ children, className = "", light = false }: { children: React.ReactNode; className?: string; light?: boolean }) {
+  return (
+    <h2 className={`mt-4 font-display text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1] ${light ? "text-ink" : "text-white"} ${className}`}>
+      {children}
+    </h2>
+  );
 }
 
 /** An organisation's logo, or its initial, for the "Find your portal" list. */
 function OrgMark({ org }: { org: ShowcaseOrg }) {
   return (
     <span className="flex items-center gap-3">
-      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white p-1">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white p-1">
         {org.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={org.logoUrl} alt="" className="h-full w-full object-contain" loading="lazy" />
@@ -222,7 +227,7 @@ function OrgMark({ org }: { org: ShowcaseOrg }) {
           </span>
         )}
       </span>
-      <span className="font-semibold text-white">{org.name}</span>
+      <span className="font-semibold text-ink">{org.name}</span>
     </span>
   );
 }
@@ -327,12 +332,12 @@ export default async function Home() {
         )}
 
         {/* Problem */}
-        <section className="bg-night-950">
+        <section className="border-t border-slate-200 bg-white">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-2 lg:px-8 lg:py-28">
             <Reveal>
-              <Eyebrow>The problem</Eyebrow>
-              <Heading>Tuition exams still run on chat groups and forms.</Heading>
-              <p className="mt-5 text-lg leading-relaxed text-slate-400">
+              <Eyebrow light>The problem</Eyebrow>
+              <Heading light>Tuition exams still run on chat groups and forms.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-600">
                 The paper goes out as a file, answers come back as photos, and marks end up in a sheet. Every step
                 leaks time, and some of them leak the paper.
               </p>
@@ -340,11 +345,11 @@ export default async function Home() {
             <div className="grid gap-4 sm:grid-cols-2">
               {pains.map(({ icon: Icon, text }, i) => (
                 <Reveal key={text} delay={i * 80}>
-                  <div className="h-full rounded-2xl border border-white/10 bg-night-900 p-5 transition hover:border-rose-400/40">
-                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-400/20 bg-rose-500/10 text-rose-300">
+                  <div className="h-full rounded-2xl border border-slate-200 bg-white shadow-sm p-5 transition hover:border-rose-300 hover:shadow-md">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600">
                       <Icon className="h-5 w-5" />
                     </span>
-                    <p className="mt-4 font-medium leading-snug text-slate-100">{text}</p>
+                    <p className="mt-4 font-medium leading-snug text-slate-800">{text}</p>
                   </div>
                 </Reveal>
               ))}
@@ -426,16 +431,15 @@ export default async function Home() {
         </section>
 
         {/* Proctoring */}
-        <section id="proctoring" className="relative isolate overflow-hidden border-t border-white/5 bg-night-900/60">
+        <section id="proctoring" className="relative isolate overflow-hidden border-t border-slate-200 bg-slate-50">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10">
-            <div className="absolute -right-32 -top-32 h-[480px] w-[480px] rounded-full bg-brand-500/20 blur-[120px]" />
-            <div className="absolute -bottom-40 left-0 h-[420px] w-[420px] rounded-full bg-accent-500/10 blur-[120px]" />
+            <div className="absolute inset-0 bg-dot-grid" />
           </div>
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal className="max-w-3xl">
-              <Eyebrow>Proctoring</Eyebrow>
-              <Heading>An exam hall, without the hall.</Heading>
-              <p className="mt-5 text-lg leading-relaxed text-slate-400">
+              <Eyebrow light>Proctoring</Eyebrow>
+              <Heading light>An exam hall, without the hall.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-600">
                 Strikes are counted on the server, so a reload never resets them. No video is saved or sent: the camera
                 works on the student&apos;s own device and only the flags reach the tutor.
               </p>
@@ -443,10 +447,10 @@ export default async function Home() {
             <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {proctoring.map(({ icon: Icon, title, body }, i) => (
                 <Reveal key={title} delay={(i % 3) * 80}>
-                  <div className="h-full rounded-2xl border border-white/10 bg-night-900 p-6 transition hover:border-brand-400/40">
-                    <Icon className="h-6 w-6 text-brand-300" />
-                    <h3 className="mt-5 text-lg font-semibold text-white">{title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
+                  <div className="h-full rounded-2xl border border-slate-200 bg-white shadow-sm p-6 transition hover:border-brand-300 hover:shadow-md">
+                    <Icon className="h-6 w-6 text-brand-600" />
+                    <h3 className="mt-5 text-lg font-semibold text-ink">{title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
                   </div>
                 </Reveal>
               ))}
@@ -455,24 +459,24 @@ export default async function Home() {
         </section>
 
         {/* Who it is for */}
-        <section className="border-t border-white/5 bg-night-950">
+        <section className="border-t border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal className="max-w-3xl">
-              <Eyebrow>Who it is for</Eyebrow>
-              <Heading>A view for everyone in the classroom.</Heading>
+              <Eyebrow light>Who it is for</Eyebrow>
+              <Heading light>A view for everyone in the classroom.</Heading>
             </Reveal>
             <div className="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {people.map(({ icon: Icon, title, body }, i) => (
                 <Reveal key={title} delay={(i % 3) * 80}>
-                  <div className="flex h-full flex-col rounded-2xl border border-white/10 bg-night-900 p-6">
+                  <div className="flex h-full flex-col rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
                     <div className="flex items-start justify-between gap-3">
-                      <Icon className="h-6 w-6 text-brand-300" />
-                      <span className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-300">
+                      <Icon className="h-6 w-6 text-brand-600" />
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700">
                         Live
                       </span>
                     </div>
-                    <h3 className="mt-5 text-lg font-semibold text-white">{title}</h3>
-                    <p className="mt-2 text-sm leading-relaxed text-slate-400">{body}</p>
+                    <h3 className="mt-5 text-lg font-semibold text-ink">{title}</h3>
+                    <p className="mt-2 text-sm leading-relaxed text-slate-600">{body}</p>
                   </div>
                 </Reveal>
               ))}
@@ -481,18 +485,18 @@ export default async function Home() {
         </section>
 
         {/* Your portal */}
-        <section className="border-t border-white/5 bg-night-900/60">
+        <section className="border-t border-slate-200 bg-slate-50">
           <div className="mx-auto grid max-w-7xl items-center gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.9fr_1.1fr] lg:px-8 lg:py-28">
             <Reveal>
-              <Eyebrow>Your portal</Eyebrow>
-              <Heading>Your name on the door. Your data behind it.</Heading>
-              <p className="mt-5 text-lg leading-relaxed text-slate-400">
+              <Eyebrow light>Your portal</Eyebrow>
+              <Heading light>Your name on the door. Your data behind it.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-600">
                 Every organisation runs its own copy of Proshnopotro, set up for it. Students see your brand, not ours.
               </p>
               <ul className="mt-8 space-y-3">
                 {highlights.map(({ icon: Icon, text }) => (
-                  <li key={text} className="flex items-center gap-3 text-sm font-medium text-slate-300">
-                    <Icon className="h-5 w-5 shrink-0 text-brand-300" />
+                  <li key={text} className="flex items-center gap-3 text-sm font-medium text-slate-700">
+                    <Icon className="h-5 w-5 shrink-0 text-brand-600" />
                     {text}
                   </li>
                 ))}
@@ -501,13 +505,13 @@ export default async function Home() {
             <div className="space-y-4">
               {yours.map(({ icon: Icon, title, body }, i) => (
                 <Reveal key={title} delay={i * 80}>
-                  <div className="flex gap-5 rounded-2xl border border-white/10 bg-night-900 p-6">
+                  <div className="flex gap-5 rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
                     <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-sky-600 text-white">
                       <Icon className="h-5 w-5" />
                     </span>
                     <div>
-                      <h3 className="text-lg font-semibold text-white">{title}</h3>
-                      <p className="mt-1 text-slate-400">{body}</p>
+                      <h3 className="text-lg font-semibold text-ink">{title}</h3>
+                      <p className="mt-1 text-slate-600">{body}</p>
                     </div>
                   </div>
                 </Reveal>
@@ -517,25 +521,25 @@ export default async function Home() {
         </section>
 
         {/* Organisations / log in */}
-        <section id="organisations" className="border-t border-white/5 bg-night-950">
+        <section id="organisations" className="border-t border-slate-200 bg-white">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal className="mx-auto max-w-2xl text-center">
-              <Eyebrow>Log in</Eyebrow>
-              <Heading>Find your portal</Heading>
-              <p className="mt-5 text-lg leading-relaxed text-slate-400">Students and staff sign in on their own organisation&apos;s portal.</p>
+              <Eyebrow light>Log in</Eyebrow>
+              <Heading light>Find your portal</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-600">Students and staff sign in on their own organisation&apos;s portal.</p>
             </Reveal>
             <div className="mx-auto mt-12 grid max-w-3xl gap-4">
               {organisations.map((org) => (
                 <Reveal key={org.slug}>
                   <a
                     href={org.portalUrl}
-                    className="group flex items-center justify-between gap-4 rounded-2xl border border-white/10 bg-night-900 p-5 transition hover:border-brand-400/50"
+                    className="group flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-white shadow-sm p-5 transition hover:border-brand-300 hover:shadow-md"
                   >
                     <span className="flex items-center gap-4">
                       <OrgMark org={org} />
                       <span className="hidden text-sm text-slate-500 sm:block">{new URL(org.portalUrl).host}</span>
                     </span>
-                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-300">
+                    <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600">
                       Open portal
                       <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" />
                     </span>
@@ -547,14 +551,14 @@ export default async function Home() {
         </section>
 
         {/* Pricing */}
-        <section id="pricing" className="border-t border-white/5 bg-night-900/60">
+        <section id="pricing" className="border-t border-slate-200 bg-slate-50">
           <div className="mx-auto max-w-7xl px-4 py-20 sm:px-6 lg:px-8 lg:py-28">
             <Reveal>
-              <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-white/10 bg-night-900 lg:grid-cols-[1.2fr_1fr]">
+              <div className="mx-auto grid max-w-5xl overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-200/60 lg:grid-cols-[1.2fr_1fr]">
                 <div className="p-8 sm:p-10">
-                  <Eyebrow>Pricing</Eyebrow>
-                  <Heading className="sm:text-3xl">Pay per student. Nothing else.</Heading>
-                  <p className="mt-4 text-lg leading-relaxed text-slate-400">
+                  <Eyebrow light>Pricing</Eyebrow>
+                  <Heading light className="sm:text-3xl">Pay per student. Nothing else.</Heading>
+                  <p className="mt-4 text-lg leading-relaxed text-slate-600">
                     One monthly price for each student on your roster. Every feature, every exam, every teacher included.
                   </p>
                   <ul className="mt-8 grid gap-3 sm:grid-cols-2">
@@ -566,8 +570,8 @@ export default async function Home() {
                       "Setup of your first papers",
                       "Pay by bank transfer, UPI or cheque",
                     ].map((f) => (
-                      <li key={f} className="flex gap-2.5 text-sm text-slate-300">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" />
+                      <li key={f} className="flex gap-2.5 text-sm text-slate-700">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
                         {f}
                       </li>
                     ))}
@@ -593,32 +597,32 @@ export default async function Home() {
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="border-t border-white/5 bg-night-950">
+        <section id="faq" className="border-t border-slate-200 bg-white">
           <div className="mx-auto grid max-w-7xl gap-12 px-4 py-20 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8 lg:py-28">
             <Reveal>
-              <Eyebrow>FAQ</Eyebrow>
-              <Heading>Questions, answered.</Heading>
-              <p className="mt-5 text-lg leading-relaxed text-slate-400">
+              <Eyebrow light>FAQ</Eyebrow>
+              <Heading light>Questions, answered.</Heading>
+              <p className="mt-5 text-lg leading-relaxed text-slate-600">
                 Something else on your mind?{" "}
-                <a href={demoHref} className="font-semibold text-brand-300 underline-offset-4 hover:underline">
+                <a href={demoHref} className="font-semibold text-brand-600 underline-offset-4 hover:underline">
                   Write to us
                 </a>
                 .
               </p>
             </Reveal>
-            <div className="divide-y divide-white/10 border-y border-white/10">
+            <div className="divide-y divide-slate-200 border-y border-slate-200">
               {faqs.map(({ q, a }) => (
                 <details key={q} className="group py-5">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left font-semibold text-white [&::-webkit-details-marker]:hidden">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-left font-semibold text-ink [&::-webkit-details-marker]:hidden">
                     <span className="flex items-center gap-3">
-                      <MessageCircleQuestion className="h-5 w-5 shrink-0 text-brand-300" />
+                      <MessageCircleQuestion className="h-5 w-5 shrink-0 text-brand-600" />
                       {q}
                     </span>
-                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-white/15 text-brand-300 transition group-open:rotate-45">
+                    <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-300 text-brand-600 transition group-open:rotate-45">
                       +
                     </span>
                   </summary>
-                  <p className="mt-3 pl-8 leading-relaxed text-slate-400">{a}</p>
+                  <p className="mt-3 pl-8 leading-relaxed text-slate-600">{a}</p>
                 </details>
               ))}
             </div>
@@ -626,9 +630,9 @@ export default async function Home() {
         </section>
 
         {/* Final CTA */}
-        <section className="bg-night-950 px-4 pb-20 sm:px-6 lg:px-8 lg:pb-28">
+        <section className="bg-white px-4 pb-20 sm:px-6 lg:px-8 lg:pb-28">
           <Reveal>
-            <div className="relative isolate mx-auto max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-night-900 px-6 py-16 text-center sm:px-12">
+            <div className="relative isolate mx-auto max-w-7xl overflow-hidden rounded-3xl border border-white/10 bg-night-900 px-6 py-16 text-center shadow-xl shadow-slate-300/50 sm:px-12">
               <div aria-hidden="true" className="absolute inset-0 -z-10 bg-dot-grid-dark" />
               <div aria-hidden="true" className="absolute -left-20 -top-24 -z-10 h-80 w-80 rounded-full bg-sky-500/25 blur-3xl" />
               <div aria-hidden="true" className="absolute -bottom-24 -right-20 -z-10 h-80 w-80 rounded-full bg-accent-500/25 blur-3xl" />
