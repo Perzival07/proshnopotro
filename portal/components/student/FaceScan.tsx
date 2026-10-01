@@ -5,12 +5,15 @@ import { Button } from "@/components/ui/button";
 import type { CameraStatus } from "@/lib/proctor-camera";
 import { FACE_MODEL, WASM_ROOT } from "@/components/student/ProctorDetection";
 import { silenceMediapipeInfo } from "@/lib/mediapipe-log";
+import { createFrameCopier } from "@/lib/face-frame";
 import { coverRect, NO_FACES, toFaceBoxes, type FaceSnapshot } from "@/lib/proctor-detect";
 import { createScanGate, scanMessage, type ScanResult } from "@/lib/proctor-scan";
 import { CheckCircle2, ScanFace, VideoOff } from "lucide-react";
 
 /** Looks per second while scanning; the hold is two seconds, so this is smooth enough. */
 const SAMPLE_INTERVAL_MS = 250;
+/** Width of the copy the face model looks at (`lib/face-frame.ts`). */
+const FACE_FRAME_WIDTH = 320;
 /** How long "Face verified" stays up before the paper opens. */
 const PASSED_PAUSE_MS = 700;
 
@@ -91,6 +94,7 @@ export function FaceScan({
 
         setChecker("ready");
         const gate = createScanGate();
+        const frames = createFrameCopier(FACE_FRAME_WIDTH);
         let lastVideoTime = -1;
         let busy = false;
 
@@ -103,12 +107,11 @@ export function FaceScan({
 
           busy = true;
           try {
-            const found = detector.detectForVideo(el, performance.now()).detections;
-            const boxes = toFaceBoxes(found, el.videoWidth, el.videoHeight);
-            setSnapshot({
-              boxes,
-              frameAspect: el.videoWidth / el.videoHeight || NO_FACES.frameAspect,
-            });
+            const frame = frames.copy(el);
+            if (!frame) return;
+            const found = detector.detectForVideo(frame, performance.now()).detections;
+            const boxes = toFaceBoxes(found, frame.width, frame.height);
+            setSnapshot({ boxes, frameAspect: frame.width / frame.height });
             const next = gate.observe({ faceWidths: boxes.map((b) => b.w) }, Date.now());
             setResult(next);
             if (next.state === "passed" && timer) {

@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
 import { silenceMediapipeInfo } from "@/lib/mediapipe-log";
+import { createFrameCopier } from "@/lib/face-frame";
 import { fullscreenElement } from "@/lib/fullscreen";
 import { recordProctorFlag } from "@/app/test/[assignmentId]/actions";
 import {
@@ -21,6 +22,12 @@ const ASSET_ROOT = "/proctor";
 export const FACE_MODEL = `${ASSET_ROOT}/blaze_face_short_range.tflite`;
 const OBJECT_MODEL = `${ASSET_ROOT}/efficientdet_lite0.tflite`;
 export const WASM_ROOT = `${ASSET_ROOT}/wasm`;
+/**
+ * Widths of the frame copies the models look at (`lib/face-frame.ts`). The
+ * phone check keeps VGA: a phone at arm's length is small in the picture.
+ */
+const FACE_FRAME_WIDTH = 320;
+const PHONE_FRAME_WIDTH = 640;
 
 /** Two looks a second is plenty: a flag needs seconds of evidence anyway. */
 const SAMPLE_INTERVAL_MS = 500;
@@ -180,6 +187,8 @@ export function useProctorDetection(
         };
 
         const tracker = createTracker();
+        const faceFrames = createFrameCopier(FACE_FRAME_WIDTH);
+        const phoneFrames = createFrameCopier(PHONE_FRAME_WIDTH);
         let lastVideoTime = -1;
         let busy = false;
         // The object model is the costly one, and a phone must persist for
@@ -200,14 +209,17 @@ export function useProctorDetection(
           busy = true;
           try {
             const now = performance.now();
-            const found = faceDetector.detectForVideo(el, now).detections;
+            const faceFrame = faceFrames.copy(el);
+            if (!faceFrame) return;
+            const found = faceDetector.detectForVideo(faceFrame, now).detections;
             const faceCount = found.length;
             faceStore.set({
-              boxes: toFaceBoxes(found, el.videoWidth, el.videoHeight),
-              frameAspect: el.videoWidth / el.videoHeight || NO_FACES.frameAspect,
+              boxes: toFaceBoxes(found, faceFrame.width, faceFrame.height),
+              frameAspect: faceFrame.width / faceFrame.height,
             });
             if (tick++ % 2 === 0) {
-              phoneInView = hasPhone(objectDetector.detectForVideo(el, now).detections);
+              const phoneFrame = phoneFrames.copy(el);
+              if (phoneFrame) phoneInView = hasPhone(objectDetector.detectForVideo(phoneFrame, now).detections);
             }
             const phone = phoneInView;
 
