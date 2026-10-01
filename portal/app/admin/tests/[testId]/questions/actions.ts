@@ -66,21 +66,17 @@ function lockedMessage(started: number) {
 /**
  * Looks up each "Chapter:" in the test's syllabus. Returns the chapter id for
  * every question that names one, or the lines that name a chapter the
- * syllabus does not have.
+ * syllabus does not have. A test without a board and class has no syllabus,
+ * so its "Chapter:" lines are skipped rather than blocking the paper.
  */
 async function resolveChapters(
   test: { board: string | null; classLevel: string | null; subject: string },
   paper: ImportedPaper
-): Promise<{ ids: Map<ImportedQuestion, string>; errors: ImportError[] }> {
+): Promise<{ ids: Map<ImportedQuestion, string>; errors: ImportError[]; skipped?: boolean }> {
   const named = paper.sections.flatMap((s) => s.questions).filter((q) => q.chapter);
   const ids = new Map<ImportedQuestion, string>();
   if (named.length === 0) return { ids, errors: [] };
-  if (!test.board || !test.classLevel) {
-    return {
-      ids,
-      errors: [{ line: named[0].line, message: "To tag chapters, first set this test's board and class (Edit test)." }],
-    };
-  }
+  if (!test.board || !test.classLevel) return { ids, errors: [], skipped: true };
   const chapters = await prisma.chapter.findMany({
     where: { board: test.board, classLevel: test.classLevel, subject: test.subject },
     orderBy: { position: "asc" },
@@ -264,7 +260,7 @@ export async function updateQuestion(questionId: string, text: string): Promise<
       marksWrong: q.rule?.wrong ?? null,
       // A "Chapter:" or "Topic:" line in the box changes the tag; without one
       // the tag set from the menu stays as it is.
-      ...(q.chapter ? { chapterId: tagged.ids.get(q) ?? null } : {}),
+      ...(q.chapter && !tagged.skipped ? { chapterId: tagged.ids.get(q) ?? null } : {}),
       ...(q.topic ? { topic: q.topic } : {}),
       videoUrl: q.videoUrl,
     },

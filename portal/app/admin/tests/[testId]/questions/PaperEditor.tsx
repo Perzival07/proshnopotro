@@ -408,18 +408,20 @@ function ImportPanel({
     const paper = parseQuestionPaper(deferred);
     // "Chapter:" lines are checked against the syllabus here too, so a typo
     // shows before saving rather than after.
+    // Without a syllabus they are skipped, not an error.
     const chapterErrors: ImportError[] = [];
+    let untaggable = false;
     for (const q of paper.sections.flatMap((s) => s.questions)) {
       if (!q.chapter) continue;
       if (!syllabus) {
-        chapterErrors.push({ line: q.line, message: "To tag chapters, first set this test's board and class (Edit test)." });
+        untaggable = true;
         break;
       }
       if (!findChapter(chapters, q.chapter)) {
         chapterErrors.push({ line: q.line, message: `Chapter "${q.chapter}" is not in ${syllabus}. Check the spelling, or add it on the Syllabus page.` });
       }
     }
-    return { ...paper, errors: [...paper.errors, ...chapterErrors] };
+    return { ...paper, errors: [...paper.errors, ...chapterErrors], untaggable };
   }, [deferred, chapters, syllabus]);
   const count = parsed ? parsed.sections.reduce((n, s) => n + s.questions.length, 0) : 0;
 
@@ -568,6 +570,12 @@ function ImportPanel({
 
       {error && <Banner tone="error">{error}</Banner>}
       <ErrorList errors={serverErrors.length ? serverErrors : parsed?.errors ?? []} />
+      {parsed?.untaggable && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800">
+          This test has no board and class, so the &ldquo;Chapter:&rdquo; lines will be ignored. The questions still
+          save; set the board and class (Edit test) if you want chapter tags.
+        </p>
+      )}
 
       {parsed && count > 0 && (
         <div className="space-y-3 rounded-md border border-dashed border-brand-border p-3">
