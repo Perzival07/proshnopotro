@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import {
   answerFolder,
+  answerPageId,
   attemptEndedAt,
   canSaveUpload,
   fitWithin,
+  isAnswerPageId,
   isInAnswerFolder,
+  MAX_ANSWER_IMAGES,
   SAVE_GRACE_MINUTES,
   UPLOAD_WINDOW_MINUTES,
   uploadClosesAt,
@@ -118,6 +121,22 @@ describe("isInAnswerFolder", () => {
   it("rejects the bare folder and path tricks", () => {
     expect(isInAnswerFolder(`${answerFolder("a1")}/`, "a1")).toBe(false);
     expect(isInAnswerFolder(`${answerFolder("a1")}/../a2/x`, "a1")).toBe(false);
+  });
+});
+
+describe("answerPageId", () => {
+  it("names a slot that isAnswerPageId accepts, for every page up to the limit", () => {
+    for (let i = 0; i < MAX_ANSWER_IMAGES; i++) {
+      expect(isAnswerPageId(answerPageId("a1", i), "a1")).toBe(true);
+    }
+  });
+
+  it("rejects a slot past the limit, other assignments and free-form names", () => {
+    expect(isAnswerPageId(answerPageId("a1", MAX_ANSWER_IMAGES), "a1")).toBe(false);
+    expect(isAnswerPageId(answerPageId("a2", 0), "a1")).toBe(false);
+    expect(isAnswerPageId(`${answerFolder("a1")}/xyz123`, "a1")).toBe(false);
+    expect(isAnswerPageId(`${answerFolder("a1")}/p01`, "a1")).toBe(false);
+    expect(isAnswerPageId(`${answerFolder("a1")}/p`, "a1")).toBe(false);
   });
 });
 

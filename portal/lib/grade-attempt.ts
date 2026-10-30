@@ -3,6 +3,7 @@ import { markPaper, type ResponseValue } from "@/lib/marking";
 import { normalizeScheme, toMarkableSections } from "@/lib/paper";
 import { org } from "@/lib/org";
 import { effectiveFeatures } from "@/lib/org-features";
+import { groupByOutcome, mapLimit } from "@/lib/grade-batch";
 
 /**
  * Marks a closed attempt at a QUESTIONS test and records the score.
@@ -48,13 +49,18 @@ export async function gradeAssignment(assignmentId: string): Promise<void> {
   const byQuestion = Object.assign({}, ...marked.sections.map((s) => s.questions));
 
   await prisma.$transaction([
-    ...assignment.responses.map((r) =>
-      prisma.questionResponse.update({
-        where: { assignmentId_questionId: { assignmentId: assignment.id, questionId: r.questionId } },
-        data: {
-          marks: byQuestion[r.questionId]?.marks ?? 0,
-          status: byQuestion[r.questionId]?.status ?? "UNATTEMPTED",
-        },
+    // One write per distinct outcome, not per response: a paper has a handful
+    // of them, and a class re-marked after a key change has thousands of rows.
+    ...groupByOutcome(
+      assignment.responses.map((r) => ({
+        questionId: r.questionId,
+        marks: byQuestion[r.questionId]?.marks ?? 0,
+        status: byQuestion[r.questionId]?.status ?? "UNATTEMPTED",
+      }))
+    ).map((g) =>
+      prisma.questionResponse.updateMany({
+        where: { assignmentId: assignment.id, questionId: { in: g.questionIds } },
+        data: { marks: g.marks, status: g.status },
       })
     ),
     prisma.result.upsert({
@@ -80,12 +86,16 @@ export async function gradeAssignment(assignmentId: string): Promise<void> {
   ]);
 }
 
+const REGRADE_CONCURRENCY = 5;
+
 /** Re-marks every closed attempt at a test, after its key or marks changed. */
 export async function regradeTest(testId: string): Promise<number> {
   const closed = await prisma.assignment.findMany({
     where: { testId, status: "SUBMITTED" },
     select: { id: true },
   });
-  for (const { id } of closed) await gradeAssignment(id);
+  // A few at a time: serial is too slow for a big class inside one request,
+  // and unbounded would exhaust the database's connections.
+  await mapLimit(closed, REGRADE_CONCURRENCY, ({ id }) => gradeAssignment(id));
   return closed.length;
 }

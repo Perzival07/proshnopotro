@@ -43,6 +43,18 @@ export async function closeExpiredAttempts(
       isTimeUp(a)
   );
 
+  // A paper whose marking failed when it closed stays SUBMITTED with no
+  // result, and nothing else would ever look at it again. `result === null`
+  // (not undefined) means the caller loaded the result and there is none.
+  const unmarked = assignments.filter(
+    (a) =>
+      a.status === "SUBMITTED" &&
+      a.result === null &&
+      a.test.format === "QUESTIONS" &&
+      !expired.includes(a)
+  );
+  await markAll(unmarked);
+
   if (expired.length === 0) return new Set();
 
   // One write per attempt, because each records its own deadline as the moment
@@ -59,13 +71,18 @@ export async function closeExpiredAttempts(
   );
 
   // Papers written in the portal are marked as they close, here as anywhere.
-  for (const a of expired) {
+  await markAll(expired);
+
+  return new Set(expired.map((a) => a.id));
+}
+
+/** Marks each attempt; one failing must not stop the rest, or the page. */
+async function markAll(attempts: ClosableAssignment[]): Promise<void> {
+  for (const a of attempts) {
     try {
       await gradeAssignment(a.id);
     } catch (err) {
       console.error("Failed to mark attempt", a.id, err);
     }
   }
-
-  return new Set(expired.map((a) => a.id));
 }

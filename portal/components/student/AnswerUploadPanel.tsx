@@ -230,23 +230,25 @@ export function AnswerUploadPanel({
     setProgress({ done: 0, total: pages.length });
 
     try {
-      const signed = await getAnswerUploadSignature(assignmentId);
-      if (signed.error || !signed.upload) {
+      const signed = await getAnswerUploadSignature(assignmentId, pages.length);
+      if (signed.error || !signed.uploads || signed.uploads.length !== pages.length) {
         setError(signed.error || "Could not start the upload.");
         await loadStatus();
         setPhase((p) => (p === "uploading" ? "capture" : p));
         return;
       }
-      const sig = signed.upload;
+      const sigs = signed.uploads;
 
       const uploaded: UploadedPage[] = [];
       for (let i = 0; i < pages.length; i++) {
+        const sig = sigs[i];
         const form = new FormData();
         form.append("file", pages[i].blob, `page-${i + 1}.jpg`);
         form.append("api_key", sig.apiKey);
         form.append("timestamp", String(sig.timestamp));
         form.append("signature", sig.signature);
-        form.append("folder", sig.folder);
+        form.append("public_id", sig.publicId!);
+        form.append("overwrite", "true");
         form.append("type", sig.type);
 
         const res = await fetch(

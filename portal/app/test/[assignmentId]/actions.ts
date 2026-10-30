@@ -15,14 +15,20 @@ import {
 } from "@/lib/proctor-detect";
 import {
   answerFolder,
+  answerPageId,
   canSaveUpload,
-  isInAnswerFolder,
+  isAnswerPageId,
   MAX_ANSWER_IMAGES,
   uploadClosesAt,
   uploadState,
   type UploadState,
 } from "@/lib/answer-upload";
-import { signAnswerUpload, type UploadSignature } from "@/lib/cloudinary";
+import {
+  lookupAnswerPages,
+  pruneAnswerFolder,
+  signAnswerUpload,
+  type UploadSignature,
+} from "@/lib/cloudinary";
 import { gradeAssignment } from "@/lib/grade-attempt";
 import { org } from "@/lib/org";
 import { effectiveFeatures } from "@/lib/org-features";
@@ -335,46 +341,55 @@ export async function saveQuestionResponse(
   );
   if (!checked.ok) return { error: checked.error };
 
-  if (question.section.attemptLimit && isAttempted(checked.value)) {
-    const inSection = await prisma.questionResponse.findMany({
-      where: { assignmentId, question: { sectionId: question.sectionId } },
-      select: { questionId: true, value: true },
-    });
-    const answered = inSection.filter(
-      (r) => r.questionId !== questionId && isAttempted(r.value as ResponseValue)
-    ).length;
-    const already = inSection.some(
-      (r) => r.questionId === questionId && isAttempted(r.value as ResponseValue)
-    );
-    if (!withinAttemptLimit(question.section.attemptLimit, answered, already)) {
-      return {
-        error: `You can answer only ${question.section.attemptLimit} questions in this section. Clear another answer first.`,
-      };
-    }
-  }
-
-  // Internal choice: one side only. Answering the other means clearing this.
-  if (question.choiceGroup && isAttempted(checked.value)) {
-    const others = await prisma.questionResponse.findMany({
-      where: {
-        assignmentId,
-        questionId: { not: questionId },
-        question: { choiceGroup: question.choiceGroup, section: { testId: assignment.test.id } },
-      },
-      select: { value: true },
-    });
-    if (others.some((o) => isAttempted(o.value as ResponseValue))) {
-      return { error: "You have answered the other choice of this question. Clear that answer to answer this one." };
-    }
-  }
-
   const stored = checked.value === null ? Prisma.JsonNull : (checked.value as Prisma.InputJsonValue);
-  await prisma.questionResponse.upsert({
-    where: { assignmentId_questionId: { assignmentId, questionId } },
-    create: { assignmentId, questionId, value: stored, markedForReview },
-    update: { value: stored, markedForReview },
+
+  // The limit and choice checks read the other answers and the upsert writes
+  // this one, so two saves running together could each see room and both go
+  // through. Locking the attempt's row makes saves for one student take turns:
+  // the second reads the first's answer before it decides.
+  return prisma.$transaction(async (tx): Promise<{ success?: true; error?: string }> => {
+    await tx.$queryRaw`SELECT id FROM "Assignment" WHERE id = ${assignmentId} FOR UPDATE`;
+
+    if (question.section.attemptLimit && isAttempted(checked.value)) {
+      const inSection = await tx.questionResponse.findMany({
+        where: { assignmentId, question: { sectionId: question.sectionId } },
+        select: { questionId: true, value: true },
+      });
+      const answered = inSection.filter(
+        (r) => r.questionId !== questionId && isAttempted(r.value as ResponseValue)
+      ).length;
+      const already = inSection.some(
+        (r) => r.questionId === questionId && isAttempted(r.value as ResponseValue)
+      );
+      if (!withinAttemptLimit(question.section.attemptLimit, answered, already)) {
+        return {
+          error: `You can answer only ${question.section.attemptLimit} questions in this section. Clear another answer first.`,
+        };
+      }
+    }
+
+    // Internal choice: one side only. Answering the other means clearing this.
+    if (question.choiceGroup && isAttempted(checked.value)) {
+      const others = await tx.questionResponse.findMany({
+        where: {
+          assignmentId,
+          questionId: { not: questionId },
+          question: { choiceGroup: question.choiceGroup, section: { testId: assignment.test.id } },
+        },
+        select: { value: true },
+      });
+      if (others.some((o) => isAttempted(o.value as ResponseValue))) {
+        return { error: "You have answered the other choice of this question. Clear that answer to answer this one." };
+      }
+    }
+
+    await tx.questionResponse.upsert({
+      where: { assignmentId_questionId: { assignmentId, questionId } },
+      create: { assignmentId, questionId, value: stored, markedForReview },
+      update: { value: stored, markedForReview },
+    });
+    return { success: true };
   });
-  return { success: true };
 }
 
 /**
@@ -505,6 +520,29 @@ export async function markStudentSubmission(
 /** Sentinel for "not being watched", so the client stops counting. */
 const MAX_UNWATCHED = Number.MAX_SAFE_INTEGER;
 
+/**
+ * Whether a proctoring flag can count against this attempt right now.
+ *
+ * Flags only mean something while the student is sitting the paper: before it
+ * opens (or before it is scheduled to) there is nothing to police, and after
+ * the clock has run out the attempt is already over, so a late report must not
+ * tip a second flag into closing it and stamping `endedAt` as now. Timed
+ * papers and papers answered in the portal are started by opening them;
+ * an untimed link has no start to check and is judged on its dates alone.
+ */
+function flagsCount(assignment: {
+  opensAt: Date | null;
+  dueAt: Date;
+  startedAt: Date | null;
+  test: { durationMinutes: number | null; format: string };
+}): boolean {
+  if (isNotYetOpen(assignment)) return false;
+  if ((isTimed(assignment) || assignment.test.format === "QUESTIONS") && !assignment.startedAt) {
+    return false;
+  }
+  return !isTimeUp(assignment);
+}
+
 export interface TabSwitchResult {
   count?: number;
   remaining?: number;
@@ -537,7 +575,7 @@ export async function recordTabSwitch(
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     include: {
-      test: { select: { proctored: true, durationMinutes: true } },
+      test: { select: { proctored: true, durationMinutes: true, format: true } },
       result: true,
     },
   });
@@ -552,6 +590,7 @@ export async function recordTabSwitch(
   if (isAssignmentSubmitted(assignment)) {
     return { submitted: true, count: assignment.tabSwitches };
   }
+  if (!flagsCount(assignment)) return { count: assignment.tabSwitches };
 
   const updated = await prisma.assignment.update({
     where: { id: assignmentId },
@@ -610,7 +649,7 @@ export async function recordProctorFlag(
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     include: {
-      test: { select: { proctored: true } },
+      test: { select: { proctored: true, durationMinutes: true, format: true } },
       result: true,
     },
   });
@@ -622,6 +661,7 @@ export async function recordProctorFlag(
 
   if (!isProctored(assignment, org.features)) return {};
   if (isAssignmentSubmitted(assignment)) return { submitted: true };
+  if (!flagsCount(assignment)) return {};
 
   const column = DETECTION_COLUMN[kind];
   const updated = await prisma.assignment.update({
@@ -660,7 +700,7 @@ export async function recordCaptureAttempt(
   const assignment = await prisma.assignment.findUnique({
     where: { id: assignmentId },
     include: {
-      test: { select: { proctored: true } },
+      test: { select: { proctored: true, durationMinutes: true, format: true } },
       result: true,
     },
   });
@@ -672,6 +712,7 @@ export async function recordCaptureAttempt(
 
   if (!isProctored(assignment, org.features)) return {};
   if (isAssignmentSubmitted(assignment)) return { submitted: true };
+  if (!flagsCount(assignment)) return {};
 
   const updated = await prisma.assignment.update({
     where: { id: assignmentId },
@@ -750,18 +791,27 @@ export async function getAnswerUploadStatus(
 }
 
 export interface SignatureResult {
-  upload?: UploadSignature;
+  /** One per page, in order; each can write only its own file. */
+  uploads?: UploadSignature[];
   error?: string;
 }
 
 /**
- * A short-lived permission to upload straight to Cloudinary, pinned to this
- * assignment's folder. Only issued while the window is open and nothing has
- * been saved yet.
+ * Permission to upload `pageCount` photos straight to Cloudinary, one
+ * signature per page and each pinned to that page's file name. A signature
+ * stays valid at Cloudinary for an hour, so what bounds the damage is that
+ * none of them can add a file beyond its own: at most MAX_ANSWER_IMAGES files
+ * can exist for an attempt however often this is called. Only issued while the
+ * window is open and nothing has been saved yet.
  */
 export async function getAnswerUploadSignature(
-  assignmentId: string
+  assignmentId: string,
+  pageCount: number
 ): Promise<SignatureResult> {
+  if (!Number.isInteger(pageCount) || pageCount < 1 || pageCount > MAX_ANSWER_IMAGES) {
+    return { error: `You can upload between 1 and ${MAX_ANSWER_IMAGES} pages.` };
+  }
+
   const loaded = await loadOwnAssignment(assignmentId);
   if ("error" in loaded) return { error: loaded.error };
   const { assignment } = loaded;
@@ -771,12 +821,16 @@ export async function getAnswerUploadSignature(
   if (state === "NOT_ENDED") return { error: "Finish the assessment before uploading your answers." };
   if (state === "EXPIRED") return { error: "The time to upload your answers is over." };
 
-  const upload = signAnswerUpload(answerFolder(assignment.id));
-  if (!upload) {
-    console.error("Cloudinary is not configured: set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.");
-    return { error: "Uploads are not set up yet. Please tell your tutor." };
+  const uploads: UploadSignature[] = [];
+  for (let i = 0; i < pageCount; i++) {
+    const upload = signAnswerUpload(answerFolder(assignment.id), answerPageId(assignment.id, i));
+    if (!upload) {
+      console.error("Cloudinary is not configured: set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY and CLOUDINARY_API_SECRET.");
+      return { error: "Uploads are not set up yet. Please tell your tutor." };
+    }
+    uploads.push(upload);
   }
-  return { upload };
+  return { uploads };
 }
 
 export interface UploadedPage {
@@ -814,20 +868,23 @@ export async function saveAnswerUploads(
     return { error: `You can upload at most ${MAX_ANSWER_IMAGES} pages.` };
   }
 
-  for (const page of pages) {
-    if (
-      typeof page?.publicId !== "string" ||
-      !isInAnswerFolder(page.publicId, assignment.id) ||
-      !Number.isInteger(page.version) ||
-      typeof page.format !== "string" ||
-      !/^[a-z0-9]{2,5}$/i.test(page.format)
-    ) {
-      return { error: "One of the uploaded pages could not be verified. Please try again." };
-    }
+  // Only this attempt's own page slots, each once. The browser's version,
+  // format and size are ignored: what Cloudinary holds is what gets recorded.
+  const ids = pages.map((page) => page?.publicId);
+  if (
+    !ids.every((id) => typeof id === "string" && isAnswerPageId(id, assignment.id)) ||
+    new Set(ids).size !== ids.length
+  ) {
+    return { error: "One of the uploaded pages could not be verified. Please try again." };
   }
 
-  const toInt = (n: unknown) =>
-    typeof n === "number" && Number.isFinite(n) ? Math.round(n) : null;
+  const stored = await lookupAnswerPages(ids);
+  if (!stored) return { error: "Your photos could not be checked just now. Please press Upload again." };
+  const byId = new Map(stored.map((f) => [f.publicId, f]));
+  const files = ids.map((id) => byId.get(id));
+  if (files.some((f) => !f)) {
+    return { error: "One of your photos did not arrive. Please press Upload again." };
+  }
 
   try {
     const saved = await prisma.$transaction(async (tx) => {
@@ -838,14 +895,14 @@ export async function saveAnswerUploads(
       if (claimed.count === 0) return false;
 
       await tx.answerImage.createMany({
-        data: pages.map((page, index) => ({
+        data: files.map((file, index) => ({
           assignmentId: assignment.id,
-          publicId: page.publicId,
-          version: page.version,
-          format: page.format.toLowerCase(),
-          width: toInt(page.width),
-          height: toInt(page.height),
-          bytes: toInt(page.bytes),
+          publicId: file!.publicId,
+          version: file!.version,
+          format: file!.format.toLowerCase(),
+          width: file!.width,
+          height: file!.height,
+          bytes: file!.bytes,
           position: index,
         })),
       });
@@ -853,6 +910,8 @@ export async function saveAnswerUploads(
     });
 
     if (!saved) return { error: "Your answers have already been uploaded." };
+    // Slots signed but not used, or left over from an interrupted try.
+    await pruneAnswerFolder(assignment.id, ids);
   } catch (err) {
     console.error("Failed to save answer uploads:", err);
     return { error: "Your photos were sent but could not be saved. Please press Upload again." };
@@ -882,6 +941,8 @@ export async function closeAnswerUpload(
     where: { id: assignment.id, answersUploadedAt: null },
     data: { answersUploadedAt: new Date() },
   });
+  // Nothing is kept, so photos from an upload that never finished go too.
+  await pruneAnswerFolder(assignment.id, []);
 
   revalidatePath("/");
   revalidatePath("/admin/roster");

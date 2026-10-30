@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { revalidatePath } from "next/cache";
 import { canReassign, parseNewDeadline, REOPEN_DATA } from "@/lib/reassign";
 import { destroyAnswerFolder, signedAnswerUrl } from "@/lib/cloudinary";
+import { gradeAssignment } from "@/lib/grade-attempt";
 
 /**
  * Every write here changes the same four surfaces: the roster it was made
@@ -102,11 +103,24 @@ export async function toggleAssignmentStatus(
     if (newStatus === "ASSIGNED") {
       const existing = await prisma.assignment.findUnique({
         where: { id: assignmentId },
-        select: { result: { select: { id: true, score: true, maxScore: true } } },
+        select: {
+          dueAt: true,
+          result: { select: { id: true, score: true, maxScore: true } },
+        },
       });
 
       if (!existing) {
         return { error: "Assignment not found." };
+      }
+
+      // The toggle keeps the original deadline. Once that has passed, the
+      // student would see "Closed" or be auto-submitted again on opening, so
+      // the reopen needs a new deadline: that is what Reassign asks for.
+      if (existing.dueAt.getTime() <= Date.now()) {
+        return {
+          error:
+            "This test's deadline has passed, so reopening it would close it again at once. Use Reassign to give the student a new deadline.",
+        };
       }
 
       if (existing.result && !clearMarks) {
@@ -146,10 +160,29 @@ export async function toggleAssignmentStatus(
       ]);
       await destroyAnswerFolder(assignmentId);
     } else {
+      // The answer upload window runs from endedAt, and untimed tests have no
+      // deadline to fall back on, so a submission without a stamp would show
+      // as expired. Keep a stamp that is already there.
+      const current = await prisma.assignment.findUnique({
+        where: { id: assignmentId },
+        select: { endedAt: true },
+      });
+      if (!current) {
+        return { error: "Assignment not found." };
+      }
+
       await prisma.assignment.update({
         where: { id: assignmentId },
-        data: { status: "SUBMITTED" },
+        data: { status: "SUBMITTED", endedAt: current.endedAt ?? new Date() },
       });
+
+      // Papers written in the portal are marked as they close. A failure here
+      // must not undo the status change; closeExpiredAttempts retries it.
+      try {
+        await gradeAssignment(assignmentId);
+      } catch (err) {
+        console.error("Failed to mark attempt", assignmentId, err);
+      }
     }
 
     revalidateAdminSurfaces();

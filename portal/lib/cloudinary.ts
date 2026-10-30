@@ -61,14 +61,23 @@ export interface UploadSignature {
   signature: string;
   folder: string;
   type: string;
+  /** Set when the signature is pinned to one file; the upload then sends this, not the folder. */
+  publicId?: string;
 }
 
-/** Signs a direct browser upload pinned to one folder. */
-export function signAnswerUpload(folder: string): UploadSignature | null {
+/**
+ * Signs a direct browser upload pinned to one folder, or, with `publicId`, to
+ * one file. Cloudinary honours a signature for an hour and cannot be told
+ * otherwise, so pinning the name is what stops a signature from being used to
+ * add files: the same signature can only write the same file again.
+ */
+export function signAnswerUpload(folder: string, publicId?: string): UploadSignature | null {
   const c = getCloudinary();
   if (!c) return null;
   const timestamp = Math.floor(Date.now() / 1000);
-  const params = { folder, timestamp, type: ANSWER_DELIVERY_TYPE };
+  const params = publicId
+    ? { public_id: publicId, overwrite: "true", timestamp, type: ANSWER_DELIVERY_TYPE }
+    : { folder, timestamp, type: ANSWER_DELIVERY_TYPE };
   const signature = c.cloudinary.utils.api_sign_request(params, c.apiSecret);
   return {
     cloudName: c.cloudName,
@@ -77,7 +86,71 @@ export function signAnswerUpload(folder: string): UploadSignature | null {
     signature,
     folder,
     type: ANSWER_DELIVERY_TYPE,
+    ...(publicId ? { publicId } : {}),
   };
+}
+
+export interface StoredAnswerPage {
+  publicId: string;
+  version: number;
+  format: string;
+  width: number | null;
+  height: number | null;
+  bytes: number | null;
+}
+
+/**
+ * Asks Cloudinary what it actually holds for these ids, so the database is
+ * written from the stored files and not from what the browser claims. Ids that
+ * are not there are left out of the result. Null when Cloudinary is not
+ * configured or cannot be reached.
+ */
+export async function lookupAnswerPages(publicIds: string[]): Promise<StoredAnswerPage[] | null> {
+  const c = getCloudinary();
+  if (!c) return null;
+  try {
+    const res = await c.cloudinary.api.resources_by_ids(publicIds, {
+      type: ANSWER_DELIVERY_TYPE,
+      resource_type: "image",
+    });
+    return (res?.resources ?? []).map(
+      (r: { public_id: string; version: number; format: string; width?: number; height?: number; bytes?: number }) => ({
+        publicId: r.public_id,
+        version: r.version,
+        format: r.format,
+        width: r.width ?? null,
+        height: r.height ?? null,
+        bytes: r.bytes ?? null,
+      })
+    );
+  } catch (err) {
+    console.error("Failed to look up answer photos in Cloudinary:", err);
+    return null;
+  }
+}
+
+/**
+ * Deletes the files in an assignment's answer folder that are not in `keep`:
+ * pages uploaded but never saved. Best effort, like the other clean-ups; a
+ * failure only leaves files nothing points at.
+ */
+export async function pruneAnswerFolder(assignmentId: string, keep: string[]): Promise<void> {
+  const c = getCloudinary();
+  if (!c) return;
+  try {
+    const res = await c.cloudinary.api.resources({
+      type: ANSWER_DELIVERY_TYPE,
+      resource_type: "image",
+      prefix: `proshnopotro/answers/${assignmentId}/`,
+      max_results: 100,
+    });
+    const stray = (res?.resources ?? [])
+      .map((r: { public_id: string }) => r.public_id)
+      .filter((id: string) => !keep.includes(id));
+    if (stray.length > 0) await destroyAnswerImages(stray);
+  } catch (err) {
+    console.error(`Failed to prune stray answer photos for ${assignmentId}:`, err);
+  }
 }
 
 /**

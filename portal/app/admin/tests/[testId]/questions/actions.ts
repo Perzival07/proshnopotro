@@ -284,6 +284,36 @@ export async function setQuestionBonus(questionId: string, bonus: boolean): Prom
   return { success: true };
 }
 
+/** Whether every section of the test has its own timer. */
+async function isSectional(testId: string): Promise<boolean> {
+  const sections = await prisma.testSection.findMany({
+    where: { testId },
+    select: { id: true, position: true, durationMinutes: true },
+  });
+  return sectionalDuration(sections) !== null;
+}
+
+/**
+ * Keeps the test's own time in step with its section timers. With a time on
+ * every section the test's time is their total, so the one countdown and the
+ * automatic submission cover the whole paper. If the sections stop being fully
+ * timed (a timer cleared, or the last section removed), a total we derived
+ * would be stale, so it is cleared; a time the tutor set by hand on a paper
+ * that was never fully sectional is left alone.
+ */
+async function syncSectionalDuration(testId: string, wasSectional: boolean): Promise<void> {
+  const sections = await prisma.testSection.findMany({
+    where: { testId },
+    select: { id: true, position: true, durationMinutes: true },
+  });
+  const total = sectionalDuration(sections);
+  if (total !== null) {
+    await prisma.test.update({ where: { id: testId }, data: { durationMinutes: total } });
+  } else if (wasSectional) {
+    await prisma.test.update({ where: { id: testId }, data: { durationMinutes: null } });
+  }
+}
+
 export async function deleteQuestion(questionId: string): Promise<Result> {
   await requireAdmin();
   const question = await prisma.question.findUnique({
@@ -303,8 +333,10 @@ export async function deleteQuestion(questionId: string): Promise<Result> {
       data: { position: { decrement: 1 } },
     }),
   ]);
-  // A section left empty goes too.
-  await prisma.testSection.deleteMany({ where: { id: question.sectionId, questions: { none: {} } } });
+  // A section left empty goes too, and with it its share of the paper's time.
+  const wasSectional = await isSectional(testId);
+  const dropped = await prisma.testSection.deleteMany({ where: { id: question.sectionId, questions: { none: {} } } });
+  if (dropped.count > 0) await syncSectionalDuration(testId, wasSectional);
 
   refresh(testId);
   return { success: true };
@@ -346,6 +378,7 @@ export async function updateSection(
   });
   if (!current) return { error: "Section not found." };
   const started = await startedCount(current.testId);
+  const wasSectional = await isSectional(current.testId);
   if (started > 0 && current.durationMinutes !== minutes) {
     return { error: `${started} ${started === 1 ? "student has" : "students have"} already started, so section times can no longer change.` };
   }
@@ -361,16 +394,7 @@ export async function updateSection(
     },
   });
 
-  // With a time on every section, the test's own time is their total, so the
-  // one countdown and the automatic submission cover the whole paper.
-  const sections = await prisma.testSection.findMany({
-    where: { testId: current.testId },
-    select: { id: true, position: true, durationMinutes: true },
-  });
-  const total = sectionalDuration(sections);
-  if (total !== null) {
-    await prisma.test.update({ where: { id: current.testId }, data: { durationMinutes: total } });
-  }
+  await syncSectionalDuration(current.testId, wasSectional);
 
   await regradeTest(current.testId);
   refresh(current.testId);

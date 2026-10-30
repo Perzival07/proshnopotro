@@ -120,6 +120,24 @@ export function isInAnswerFolder(publicId: string, assignmentId: string): boolea
 }
 
 /**
+ * The public id of page `index` (0-based). Each upload signature is pinned to
+ * one of these, so a signature can only ever write that page: reusing it
+ * replaces the file instead of adding another, and an attempt can hold at most
+ * MAX_ANSWER_IMAGES files however many times uploads are signed.
+ */
+export function answerPageId(assignmentId: string, index: number): string {
+  return `${answerFolder(assignmentId)}/p${index}`;
+}
+
+/** Whether a reported public id is one of this assignment's page slots. */
+export function isAnswerPageId(publicId: string, assignmentId: string): boolean {
+  const prefix = `${answerFolder(assignmentId)}/p`;
+  if (!publicId.startsWith(prefix)) return false;
+  const rest = publicId.slice(prefix.length);
+  return /^(0|[1-9]\d?)$/.test(rest) && Number(rest) < MAX_ANSWER_IMAGES;
+}
+
+/**
  * Scales an image to fit within `maxEdge` on its longest side, never
  * enlarging it. Returns whole pixels, at least 1 on each side.
  */
