@@ -554,7 +554,22 @@ export function StartTestButton({
               src={embedUrl}
               title={isDoc ? "Question paper" : "Assessment form"}
               label={isDoc ? "Question paper" : "Assessment form"}
-              toolbar={countdown}
+              toolbar={
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">{countdown}</div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      collapse();
+                      setConfirmingFinish(true);
+                    }}
+                    className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+                  >
+                    Submit
+                  </Button>
+                </div>
+              }
               overlay={cameraBadge}
               watermark={proctored ? watermark : undefined}
               sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-popups-to-escape-sandbox"
