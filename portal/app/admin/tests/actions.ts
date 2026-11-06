@@ -127,11 +127,37 @@ async function discardPaper(paper: { paperPublicId: string | null; paperVersion:
   if (file) await destroyNoteFile(file);
 }
 
+/**
+ * A Google Doc or Drive file that is not shared with "Anyone with the link"
+ * opens blank (or without its images) inside the student's frame. Ask Google
+ * the way a signed-out student would, and refuse a link that is not public.
+ * Only a definite refusal blocks the save; a network hiccup never does.
+ */
+async function checkPublicAccess(url: string, format: TestFormat): Promise<string | null> {
+  if (format !== "GOOGLE_DOC" && format !== "PDF") return null;
+  const embed = toEmbedUrl(url, format);
+  if (!embed) return null;
+  try {
+    const res = await fetch(embed, { redirect: "manual", signal: AbortSignal.timeout(8000) });
+    const to = res.headers.get("location") ?? "";
+    const refused = (res.status >= 300 && res.status < 400 && /accounts\.google\.com|ServiceLogin/i.test(to)) ||
+      res.status === 401 || res.status === 403 || res.status === 404;
+    if (refused) {
+      return "Students cannot open that file. In Google, choose Share \u2192 General access \u2192 \u201CAnyone with the link\u201D \u2192 Viewer, then save again. Otherwise the paper and its images show blank during the test.";
+    }
+  } catch {
+    // Offline or slow: do not block the save on a check that could not run.
+  }
+  return null;
+}
+
 export async function createTest(data: TestInput) {
   await requireAdmin();
 
   const checked = validateTestInput(data);
   if ("error" in checked) return { error: checked.error };
+  const access = await checkPublicAccess(data.formUrl, checked.format);
+  if (access) return { error: access };
 
   try {
     const test = await prisma.test.create({
@@ -164,6 +190,8 @@ export async function updateTest(id: string, data: TestInput) {
 
   const checked = validateTestInput(data);
   if ("error" in checked) return { error: checked.error };
+  const access = await checkPublicAccess(data.formUrl, checked.format);
+  if (access) return { error: access };
 
   try {
     const previous = await prisma.test.findUnique({
